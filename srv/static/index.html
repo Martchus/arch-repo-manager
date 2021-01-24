@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+  <head>
+    <title>Build service</title>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Service for managing and building Arch Linux packages" />
+    <meta name="author" content="Martchus" />
+    <meta name="keywords" content="pacman, Arch Linux, build, service" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <!-- include custom styles and scripts -->
+    <link rel="stylesheet" type="text/css" href="css/basics.css" />
+    <link rel="stylesheet" type="text/css" href="css/layout.css" />
+    <link rel="stylesheet" type="text/css" href="css/genericrendering.css" />
+    <link rel="stylesheet" type="text/css" href="css/specifics.css" />
+    <script src="js/ajaxhelper.js"></script>
+    <script src="js/terminal.js"></script>
+    <script src="js/genericrendering.js"></script>
+    <script src="js/customrendering.js"></script>
+    <script src="js/globalstatuspage.js"></script>
+    <script src="js/packagesearchpage.js"></script>
+    <script src="js/packagedetailspage.js"></script>
+    <script src="js/buildactionspage.js"></script>
+    <script src="js/singlepage.js"></script>
+    <script src="js/utils.js"></script>
+    <!-- include xterm.js -->
+    <link rel="stylesheet" type="text/css" href="node_modules/xterm/css/xterm.css" />
+    <script src="node_modules/xterm/lib/xterm.js"></script>
+    <script src="node_modules/xterm-addon-search/out/SearchAddon.js"></script>
+  </head>
+  <body onload="initPage();" onhashchange="handleHashChange();">
+    <header>
+        <nav>
+          <div>
+              <a href="#" onclick="document.getElementById('about-dialog').style.display = 'block'; return false;">
+                <img src="img/logo.svg" alt="Logo" />
+              </a>
+              Repository Manager for Arch Linux<br />
+              <span><em>Inofficial</em> tool to build packages and manage repositories</span>
+          </div>
+          <ul>
+            <li id="global-nav-link">
+                <a href="#global-section" title="Databases">DBs</a>
+            </li>
+            <li id="package-search-nav-link">
+                <a href="#package-search-section" title="Package search">Search</a>
+            </li>
+            <li id="package-details-nav-link">
+                <a href="#package-details-section" title="Package details">Package</a>
+            </li>
+            <li id="build-action-nav-link">
+                <a href="#build-action-section" title="Build actions">Actions</a>
+            </li>
+            <li id="build-action-details-nav-link">
+                <a href="#build-action-details-section" title="Build action details">Details</a>
+            </li>
+          </ul>
+        </nav>
+    </header>
+    <main>
+      <section id="global-section">
+        <h2>Databases</h2>
+        <div id="global-status">
+        </div>
+      </section>
+      <section id="package-search-section">
+        <h2>Package search</h2>
+        <form id="package-search-form" onsubmit="searchForPackages(); return false;" action="/packages" method="GET">
+          <table class="form-row">
+            <tr>
+              <th>Package name:</th>
+              <td><input type="text" name="name" placeholder="Package name" /></td>
+              <th rowspan="3">Database:</th>
+              <th rowspan="3">
+                <select id="package-search-db" name="db" multiple="multiple">
+                  <option id="package-search-db-any" style="font-style: italic;">any</option>
+                </select>
+              </th>
+            </tr>
+            <tr>
+              <th>Mode:</th>
+              <td>
+                <select name="mode">
+                  <optgroup label="By package name">
+                    <option value="name-contains">Name contains</option>
+                    <option value="regex">Regex match for name</option>
+                    <option value="name">Exact match for repo/name</option>
+                  </optgroup>
+                  <optgroup label="By dependency">
+                    <option value="provides">Provides match</option>
+                    <option value="depends">Depends match</option>
+                    <option value="libprovides">Library provides match</option>
+                    <option value="libdepends">Library depends match</option>
+                  </optgroup>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <th></th>
+              <td>
+                <button type="submit" style="background-image: url(img/icon/magnify.svg)" class="icon-button">Search</button>
+              </td>
+            </tr>
+          </table>
+        </form>
+        <form id="package-results-form">
+          <div id="package-search-results">
+          </div>
+          <fieldset>
+            <legend>Actions</legend>
+            <div>
+              <button type="button" style="background-image: url(img/icon/select-all.svg)" onclick="alterFormSelection(this.form, 'check-all');" class="icon-button">
+                Select all packages
+              </button>
+              <button type="button" style="background-image: url(img/icon/select-off.svg)" onclick="alterFormSelection(this.form, 'uncheck-all');" class="icon-button">
+                Unselect all package
+              </button>
+              <button type="button" style="background-image: url(img/icon/plus.svg)" onclick="fillBuildActionFromPackageSearch();" class="icon-button">
+                Start build action from selection
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      </section>
+      <section id="package-details-section">
+        <h2>Package details</h2>
+        <div id="package-details-container">
+          <p>No package selected. Use the "Search" to find and select a package.</p>
+        </div>
+      </section>
+      <section id="build-action-section">
+        <h2>
+            Build actions
+            <span class="heading-actions">
+                <a href="#" title="Save state manually"
+                   class="icon-link"
+                   onclick="return triggerToolbarAction(this);"
+                   data-action="/dump/cache-file"
+                   data-method="POST"><img src="img/icon/content-save.svg" alt="Save state manually" class="icon" /></a>
+                <a href="#" title="Stop service"
+                   class="icon-link"
+                   onclick="return triggerToolbarAction(this);"
+                   data-action="/quit"
+                   data-method="POST"
+                   data-confirmation="Do you really want to stop the service?"><img src="img/icon/power.svg" alt="Save state manually" class="icon" /></a>
+            </span>
+        </h2>
+        <form id="build-actions-list-form">
+          <div id="build-actions-list">
+            <p>Loading build actions ...</p>
+          </div>
+          <fieldset>
+            <legend>Modify selected actions</legend>
+            <div>
+              <button type="button" style="background-image: url(img/icon/select-all.svg)" onclick="alterFormSelection(this.form, 'check-all');" class="icon-button">
+                Select all actions
+              </button>
+              <button type="button" style="background-image: url(img/icon/select-off.svg)" onclick="alterFormSelection(this.form, 'uncheck-all');" class="icon-button">
+                Unselect all actions
+              </button>
+              <button type="button" style="background-image: url(img/icon/magnify.svg)" onclick="showSelectedActions();" class="icon-button">
+                Show selected actions
+              </button>
+              <button type="button" style="background-image: url(img/icon/delete.svg)" onclick="deleteSelectedActions();" class="icon-button">
+                Delete selected actions
+              </button>
+            </div>
+          </fieldset>
+        </form>
+        <form id ="build-action-form" onsubmit="submitBuildAction(); return false;" action="/build-action" method="POST">
+          <fieldset>
+          <legend>Start new build action</legend>
+          <div>
+            <div class="form-row">
+              <div class="form-split-50">
+                <label for="build-action-task">Predefined task:</label>
+                <br />
+                <select name="task" id="build-action-task" onchange="handleBuildActionPresetChange();">
+                  <option id="build-action-task-none" data-ignore="1" style="font-style: italic;">None</option>
+                </select>
+              </div>
+              <div class="form-split-50" id="build-action-task-info">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-split-50">
+                <label for="build-action-type">Action:</label>
+                <br />
+                <select name="type" id="build-action-type" onchange="handleBuildActionTypeChange();"></select>
+              </div>
+              <div class="form-split-50">
+                <label for="build-action-directory">Directory:</label>
+                <br />
+                <input name="directory" id="build-action-directory" style="width: 100%;" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-split-50">
+                <label for="build-action-source-repo">Source repo:</label>
+                <br />
+                <select name="source-repo" id="build-action-source-repo" multiple="multiple">
+                  <option id="build-action-source-repo-none" style="font-style: italic;">none</option>
+                </select>
+              </div>
+              <div class="form-split-50">
+                <label for="build-action-destination-repo">Destination repo:</label>
+                <br />
+                <select name="destination-repo" id="build-action-destination-repo" multiple="multiple">
+                  <option id="build-action-destination-repo-none" style="font-style: italic;">none</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <label for="build-action-package-names">Package names:</label>
+              <br />
+              <textarea name="package-names" id="build-action-package-names" style="box-sizing: border-box; width: 100%; height: 50px;"></textarea>
+            </div>
+            <div class="form-row">
+              <fieldset>
+                <legend>Flags:</legend>
+                <div id="build-action-flags"></div>
+              </fieldset>
+            </div>
+            <div class="form-row">
+              <fieldset>
+                <legend>Settings:</legend>
+                <table id="build-action-settings"></table>
+               </fieldset>
+            </div>
+            <div class="form-row">
+              <fieldset>
+                <legend>Start condition:</legend>
+                <input id="build-action-start-immediately" name="start-condition" type="radio" value="immediately"
+                       checked="checked" onchange="this.form['start-after-id'].disabled = this.checked" />
+                <label for="build-action-start-immediately">Immediately</label>
+                <input id="build-action-start-manually" name="start-condition" type="radio" value="manually"
+                       onchange="this.form['start-after-id'].disabled = this.checked" />
+                <label for="build-action-start-manually">Manually</label>
+                <input id="build-action-start-after" name="start-condition" type="radio" value="after"
+                       onchange="this.form['start-after-id'].disabled = !this.checked" />
+                <label for="build-action-start-after">After</label>
+                <input type="text" name="start-after-id" value="" placeholder="build action ID" disabled="disabled" />
+               </fieldset>
+            </div>
+          </div>
+          <div>
+            <button type="submit" style="background-image: url(img/icon/plus.svg)" class="icon-button">
+              Submit build action
+            </button>
+            <button type="reset" style="background-image: url(img/icon/undo-variant.svg)" class="icon-button">
+              Reset form
+            </button>
+          </div>
+          </fieldset>
+        </form>
+      </section>
+      <section id="build-action-details-section">
+        <h2>Build action details<span id="build-action-details-actions" class="heading-actions"></span></h2>
+        <div id="build-action-results">
+          <p>No build action has been selected yet. Start or select a build action under "Actions" first.</p>
+        </div>
+      </section>
+    </main>
+    <div id="about-dialog" style="display: none;">
+      <a href="#" onclick="document.getElementById('about-dialog').style.display = 'none'; return false;" class="close-button">×</a>
+      <div id="about-text">
+        <h1>Repository Manager for Arch Linux</h1>
+        <p><img src="img/logo.svg" alt="Logo" /></p>
+        <p id="application-version">unknown version</p>
+        <p>Icons from <a href="https://materialdesignicons.com" target="blank">Material Design Icons</a></p>
+      </div>
+    </div>
+  </body>
+</html>

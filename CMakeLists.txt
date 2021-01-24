@@ -1,0 +1,29 @@
+cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+
+# metadata
+set(META_PROJECT_NAME repomgr)
+set(META_PROJECT_TYPE application)
+set(META_APP_AUTHOR "Martchus")
+set(META_APP_URL "https://github.com/${META_APP_AUTHOR}/${META_PROJECT_NAME}")
+set(META_APP_DESCRIPTION "Repository manager and package builder for Arch Linux")
+set(META_APP_CATEGORIES "System;Utility;Network;FileTransfer")
+set(META_VERSION_MAJOR 0)
+set(META_VERSION_MINOR 0)
+set(META_VERSION_PATCH 1)
+set(META_VERSION_EXACT_SONAME ON)
+set(META_CXX_STANDARD 20)
+
+project(${META_PROJECT_NAME})
+
+enable_testing()
+
+# add subdirectories
+add_subdirectory(3rdparty/tabulate)
+add_subdirectory(libpkg)
+link_directories(${LIBPKG_BINARY_DIR})
+add_subdirectory(librepomgr)
+link_directories(${LIBREPOMGR_BINARY_DIR})
+add_subdirectory(srv)
+add_subdirectory(cli)
+add_subdirectory(pacfind)
+

@@ -1,0 +1,6 @@
+pkgbase = mingw-w64-gcc
+	pkgdesc = Dummy .SRCINFO for mingw-w64-gcc
+	pkgver = 1
+	pkgrel = 1
+
+pkgname = mingw-w64-gcc

@@ -1,0 +1,12 @@
+[Unit]
+Description=@SYSTEMD_SERVICE_DESCRIPTION@
+After=network.target
+
+[Service]
+User=@SYSTEMD_SERVICE_USER_NAME@
+ExecStart=@SYSTEMD_SERVICE_EXEC@
+KillSignal=SIGQUIT
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+  <head>
+    <title>Build service</title>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Service for managing and building Arch Linux packages" />
+    <meta name="author" content="Martchus" />
+    <meta name="keywords" content="pacman, Arch Linux, build, service" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <link rel="stylesheet" type="text/css" href="css/log.css" />
+    <script type="application/javascript" src="js/ajaxhelper.js"></script>
+    <script type="application/javascript" src="js/utils.js"></script>
+    <script type="application/javascript" src="js/log.js"></script>
+    <!-- 3rd party libraries -->
+    <link rel="stylesheet" type="text/css" href="node_modules/xterm/css/xterm.css" />
+    <script type="application/javascript" src="node_modules/xterm/lib/xterm.js"></script>
+    <script type="application/javascript" src="node_modules/xterm-addon-search/out/SearchAddon.js"></script>
+  </head>
+  <body onload="initLog();" onhashchange="initLog();">
+    <main id="log-container"></main>
+  </body>
+</html>

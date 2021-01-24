@@ -1,0 +1,116 @@
+/* style for elements rendered  via genericrendering.js */
+
+.table-from-json {
+    border-top: 1px dotted #999;
+    border-bottom: 1px dotted #999;
+    border-spacing: 0px;
+    background-color: white;
+    margin-bottom: 10px;
+    font-size: .846em;
+}
+.table-from-json-array thead th {
+    position: sticky;
+    background-color: white;
+    top: -1px;
+}
+@media (min-width: 900px) {
+    .table-from-json-array thead th {
+        top: 60px;
+    }
+}
+.table-from-json-array th {
+    border-bottom: 1px solid #999;
+}
+.table-from-json tr:nth-child(even), .table-from-json .table-from-json tbody tr:nth-child(even):hover {
+    background: #e4eeff;
+}
+.table-from-json tr:nth-child(odd), .table-from-json .table-from-json tbody tr:nth-child(odd):hover {
+    background: #fff;
+}
+.table-from-json-array td {
+    padding: 1px;
+}
+.table-from-json tbody tr:hover, .pagination a:hover, .table-row-highlighted {
+    background: #ffd !important;
+}
+.table-from-json-array th, .table-from-json-object th, .table-from-json-object td {
+    padding: 3px;
+    vertical-align: middle;
+}
+.table-from-json-array a {
+    text-decoration: none;
+    color: inherit;
+}
+.table-from-json-array tbody a:hover {
+    border-bottom: 1px dotted #aaa;
+}
+.table-from-json-object th {
+    text-align: right;
+    vertical-align: top;
+}
+.table-row-actions {
+    display: block;
+    text-align: center;
+}
+.table-row-actions a {
+    font-size: 105%;
+    padding: 2px;
+}
+.table-row-actions a:hover {
+    border-bottom: none;
+    font-weight: bold;
+}
+
+.pagination {
+    position: sticky;
+    border-top: 1px solid #999;
+    background-color: white;
+    bottom: 0px;
+    text-align: center;
+    white-space: nowrap;
+    overflow-x: auto;
+    max-width: 0px;
+}
+.pagination a.prev {
+    position: sticky;
+    margin-left: 0px;
+    left: -1px;
+}
+.pagination a.next {
+    position: sticky;
+    margin-right: 0px;
+    right: 0px;
+}
+.pagination a, .pagination span, .pagination input[type="number"] {
+    display: inline-block;
+    padding: 5pt;
+    border: 1px solid #ddd;
+    background-color: #f6f9fc;
+    margin: 0.20em;
+    min-width: 12pt;
+    height: 12pt;
+    user-select: none;
+}
+.pagination a {
+    cursor: pointer;
+}
+.pagination a.current, .pagination a.current:hover {
+    font-weight: bold;
+    background: #e4eeff;
+    cursor: default;
+}
+.pagination span {
+    margin-left: 0px;
+    border-left: none;
+}
+.pagination input[type="number"] {
+    margin-right: 0px;
+    padding-right: 0px;
+    border-right: none;
+}
+
+.compact-heading {
+    margin: 0px;
+    margin-bottom: 3px;
+    padding: 0px;
+}

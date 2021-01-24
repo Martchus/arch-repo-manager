@@ -1,0 +1,48 @@
+# C++ objects and libs
+
+*.slo
+*.lo
+*.o
+*.a
+*.la
+*.lai
+*.so
+*.dll
+*.dylib
+
+# Qt-es
+
+/.qmake.cache
+/.qmake.stash
+*.pro.user
+*.txt.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+Makefile*
+*-build-*
+
+# QtCreator
+
+*.autosave
+
+#QtCtreator Qml
+*.qmlproject.user
+*.qmlproject.user.*
+
+# Dolphin
+.directory
+
+# documentation
+/doc
+
+# clang-format
+.clang-format
+
+# node modules (only essential JavaScript and CSS files are force-added)
+/srv/static/package-lock.json
+/srv/static/node_modules/

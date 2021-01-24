@@ -1,0 +1,190 @@
+/* style for page-specific elements */
+
+/* icons of buttons within navigation */
+#global-nav-link {
+    background-image: url(../img/icon/database-white.svg);
+}
+#package-search-nav-link {
+    background-image: url(../img/icon/magnify-white.svg);
+}
+#package-details-nav-link {
+    background-image: url(../img/icon/package-variant-white.svg);
+}
+#build-action-nav-link {
+    background-image: url(../img/icon/cogs-white.svg);
+}
+#build-action-details-nav-link {
+    background-image: url(../img/icon/console-line-white.svg);
+}
+
+/* elements for package search */
+#package-search-db {
+    height: 100px !important;
+}
+#package-search-form table input[type="text"], #package-search-form table select {
+    width: 100%;
+}
+#package-search-form table td, #package-search-form table th {
+    vertical-align: top;
+}
+#package-search-form table th {
+    text-align: right;
+    font-weight: normal;
+    font-size: 90%;
+}
+#package-search-section table, #build-action-section > table {
+    width: 100%;
+}
+#package-search-form input, #package-search-form select {
+    box-sizing: border-box;
+}
+
+/* elements for build actions page */
+#build-action-form select[multiple="multiple"] {
+    height: 150px;
+}
+#build-actions-list-form {
+    margin-bottom: 1em;
+}
+#build-actions-list tbody td:first-child {
+    border-left: 10px solid #93bafb;
+}
+#build-action-settings {
+    width: fit-content;
+}
+
+/* common styling for certain forms */
+.form-row {
+    margin-bottom: 5px;
+}
+.form-split-50 {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 40%;
+}
+#build-actions-list-form fieldset input[type="button"],
+#package-results-form fieldset input[type="button"] {
+    box-sizing: border-box;
+    height: 2.0em;
+    line-height: 0em;
+}
+
+/* build action details */
+.streaming-link {
+    display: inline-block;
+    margin-left: 0.5em;
+}
+.streaming-link:hover {
+    text-decoration: none;
+}
+.package-details-table ul, .update-info-form ul {
+    list-style-type: none;
+    margin: 0px;
+    padding: 0px;
+}
+.update-info-form tbody tr:hover {
+    background-color: inherit;
+}
+.update-info-form tbody tr:nth-child(even) {
+    background-color: inherit;
+}
+
+/* about dialog */
+#about-dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: auto;
+    box-sizing: border-box;
+    background-color: #f6f9fc;
+    border: 1px solid #999;
+    box-shadow: inset 0 1px 3px rgba(169, 169, 169, 0.7);
+    text-align: center;
+    z-index: 5000;
+}
+#about-text {
+    padding: 1em;
+}
+#about-text img {
+    width: 20em;
+    margin: 2em;
+}
+#about-dialog .close-button {
+    text-decoration: none;
+    background-color: #333;
+    border: 1px solid #999;
+    border-top: none;
+    border-right: none;
+    color: #fff;
+    padding: .3em;
+    float: right;
+    width: 1em;
+    height: 1em;
+    font-size: 1.5em;
+}
+
+/* icons rendered via customrendering.js */
+.icon-button {
+    background-repeat: no-repeat;
+    background-size: contain;
+    padding-left: 25px;
+}
+.icon-link {
+    opacity: .5;
+}
+.icon-link:hover {
+    opacity: 1;
+    border-bottom: none!important;
+}
+.icon-link span {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background-size: 16px 16px;
+}
+.icon-magnify {
+    background-image: url(../img/icon/magnify.svg);
+}
+.icon-table-refresh {
+    background-image: url(../img/icon/table-refresh.svg);
+}
+.icon-restart {
+    background-image: url(../img/icon/restart.svg);
+}
+.icon-reload {
+    background-image: url(../img/icon/reload.svg);
+}
+.icon-plus {
+    background-image: url(../img/icon/plus.svg);
+}
+.icon-delete {
+    background-image: url(../img/icon/delete.svg);
+}
+.icon-stop {
+    background-image: url(../img/icon/stop.svg);
+}
+.icon-play {
+    background-image: url(../img/icon/play.svg);
+}
+.icon-dock-window {
+    background-image: url(../img/icon/dock-window.svg);
+}
+.icon-download {
+    background-image: url(../img/icon/download.svg);
+}
+
+/* actions shown on top-right corner of build actions and build action details */
+.heading-actions {
+    float: right;
+    margin-bottom: -10px;
+    background: #ecf2f5;
+    border: 1px solid #bcd;
+    padding: 2px;
+}
+.heading-actions span {
+    margin-bottom: -5px;
+    width: 28px;
+    height: 28px;
+    background-size: 28px 28px;
+}

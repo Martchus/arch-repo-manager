@@ -1,0 +1,840 @@
+{
+    "buildData": {
+        "boost": {
+            "existingVersion": "1.72.0-3",
+            "existingPackages": [
+                {
+                    "origin": 4,
+                    "timestamp": "0001-01-01T00:00:00",
+                    "name": "boost",
+                    "version": "1.72.0-3",
+                    "description": "Free peer-reviewed portable C++ source libraries - development headers",
+                    "upstreamUrl": "https://www.boost.org/",
+                    "licenses": [
+                        "custom"
+                    ],
+                    "groups": [],
+                    "dependencies": [
+                        {
+                            "name": "boost-libs",
+                            "version": "1.72.0",
+                            "description": "",
+                            "mode": 2
+                        }
+                    ],
+                    "optionalDependencies": [
+                        {
+                            "name": "python",
+                            "version": "",
+                            "description": "for python bindings",
+                            "mode": 1
+                        },
+                        {
+                            "name": "python2",
+                            "version": "",
+                            "description": "for python2 bindings",
+                            "mode": 1
+                        }
+                    ],
+                    "conflicts": [],
+                    "provides": [
+                        {
+                            "name": "boost",
+                            "version": "1.72.0-3",
+                            "description": "",
+                            "mode": 1
+                        }
+                    ],
+                    "replaces": [],
+                    "libprovides": [],
+                    "libdepends": [],
+                    "sourceInfo": {
+                        "name": "boost",
+                        "archs": [],
+                        "makeDependencies": [
+                            {
+                                "name": "icu",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python2",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python-numpy",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python2-numpy",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "bzip2",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "zlib",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "openmpi",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "zstd",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "findutils",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            }
+                        ],
+                        "checkDependencies": [],
+                        "maintainer": "",
+                        "id": 0,
+                        "category": 0,
+                        "votes": 0,
+                        "outOfDate": "0001-01-01T00:00:00",
+                        "firstSubmitted": "0001-01-01T00:00:00",
+                        "lastModified": "0001-01-01T00:00:00",
+                        "url": "",
+                        "sources": [],
+                        "directory": ""
+                    },
+                    "packageInfo": {
+                        "fileName": "boost-1.72.0-3-x86_64.pkg.tar.zst",
+                        "files": [],
+                        "buildDate": "2020-05-12T10:09:15",
+                        "packager": "Martchus <martchus@gmx.net>",
+                        "md5": "e08babd70dd5d6d4e7847ebc66050c15",
+                        "sha256": "5661fa6e62472b484bb77bf01401a066d3e301d43e93f750edc8bb82c13bd41d",
+                        "pgpSignature": "",
+                        "arch": "x86_64",
+                        "size": 13872279
+                    },
+                    "installInfo": {
+                        "installDate": "0001-01-01T00:00:00",
+                        "installedSize": 183748402,
+                        "backupFiles": [],
+                        "installStatus": 20,
+                        "validationMethods": 1
+                    }
+                }
+            ],
+            "sourceDirectory": "building/build-data/conduct-build-test/boost/src",
+            "originalSourceDirectory": "$ORIGINAL_SOURCE_DIRECTORY",
+            "sourceInfo": {
+                "name": "boost",
+                "archs": [
+                    "x86_64"
+                ],
+                "makeDependencies": [
+                    {
+                        "name": "icu",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "python",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "python2",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "python-numpy",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "python2-numpy",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "bzip2",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "zlib",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "openmpi",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "zstd",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    },
+                    {
+                        "name": "findutils",
+                        "version": "",
+                        "description": "",
+                        "mode": 1
+                    }
+                ],
+                "checkDependencies": [],
+                "maintainer": "",
+                "id": 0,
+                "category": 0,
+                "votes": 0,
+                "outOfDate": "0001-01-01T00:00:00",
+                "firstSubmitted": "0001-01-01T00:00:00",
+                "lastModified": "0001-01-01T00:00:00",
+                "url": "",
+                "sources": [],
+                "directory": ""
+            },
+            "packages": [
+                {
+                    "origin": 2,
+                    "timestamp": "0001-01-01T00:00:00",
+                    "name": "boost-libs",
+                    "version": "1.73.0-1",
+                    "description": "Free peer-reviewed portable C++ source libraries - runtime libraries",
+                    "upstreamUrl": "https://www.boost.org/",
+                    "licenses": [
+                        "custom"
+                    ],
+                    "groups": [],
+                    "dependencies": [
+                        {
+                            "name": "bzip2",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "zlib",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "icu",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "zstd",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        }
+                    ],
+                    "optionalDependencies": [
+                        {
+                            "name": "openmpi",
+                            "version": "",
+                            "description": "for mpi support",
+                            "mode": 1
+                        }
+                    ],
+                    "conflicts": [],
+                    "provides": [
+                        {
+                            "name": "libboost_atomic.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_chrono.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_container.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_context.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_contract.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_coroutine.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_date_time.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_fiber.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_filesystem.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_graph.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_graph_parallel.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_iostreams.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_locale.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_log.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_log_setup.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_math_c99.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_math_c99f.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_math_c99l.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_math_tr1.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_math_tr1f.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_math_tr1l.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_mpi.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_numpy27.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_numpy38.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_prg_exec_monitor.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_program_options.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_python27.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_python38.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_random.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_regex.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_serialization.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_stacktrace_addr2line.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_stacktrace_basic.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_stacktrace_noop.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_system.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_thread.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_timer.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_type_erasure.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_unit_test_framework.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_wave.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "libboost_wserialization.so",
+                            "version": "",
+                            "description": "",
+                            "mode": 1
+                        },
+                        {
+                            "name": "boost-libs",
+                            "version": "1.73.0-1",
+                            "description": "",
+                            "mode": 1
+                        }
+                    ],
+                    "replaces": [],
+                    "libprovides": [],
+                    "libdepends": [],
+                    "sourceInfo": {
+                        "name": "boost",
+                        "archs": [
+                            "x86_64"
+                        ],
+                        "makeDependencies": [
+                            {
+                                "name": "icu",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python2",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python-numpy",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python2-numpy",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "bzip2",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "zlib",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "openmpi",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "zstd",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "findutils",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            }
+                        ],
+                        "checkDependencies": [],
+                        "maintainer": "",
+                        "id": 0,
+                        "category": 0,
+                        "votes": 0,
+                        "outOfDate": "0001-01-01T00:00:00",
+                        "firstSubmitted": "0001-01-01T00:00:00",
+                        "lastModified": "0001-01-01T00:00:00",
+                        "url": "",
+                        "sources": [],
+                        "directory": ""
+                    },
+                    "packageInfo": null,
+                    "installInfo": null
+                },
+                {
+                    "origin": 2,
+                    "timestamp": "0001-01-01T00:00:00",
+                    "name": "boost",
+                    "version": "1.73.0-1",
+                    "description": "Free peer-reviewed portable C++ source libraries - development headers",
+                    "upstreamUrl": "https://www.boost.org/",
+                    "licenses": [
+                        "custom"
+                    ],
+                    "groups": [],
+                    "dependencies": [
+                        {
+                            "name": "boost-libs",
+                            "version": "1.73.0",
+                            "description": "",
+                            "mode": 2
+                        }
+                    ],
+                    "optionalDependencies": [
+                        {
+                            "name": "python",
+                            "version": "",
+                            "description": "for python bindings",
+                            "mode": 1
+                        },
+                        {
+                            "name": "python2",
+                            "version": "",
+                            "description": "for python2 bindings",
+                            "mode": 1
+                        }
+                    ],
+                    "conflicts": [],
+                    "provides": [
+                        {
+                            "name": "boost",
+                            "version": "1.73.0-1",
+                            "description": "",
+                            "mode": 1
+                        }
+                    ],
+                    "replaces": [],
+                    "libprovides": [],
+                    "libdepends": [],
+                    "sourceInfo": {
+                        "name": "boost",
+                        "archs": [
+                            "x86_64"
+                        ],
+                        "makeDependencies": [
+                            {
+                                "name": "icu",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python2",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python-numpy",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "python2-numpy",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "bzip2",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "zlib",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "openmpi",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "zstd",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            },
+                            {
+                                "name": "findutils",
+                                "version": "",
+                                "description": "",
+                                "mode": 1
+                            }
+                        ],
+                        "checkDependencies": [],
+                        "maintainer": "",
+                        "id": 0,
+                        "category": 0,
+                        "votes": 0,
+                        "outOfDate": "0001-01-01T00:00:00",
+                        "firstSubmitted": "0001-01-01T00:00:00",
+                        "lastModified": "0001-01-01T00:00:00",
+                        "url": "",
+                        "sources": [],
+                        "directory": ""
+                    },
+                    "packageInfo": null,
+                    "installInfo": null
+                }
+            ],
+            "warnings": [],
+            "error": "",
+            "specifiedIndex": 0,
+            "hasSource": true
+        }
+    },
+    "dbConfig": [
+        [
+            "misc",
+            {
+                "Server": [
+                    "file://$TEST_FILES_PATH/repo/misc/os/x86_64"
+                ],
+                "SigLevel": [
+                    "Optional TrustedOnly"
+                ]
+            }
+        ],
+        [
+            "boost",
+            {
+                "Server": [
+                    "file://$TEST_FILES_PATH/repo/boost/os/x86_64"
+                ],
+                "SigLevel": [
+                    "Optional TrustedOnly"
+                ]
+            }
+        ],
+        [
+            "core",
+            {
+                "Server": [
+                    "http://mirror.23media.de/archlinux/core/os/x86_64",
+                    "https://ftp.fau.de/archlinux/core/os/x86_64"
+                ],
+                "SigLevel": [
+                    "Optional TrustedOnly"
+                ]
+            }
+        ]
+    ],
+    "stagingDbConfig": [
+        [
+            "boost-staging",
+            {
+                "Server": [
+                    "file://$TEST_FILES_PATH/repo/boost-staging/os/x86_64"
+                ],
+                "SigLevel": [
+                    "Optional TrustedOnly"
+                ]
+            }
+        ],
+        [
+            "misc",
+            {
+                "Server": [
+                    "file://$TEST_FILES_PATH/repo/misc/os/x86_64"
+                ],
+                "SigLevel": [
+                    "Optional TrustedOnly"
+                ]
+            }
+        ],
+        [
+            "boost",
+            {
+                "Server": [
+                    "file://$TEST_FILES_PATH/repo/boost/os/x86_64"
+                ],
+                "SigLevel": [
+                    "Optional TrustedOnly"
+                ]
+            }
+        ],
+        [
+            "core",
+            {
+                "Server": [
+                    "http://mirror.23media.de/archlinux/core/os/x86_64",
+                    "https://ftp.fau.de/archlinux/core/os/x86_64"
+                ],
+                "SigLevel": [
+                    "Optional TrustedOnly"
+                ]
+            }
+        ]
+    ],
+    "targetDb": "boost",
+    "targetArch": "x86_64",
+    "stagingDb": "boost-staging",
+    "batches": [["boost"]],
+    "cyclicLeftovers": [],
+    "warnings": [],
+    "error": "",
+    "manuallyOrdered": false
+}

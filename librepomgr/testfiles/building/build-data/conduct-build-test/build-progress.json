@@ -1,0 +1,30 @@
+{
+    "progressByPackage": {
+        "boost": {
+            "started": "0001-01-01T00:00:00",
+            "finished": "0001-01-01T00:00:00",
+            "buildDirectory": "",
+            "chrootDirectory": "",
+            "chrootUser": "",
+            "makechrootpkgFlags": [],
+            "makepkgFlags": [],
+            "packageExtension": "",
+            "warnings": [],
+            "error": "",
+            "updatedVersion": "",
+            "skipChrootUpgrade": false,
+            "skipChrootCleanup": false,
+            "keepPreviousSourceTree": false,
+            "checksumsUpdated": false,
+            "hasSources": false,
+            "addedToRepo": false
+        }
+    },
+    "targetDbFilePath": "",
+    "targetRepoPath": "",
+    "stagingDbFilePath": "",
+    "stagingRepoPath": "",
+    "producedProvides": {},
+    "removedProvides": {},
+    "rebuildList": {}
+}
