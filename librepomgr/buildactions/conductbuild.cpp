@@ -1258,10 +1258,10 @@ void ConductBuild::dumpBuildProgress()
         dumpJsonDocument(
             [this] { return m_buildProgress.toJsonDocument(); }, m_workingDirectory, buildProgressFileName, DumpJsonExistingFileHandling::Override);
 #ifdef CPP_UTILITIES_DEBUG_BUILD
-        m_buildAction->appendOutput(Phrases::InfoMessage, argsToString("Updated ", buildProgressFileName, ".json\n"));
+        m_buildAction->appendOutput(Phrases::InfoMessage, "Updated ", buildProgressFileName, ".json\n");
 #endif
     } catch (const std::runtime_error &e) {
-        m_buildAction->appendOutput(Phrases::ErrorMessage, argsToString(e.what(), '\n'));
+        m_buildAction->appendOutput(Phrases::ErrorMessage, e.what(), '\n');
     }
 }
 
