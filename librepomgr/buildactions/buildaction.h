@@ -317,9 +317,7 @@ template <typename... Args> inline void BuildAction::appendOutput(Args &&...args
  */
 template <typename... Args> inline void BuildAction::appendOutput(CppUtilities::EscapeCodes::Phrases phrase, Args &&...args)
 {
-    auto msg = CppUtilities::argsToString(CppUtilities::EscapeCodes::formattedPhraseString(phrase), std::forward<Args>(args)...);
-    std::cerr << msg;
-    appendOutput(std::move(msg));
+    appendOutput(std::move(CppUtilities::argsToString(CppUtilities::EscapeCodes::formattedPhraseString(phrase), std::forward<Args>(args)...)));
 }
 
 struct LIBREPOMGR_EXPORT BuildActionBasicInfo : public ReflectiveRapidJSON::JsonSerializable<BuildActionBasicInfo> {
