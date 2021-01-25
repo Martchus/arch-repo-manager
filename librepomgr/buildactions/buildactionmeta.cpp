@@ -131,7 +131,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::KeepPkgRelAndEpoch),
                     .name = "Keep pkgrel/epoch",
                     .desc = "Never bumps pkgrel and epoch",
-                    .param = "keep-order",
+                    .param = "keep-pkgrel-and-epoch",
                 },
             },
             .settings = {
