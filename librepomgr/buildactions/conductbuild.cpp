@@ -742,7 +742,7 @@ InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession:
     if (!m_updateChecksums || packageProgress.checksumsUpdated) {
         return InvocationResult::Skipped;
     }
-    auto processSession = m_buildAction->makeBuildProcess(packageProgress.buildDirectory + "/updpkgsums.log",
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " checksum update", packageProgress.buildDirectory + "/updpkgsums.log",
         [this, downloadsSession, &packageProgress, &packageName, buildDirectory](boost::process::child &&child, ProcessResult &&result) {
             const auto hasError = result.errorCode || result.exitCode != 0;
             auto lock = lockToWrite();
@@ -789,7 +789,7 @@ InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession:
 InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProcessingSession::SharedPointerType &downloadsSession,
     const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory)
 {
-    auto processSession = m_buildAction->makeBuildProcess(packageProgress.buildDirectory + "/download.log",
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " download", packageProgress.buildDirectory + "/download.log",
         [this, downloadsSession, &packageProgress, &packageName](boost::process::child &&child, ProcessResult &&result) {
             auto lock = lockToWrite();
             if (result.errorCode) {
@@ -931,7 +931,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
 
     // invoke makechrootpkg to build package
     m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
-    auto processSession = m_buildAction->makeBuildProcess(packageProgress.buildDirectory + "/build.log",
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
         std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
             std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
     processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
@@ -1101,7 +1101,7 @@ void ConductBuild::addPackageToRepo(
     }
 
     // add completed package to repository
-    auto processSession = m_buildAction->makeBuildProcess(packageProgress.buildDirectory + "/repo-add.log",
+    auto processSession = m_buildAction->makeBuildProcess("repo-add for " + packageName, packageProgress.buildDirectory + "/repo-add.log",
         std::bind(&ConductBuild::handleRepoAddErrorsAndMakeNextPackage, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress),
             std::placeholders::_1, std::placeholders::_2));
     processSession->launch(boost::process::start_dir(repoPath), m_repoAddPath, dbFilePath, binaryPackageNames);
@@ -1286,7 +1286,7 @@ void ConductBuild::assignNewVersion(const std::string &packageName, PackageBuild
         return;
     }
     auto &newVersion = updatedVersionInfoParts.back();
-    m_buildAction->log()(Phrases::InfoMessage, "Version of \"", packageName, "\" has been updated to: ", newVersion, '\n');
+    m_buildAction->appendOutput(Phrases::InfoMessage, "Version of \"", packageName, "\" has been updated to: ", newVersion, '\n');
     const auto lock = lockToWrite();
     packageProgress.updatedVersion = std::move(newVersion);
 }

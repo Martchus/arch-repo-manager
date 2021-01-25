@@ -152,7 +152,7 @@ void RemovePackages::run()
     }
 
     // remove package from database file
-    auto repoRemoveProcess = m_buildAction->makeBuildProcess(m_workingDirectory + "/repo-remove.log",
+    auto repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
         std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2));
     repoRemoveProcess->launch(
         boost::process::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
@@ -268,12 +268,12 @@ void MovePackages::run()
     const auto processSession = MultiSession<void>::create(m_setup.building.ioContext, std::bind(&MovePackages::conclude, this));
 
     // add packages to database file of destination repo
-    auto repoAddProcess = m_buildAction->makeBuildProcess(m_workingDirectory + "/repo-add.log",
+    auto repoAddProcess = m_buildAction->makeBuildProcess("repo-add", m_workingDirectory + "/repo-add.log",
         std::bind(&MovePackages::handleRepoAddResult, this, processSession, std::placeholders::_1, std::placeholders::_2));
     repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
 
     // remove package from database file of source repo
-    auto repoRemoveProcess = m_buildAction->makeBuildProcess(m_workingDirectory + "/repo-remove.log",
+    auto repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
         std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2));
     repoRemoveProcess->launch(boost::process::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
 

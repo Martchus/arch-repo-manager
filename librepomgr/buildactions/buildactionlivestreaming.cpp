@@ -328,7 +328,7 @@ void BufferSearch::operator()(const BuildProcessSession::BufferType &buffer, std
     }
 }
 
-std::shared_ptr<BuildProcessSession> BuildAction::makeBuildProcess(std::string &&logFilePath, ProcessHandler &&handler)
+std::shared_ptr<BuildProcessSession> BuildAction::makeBuildProcess(std::string &&displayName, std::string &&logFilePath, ProcessHandler &&handler)
 {
     const auto processesLock = std::lock_guard<std::mutex>(m_processesMutex);
     auto &process = m_ongoingProcesses[logFilePath];
@@ -342,7 +342,8 @@ std::shared_ptr<BuildProcessSession> BuildAction::makeBuildProcess(std::string &
         logfiles.emplace_back(logFilePath);
     }
     buildLock.unlock();
-    return process = make_shared<BuildProcessSession>(this, m_setup->building.ioContext, std::move(logFilePath), std::move(handler));
+    return process
+        = make_shared<BuildProcessSession>(this, m_setup->building.ioContext, std::move(displayName), std::move(logFilePath), std::move(handler));
 }
 
 void BuildAction::terminateOngoingBuildProcesses()

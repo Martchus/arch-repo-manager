@@ -238,6 +238,8 @@ void BuildActionsTests::testProcessSession()
  */
 void BuildActionsTests::testBuildActionProcess()
 {
+    m_buildAction = std::make_shared<BuildAction>(0, &m_setup);
+
     const auto scriptPath = testFilePath("scripts/print_some_data.sh");
     const auto logFilePath = std::filesystem::path(TestApplication::instance()->workingDirectory()) / "logfile.log";
     std::filesystem::create_directory(logFilePath.parent_path());
@@ -247,10 +249,10 @@ void BuildActionsTests::testBuildActionProcess()
 
     auto &ioc = m_setup.building.ioContext;
     auto session = std::make_shared<BuildProcessSession>(
-        nullptr, ioc, std::string(logFilePath), [&ioc](boost::process::child &&child, ProcessResult &&result) {
-            CPP_UTILITIES_UNUSED(child)
+        m_buildAction.get(), ioc, "test", std::string(logFilePath), [&ioc](boost::process::child &&child, ProcessResult &&result) {
             CPPUNIT_ASSERT_EQUAL(std::error_code(), result.errorCode);
             CPPUNIT_ASSERT_EQUAL(0, result.exitCode);
+            CPPUNIT_ASSERT_GREATER(0, child.native_handle());
             ioc.stop();
         });
     session->launch(scriptPath);
@@ -261,6 +263,7 @@ void BuildActionsTests::testBuildActionProcess()
     CPPUNIT_ASSERT_EQUAL(5001_st, logLines.size());
     CPPUNIT_ASSERT_EQUAL("printing some numbers"s, logLines.front());
     CPPUNIT_ASSERT_EQUAL("line 5000"s, logLines.back());
+    TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*test PID\\: [0-9]+.*\n.*"s, std::regex::extended, m_buildAction->output);
 }
 
 /*!

@@ -200,7 +200,7 @@ public:
     void setStopHandler(std::function<void(void)> &&stopHandler);
     void setConcludeHandler(std::function<void(void)> &&concludeHandler);
     std::shared_ptr<BuildProcessSession> findBuildProcess(const std::string &filePath);
-    std::shared_ptr<BuildProcessSession> makeBuildProcess(std::string &&logFilePath, ProcessHandler &&handler);
+    std::shared_ptr<BuildProcessSession> makeBuildProcess(std::string &&displayName, std::string &&logFilePath, ProcessHandler &&handler);
     void terminateOngoingBuildProcesses();
     void streamFile(const WebAPI::Params &params, const std::string &filePath, std::string_view fileMimeType);
     void streamOutput(const WebAPI::Params &params, std::size_t offset = 0);

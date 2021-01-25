@@ -8,6 +8,7 @@
 #include "../webclient/database.h"
 
 #include <c++utilities/chrono/datetime.h>
+#include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/io/inifile.h>
 #include <c++utilities/misc/flagenumclass.h>
 
@@ -21,6 +22,7 @@
 #include <boost/asio/posix/stream_descriptor.hpp>
 #include <boost/beast/core/file.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/process/extend.hpp>
 
 #ifdef CPP_UTILITIES_DEBUG_BUILD
 #include <boost/asio/deadline_timer.hpp>
@@ -131,7 +133,8 @@ public:
     using BufferPoolType = BufferPool<StorageType>;
     using BufferType = BufferPoolType::BufferType;
 
-    explicit BuildProcessSession(BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&logFilePath, Handler &&handler);
+    explicit BuildProcessSession(
+        BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&displayName, std::string &&logFilePath, Handler &&handler);
     template <typename... ChildArgs> void launch(ChildArgs &&...childArgs);
     void registerWebSession(std::shared_ptr<WebAPI::Session> &&webSession);
     void registerNewDataHandler(std::function<void(BufferType, std::size_t)> &&handler);
@@ -175,6 +178,7 @@ private:
     boost::process::async_pipe m_pipe;
     BufferPoolType m_bufferPool;
     BufferType m_buffer;
+    std::string m_displayName;
     std::string m_logFilePath;
     boost::beast::file m_logFile;
     boost::asio::posix::stream_descriptor m_logFileDescriptor;
@@ -196,12 +200,13 @@ inline std::size_t BuildProcessSession::DataForWebSession::bytesToSendFromFile()
     return m_bytesToSendFromFile.load();
 }
 
-inline BuildProcessSession::BuildProcessSession(
-    BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&logFilePath, BaseProcessSession::Handler &&handler)
+inline BuildProcessSession::BuildProcessSession(BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&displayName,
+    std::string &&logFilePath, BaseProcessSession::Handler &&handler)
     : BaseProcessSession(ioContext, std::move(handler))
     , m_buildAction(buildAction ? buildAction->weak_from_this() : std::weak_ptr<BuildAction>())
     , m_pipe(ioContext)
     , m_bufferPool(bufferSize)
+    , m_displayName(displayName)
     , m_logFilePath(std::move(logFilePath))
     , m_logFileDescriptor(ioContext)
 {
@@ -222,6 +227,13 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
     try {
         child = boost::process::child(
             m_ioContext, group, std::forward<ChildArgs>(childArgs)..., (boost::process::std_out & boost::process::std_err) > m_pipe,
+            boost::process::extend::on_success =
+                [session = shared_from_this()](auto &executor) {
+                    if (const auto buildAction = session->m_buildAction.lock()) {
+                        buildAction->appendOutput(
+                            CppUtilities::EscapeCodes::Phrases::InfoMessage, session->m_displayName, " PID: ", executor.pid, '\n');
+                    }
+                },
             boost::process::on_exit =
                 [session = shared_from_this()](int exitCode, const std::error_code &errorCode) {
                     session->result.exitCode = exitCode;

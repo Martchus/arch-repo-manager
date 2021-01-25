@@ -409,17 +409,18 @@ void DummyBuildAction::run()
     }
 
     // launch subprocess producing a logfile
-    m_logProcess = m_buildAction->makeBuildProcess(m_workingDirectory + "/foo.log", [this](boost::process::child &&child, ProcessResult &&result) {
-        CPP_UTILITIES_UNUSED(child)
-        m_logProcess = nullptr;
-        m_buildAction->appendOutput("log process exited with code: ", result.exitCode, '\n');
-        if (!result.error.empty()) {
-            m_buildAction->appendOutput("log process error: ", result.error, '\n');
-        }
-        if (!m_buildAction->isAborted()) {
-            stop();
-        }
-    });
+    m_logProcess
+        = m_buildAction->makeBuildProcess("dummy", m_workingDirectory + "/foo.log", [this](boost::process::child &&child, ProcessResult &&result) {
+              CPP_UTILITIES_UNUSED(child)
+              m_logProcess = nullptr;
+              m_buildAction->appendOutput("log process exited with code: ", result.exitCode, '\n');
+              if (!result.error.empty()) {
+                  m_buildAction->appendOutput("log process error: ", result.error, '\n');
+              }
+              if (!m_buildAction->isAborted()) {
+                  stop();
+              }
+          });
     m_logProcess->launch(scriptPath, "1");
 
     continuePrinting();
