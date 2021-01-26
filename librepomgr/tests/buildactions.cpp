@@ -263,7 +263,7 @@ void BuildActionsTests::testBuildActionProcess()
     CPPUNIT_ASSERT_EQUAL(5001_st, logLines.size());
     CPPUNIT_ASSERT_EQUAL("printing some numbers"s, logLines.front());
     CPPUNIT_ASSERT_EQUAL("line 5000"s, logLines.back());
-    TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*test PID\\: [0-9]+.*\n.*"s, std::regex::extended, m_buildAction->output);
+    TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*Launched \"test\", PID\\: [0-9]+.*\n.*"s, std::regex::extended, m_buildAction->output);
 }
 
 /*!

@@ -52,7 +52,7 @@ ThreadPool::ThreadPool(const char *name, boost::asio::io_context &ioContext, uns
     for (auto i = threadCount; i > 0; --i) {
         threads.emplace_back([&ioContext, name] {
             ioContext.run();
-            std::cout << Phrases::SubMessage << name << " terminates" << Phrases::End;
+            std::cout << argsToString(formattedPhraseString(Phrases::SubMessage), name, " terminates", formattedPhraseString(Phrases::End));
         });
     }
 }

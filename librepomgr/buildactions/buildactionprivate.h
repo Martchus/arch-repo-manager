@@ -231,7 +231,7 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
                 [session = shared_from_this()](auto &executor) {
                     if (const auto buildAction = session->m_buildAction.lock()) {
                         buildAction->appendOutput(
-                            CppUtilities::EscapeCodes::Phrases::InfoMessage, session->m_displayName, " PID: ", executor.pid, '\n');
+                            CppUtilities::EscapeCodes::Phrases::InfoMessage, "Launched \"", session->m_displayName, "\", PID: ", executor.pid, '\n');
                     }
                 },
             boost::process::on_exit =

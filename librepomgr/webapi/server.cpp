@@ -119,7 +119,8 @@ void Server::accept()
 void Server::handleAccepted(boost::system::error_code ec)
 {
     if (ec) {
-        cerr << Phrases::WarningMessage << "Failed to accept new connection: " << ec.message() << Phrases::EndFlush;
+        cerr << argsToString(
+            formattedPhraseString(Phrases::WarningMessage), "Failed to accept new connection: ", ec.message(), formattedPhraseString(Phrases::End));
     } else {
         // create session and run it
         std::make_shared<Session>(move(m_socket), m_setup)->receive();
