@@ -9,6 +9,13 @@ using namespace CppUtilities;
 namespace LibRepoMgr {
 namespace WebAPI {
 
+Url::Url(std::string_view path, std::string_view hash, std::vector<std::pair<std::string_view, std::string_view>> &&params)
+    : path(path)
+    , hash(hash)
+    , params(std::move(params))
+{
+}
+
 Url::Url(const Request &request)
 {
     const auto target = request.target();

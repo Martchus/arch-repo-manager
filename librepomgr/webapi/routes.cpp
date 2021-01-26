@@ -620,7 +620,7 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
     auto buildLock = params.setup.building.lockToWrite();
     const auto id = params.setup.building.allocateBuildActionID();
     auto startsAfterBuildActions = params.setup.building.getBuildActions(startAfterIds);
-    const auto startNow = startImmediately || BuildAction::haveSucceeded(startsAfterBuildActions);
+    const auto startNow = startImmediately || (!startsAfterBuildActions.empty() && BuildAction::haveSucceeded(startsAfterBuildActions));
     buildLock.unlock();
     auto buildAction = std::make_shared<BuildAction>(id);
     if (!directories.empty()) {
@@ -734,7 +734,7 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
     auto &building = params.setup.building;
     auto buildLock = building.lockToWrite();
     auto startsAfterBuildActions = building.getBuildActions(startAfterIds);
-    const auto startNow = startImmediately || BuildAction::haveSucceeded(startsAfterBuildActions);
+    const auto startNow = startImmediately || (!startsAfterBuildActions.empty() && BuildAction::haveSucceeded(startsAfterBuildActions));
     for (auto &newBuildAction : newBuildActions) {
         newBuildAction->id = building.allocateBuildActionID();
         if (lastBuildAction) {

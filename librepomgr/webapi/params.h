@@ -35,6 +35,7 @@ inline BadRequest::BadRequest(const char *message)
 }
 
 struct LIBREPOMGR_EXPORT Url {
+    Url(std::string_view path, std::string_view hash, std::vector<std::pair<std::string_view, std::string_view>> &&params);
     Url(const Request &request);
     std::string_view path;
     std::string_view hash;
@@ -55,6 +56,7 @@ inline bool Url::hasPrettyFlag() const
 
 struct LIBREPOMGR_EXPORT Params {
     Params(ServiceSetup &setup, Session &session);
+    Params(ServiceSetup &setup, Session &session, Url &&target);
     ServiceSetup &setup;
     Session &session;
     const Url target;
@@ -67,6 +69,13 @@ inline Params::Params(ServiceSetup &setup, Session &session)
     : setup(setup)
     , session(session)
     , target(session.request())
+{
+}
+
+inline Params::Params(ServiceSetup &setup, Session &session, Url &&target)
+    : setup(setup)
+    , session(session)
+    , target(std::move(target))
 {
 }
 

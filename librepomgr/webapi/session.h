@@ -18,13 +18,14 @@ namespace WebAPI {
 
 class Session : public std::enable_shared_from_this<Session> {
 public:
-    Session(boost::asio::ip::tcp::socket socket, ServiceSetup &config);
+    Session(boost::asio::ip::tcp::socket &&socket, ServiceSetup &config);
 
     void receive();
     void respond(std::shared_ptr<Response> &&response);
     void respond(const char *localFilePath, const char *mimeType, std::string_view urlPath);
     void close();
     const Request &request() const;
+    void assignEmptyRequest();
     boost::asio::ip::tcp::socket &socket();
     void received(boost::system::error_code ec, std::size_t bytesTransferred);
     void responded(boost::system::error_code ec, std::size_t bytesTransferred, bool shouldClose);
@@ -38,7 +39,7 @@ private:
     std::shared_ptr<void> m_res;
 };
 
-inline Session::Session(boost::asio::ip::tcp::socket socket, ServiceSetup &setup)
+inline Session::Session(boost::asio::ip::tcp::socket &&socket, ServiceSetup &setup)
     : m_socket(std::move(socket))
     , m_strand(m_socket.get_executor())
     , m_setup(setup)
@@ -48,6 +49,11 @@ inline Session::Session(boost::asio::ip::tcp::socket socket, ServiceSetup &setup
 inline const Request &Session::request() const
 {
     return m_parser->get();
+}
+
+inline void Session::assignEmptyRequest()
+{
+    m_parser = std::make_unique<RequestParser>();
 }
 
 inline boost::asio::ip::tcp::socket &Session::socket()
