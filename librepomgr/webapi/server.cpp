@@ -47,7 +47,6 @@ const Router Server::s_router = {
 
 Server::Server(ServiceSetup &setup)
     : m_acceptor(setup.webServer.ioContext)
-    , m_socket(setup.webServer.ioContext)
     , m_setup(setup)
 {
     // open the acceptor
@@ -89,12 +88,9 @@ void Server::stop()
     if (!s_instance) {
         return;
     }
-    boost::asio::post(s_instance->m_socket.get_executor(), [] {
+    boost::asio::post(s_instance->m_setup.webServer.ioContext.get_executor(), [] {
         if (!s_instance) {
             return;
-        }
-        if (s_instance->m_socket.is_open()) {
-            s_instance->m_socket.cancel();
         }
         if (s_instance->m_acceptor.is_open()) {
             s_instance->m_acceptor.cancel();
@@ -113,17 +109,18 @@ void Server::run()
 
 void Server::accept()
 {
-    m_acceptor.async_accept(m_socket, bind(&Server::handleAccepted, shared_from_this(), placeholders::_1));
+    m_acceptor.async_accept(
+        boost::asio::make_strand(m_setup.webServer.ioContext), boost::beast::bind_front_handler(&Server::handleAccepted, shared_from_this()));
 }
 
-void Server::handleAccepted(boost::system::error_code ec)
+void Server::handleAccepted(boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
 {
     if (ec) {
         cerr << argsToString(
             formattedPhraseString(Phrases::WarningMessage), "Failed to accept new connection: ", ec.message(), formattedPhraseString(Phrases::End));
     } else {
         // create session and run it
-        std::make_shared<Session>(move(m_socket), m_setup)->receive();
+        std::make_shared<Session>(std::move(socket), m_setup)->receive();
     }
     // accept next connection
     accept();

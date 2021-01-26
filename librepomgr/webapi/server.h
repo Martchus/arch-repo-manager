@@ -33,11 +33,10 @@ public:
 
     void run();
     void accept();
-    void handleAccepted(boost::system::error_code ec);
+    void handleAccepted(boost::system::error_code ec, boost::asio::ip::tcp::socket);
 
 private:
     boost::asio::ip::tcp::acceptor m_acceptor;
-    boost::asio::ip::tcp::socket m_socket;
     ServiceSetup &m_setup;
     static std::shared_ptr<Server> s_instance;
     static const Router s_router;
