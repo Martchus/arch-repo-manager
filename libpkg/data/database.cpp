@@ -306,14 +306,20 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
     return unresolvedPackages;
 }
 
-LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPkg::Database *> &updateSources)
+LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPkg::Database *> &updateSources, UpdateCheckOptions options)
 {
     PackageUpdates results;
-    for (const auto &myPackageIterator : packages) {
-        const auto &myPackage = myPackageIterator.second;
+    for (const auto &[myPackageName, myPackage] : packages) {
+        auto regularName = std::string();
+        if (options & UpdateCheckOptions::ConsiderRegularPackage) {
+            const auto decomposedName = myPackage->decomposeName();
+            if ((!decomposedName.targetPrefix.empty() || !decomposedName.vcsSuffix.empty()) && !decomposedName.isVcsPackage()) {
+                regularName = decomposedName.actualName;
+            }
+        }
         auto foundPackage = false;
-        for (auto *updateSource : updateSources) {
-            const auto updatePackageIterator = updateSource->packages.find(myPackageIterator.first);
+        for (auto *const updateSource : updateSources) {
+            const auto updatePackageIterator = updateSource->packages.find(myPackageName);
             if (updatePackageIterator == updateSource->packages.cend()) {
                 continue;
             }
@@ -339,6 +345,33 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
         }
         if (!foundPackage) {
             results.orphans.emplace_back(PackageSearchResult(*this, myPackage));
+        }
+        if (regularName.empty()) {
+            continue;
+        }
+        for (auto *const updateSource : updateSources) {
+            const auto updatePackageIterator = updateSource->packages.find(regularName);
+            if (updatePackageIterator == updateSource->packages.cend()) {
+                continue;
+            }
+            const auto &updatePackage = updatePackageIterator->second;
+            const auto versionDiff = myPackage->compareVersion(*updatePackage);
+            std::vector<PackageUpdate> *list = nullptr;
+            switch (versionDiff) {
+            case PackageVersionComparison::SoftwareUpgrade:
+                list = &results.versionUpdates;
+                break;
+            case PackageVersionComparison::PackageUpgradeOnly:
+                list = &results.packageUpdates;
+                break;
+            case PackageVersionComparison::NewerThanSyncVersion:
+                list = &results.downgrades;
+                break;
+            default:;
+            }
+            if (list) {
+                list->emplace_back(PackageSearchResult(*this, myPackage), PackageSearchResult(*updateSource, updatePackage));
+            }
         }
     }
     return results;

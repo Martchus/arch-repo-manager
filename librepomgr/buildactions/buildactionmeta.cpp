@@ -59,7 +59,14 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .category = "Repo management",
             .name = "Check for updates",
             .type = "check-updates",
-            .flags = {},
+            .flags = {
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(CheckForUpdatesFlags::ConsiderRegularPackage),
+                    .name = "Consider regular package",
+                    .desc = "When processing a variant package like mingw-w64-qt6-base compare with the regular qt6-base package as well",
+                    .param = "consider-regular-package",
+                },
+            },
             .settings = {},
             .directory = false,
             .sourceDb = true,

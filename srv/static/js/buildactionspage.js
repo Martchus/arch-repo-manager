@@ -722,7 +722,7 @@ function isBuildActionSourceAur(buildActionInfo)
     return Array.isArray(sourceDbs) && sourceDbs.length === 1 && sourceDbs[0] == 'aur';
 }
 
-function renderUpdateInfoWithCheckbox(id, packageName, versionInfo, sourceFromAur)
+function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionInfo, sourceFromAur)
 {
     const inputElement = document.createElement('input');
     inputElement.type = 'checkbox';
@@ -730,13 +730,21 @@ function renderUpdateInfoWithCheckbox(id, packageName, versionInfo, sourceFromAu
     inputElement.value = packageName;
     const labelElement = document.createElement('label');
     labelElement.htmlFor = id;
-    if (sourceFromAur) {
+    if (sourceFromAur && newPackageName) {
         const packageNameLink = document.createElement('a');
-        packageNameLink.href = 'https://aur.archlinux.org/packages/' + packageName;
+        packageNameLink.href = 'https://aur.archlinux.org/packages/' + newPackageName;
         packageNameLink.target = '_blank';
-        packageNameLink.appendChild(document.createTextNode(packageName));
+        packageNameLink.appendChild(document.createTextNode(newPackageName));
+        if (newPackageName !== packageName) {
+            labelElement.appendChild(document.createTextNode(packageName + ' ('));
+        }
         labelElement.appendChild(packageNameLink);
+        if (newPackageName !== packageName) {
+            labelElement.appendChild(document.createTextNode(')'));
+        }
         labelElement.appendChild(document.createTextNode(': ' + versionInfo));
+    } else if (newPackageName && packageName !== newPackageName) {
+        labelElement.appendChild(document.createTextNode(packageName + ' (' + newPackageName + '): ' + versionInfo));
     } else {
         labelElement.appendChild(document.createTextNode(packageName + ': ' + versionInfo));
     }
@@ -807,6 +815,7 @@ function renderOrphanPackage(value, obj, level, row)
         return renderUpdateInfoWithCheckbox(
             'update-info-checkbox-' + packageName + '-' + package.version,
             packageName,
+            undefined,
             package.version
         );
         return document.createTextNode();
@@ -825,6 +834,7 @@ function renderUpdateOrDowngrade(value, obj, level, row)
         return renderUpdateInfoWithCheckbox(
             'update-info-checkbox-' + packageName + '-' + oldVersion.version + '-' + newVersion.version,
             packageName,
+            newVersion.name,
             oldVersion.version + ' → ' + newVersion.version,
             sourceFromAur
         );

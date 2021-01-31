@@ -371,6 +371,7 @@ struct LIBREPOMGR_EXPORT UpdateCheck : public InternalBuildAction {
 private:
     LibPkg::PackageUpdates checkForUpdates();
 
+    LibPkg::UpdateCheckOptions m_options = LibPkg::UpdateCheckOptions::None;
     bool m_packageLookupDone = false;
 };
 

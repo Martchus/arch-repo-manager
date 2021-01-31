@@ -16,6 +16,9 @@ UpdateCheck::UpdateCheck(ServiceSetup &setup, const std::shared_ptr<BuildAction>
 
 void UpdateCheck::run()
 {
+    const auto flags = static_cast<CheckForUpdatesFlags>(m_buildAction->flags);
+    m_options = static_cast<LibPkg::UpdateCheckOptions>(flags);
+
     auto configReadLock = init(BuildActionAccess::ReadConfig,
         RequiredDatabases::OneOrMoreSources | RequiredDatabases::OneDestination | RequiredDatabases::AllowFromAur, RequiredParameters::None);
     if (holds_alternative<monostate>(configReadLock)) {
@@ -47,7 +50,7 @@ LibPkg::PackageUpdates UpdateCheck::checkForUpdates()
     if (m_fromAur) {
         sourceDbs.emplace_back(&m_setup.config.aur);
     }
-    return (**m_destinationDbs.begin()).checkForUpdates(sourceDbs);
+    return (**m_destinationDbs.begin()).checkForUpdates(sourceDbs, m_options);
 }
 
 } // namespace LibRepoMgr

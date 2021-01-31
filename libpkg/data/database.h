@@ -42,16 +42,22 @@ struct LIBPKG_EXPORT PackageSearchResult {
  */
 enum class DatabaseUsage {
     None = 0,
-    Sync = 1, /*! The database is used when synchronizing. */
+    Sync = (1 << 0), /*! The database is used when synchronizing. */
     Search = (1 << 1), /*! The database is used when searching. */
     Install = (1 << 2), /*! The database is used to install packages. */
     Upgrade = (1 << 3), /*! The database is used to upgrade packages. */
     All = (1 << 4) - 1, /*! The database is used for everything. */
 };
 
+enum class UpdateCheckOptions {
+    None = 0,
+    ConsiderRegularPackage = (1 << 0),
+};
+
 } // namespace LibPkg
 
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibPkg, LibPkg::DatabaseUsage)
+CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibPkg, LibPkg::UpdateCheckOptions)
 
 namespace LibPkg {
 
@@ -109,7 +115,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     void replacePackages(const std::vector<std::shared_ptr<Package>> &newPackages, CppUtilities::DateTime lastModified);
     std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> detectUnresolvedPackages(
         Config &config, const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedPackages);
-    PackageUpdates checkForUpdates(const std::vector<Database *> &updateSources);
+    PackageUpdates checkForUpdates(const std::vector<Database *> &updateSources, UpdateCheckOptions options = UpdateCheckOptions::None);
     PackageLocation locatePackage(const std::string &packageName) const;
     std::string filesPathFromRegularPath() const;
 
