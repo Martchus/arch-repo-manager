@@ -227,16 +227,17 @@ PackageVersionPartComparison PackageVersion::compareParts(const string &part1, c
             part2Pos = part2End + 1;
         } else if (*part1End) {
             // only part 1 has another segment -> it is more specific and hence considered newer
-            if (allowImplicitPkgRel) {
-                // check whether the only further segment in part 1 is pkgrel
-                // -> check for pkgrel separation which is always '-'
-                if (*part1End == '-') {
-                    part1Pos = part1End + 1;
-                    part1End = firstNonAlphanumericCharacter(part1Pos, part1End);
-                    if (!*part1End) {
-                        // consider both parts equal if part 2 doesn't have explicit pkgrel and part 1 does
-                        return PackageVersionPartComparison::Equal;
+            if (allowImplicitPkgRel && *part1End == '-') {
+                // check whether the only further segment in part 1 is pkgrel (starts with '-' and only contains alphanumeric chars and '.')
+                for (part1Pos = part1End + 1; part1Pos != part1End; ++part1Pos) {
+                    const char c = *part1Pos;
+                    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '.'))) {
+                        break;
                     }
+                }
+                if (!*part1Pos) {
+                    // consider both parts equal if part 2 doesn't have explicit pkgrel and part 1 does
+                    return PackageVersionPartComparison::Equal;
                 }
             }
             return PackageVersionPartComparison::Newer;

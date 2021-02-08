@@ -188,12 +188,17 @@ void DataTests::testDependencyMatching()
     CPPUNIT_ASSERT_MESSAGE(
         "greather equal constraint with explicitely specified pkgrel must match", pkg3.providesDependency(Dependency::fromString(depStr, 17)));
 
-    Package pkg4;
+    pkg3.name = "sphinxbase";
+    pkg3.version = "5prealpha-11.1aBc";
+    depStr = "sphinxbase=5prealpha";
+    CPPUNIT_ASSERT_MESSAGE(
+        "equal constraint, any pkgrel should match (even strange one)", pkg3.providesDependency(Dependency::fromString(depStr, 20)));
+
     pkg3.name = "ffmpeg";
     pkg3.version = "1:4.1-3";
-    CPPUNIT_ASSERT(pkg3.providesDependency(Dependency::fromString("ffmpeg<1:4.3")));
+    CPPUNIT_ASSERT_MESSAGE("real-world ffmpeg example (1)", pkg3.providesDependency(Dependency::fromString("ffmpeg<1:4.3")));
     pkg3.version = "1:4.1-2";
-    CPPUNIT_ASSERT(!pkg3.providesDependency(Dependency::fromString("ffmpeg>=1:4.1-3")));
+    CPPUNIT_ASSERT_MESSAGE("real-world ffmpeg example (2)", !pkg3.providesDependency(Dependency::fromString("ffmpeg>=1:4.1-3")));
 }
 
 void DataTests::testPackageSearch()
