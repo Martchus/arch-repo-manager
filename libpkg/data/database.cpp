@@ -204,7 +204,7 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
     const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedProvides,
     const std::unordered_set<std::string_view> &depsToIgnore, const std::unordered_set<std::string_view> &libsToIgnore)
 {
-    std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> unresolvedPackages;
+    auto unresolvedPackages = std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies>();
 
     // determine new provides
     DependencySet newProvides;
@@ -217,6 +217,16 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
         for (const auto &newLibProvide : newPackage->libprovides) {
             newLibProvides.emplace(newLibProvide);
         }
+    }
+
+    // determine dependencies and "protected" database
+    auto deps = std::vector<Database *>();
+    const auto depOrder = config.computeDatabaseDependencyOrder(*this);
+    if (auto *const dbs = std::get_if<std::vector<Database *>>(&depOrder)) {
+        deps = std::move(*dbs);
+    }
+    if (auto *const protectedDb = config.findDatabase(name + "-protected", arch)) {
+        deps.emplace_back(protectedDb);
     }
 
     // check whether all required dependencies are still provided
@@ -239,27 +249,14 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
             continue;
         }
 
-        // skip if dependency is provided by a database this database depends on
-        const auto checkDb = [this, &config, &requiredDep](const std::string &dbName) {
-            if (const auto *const db = config.findDatabase(dbName, arch)) {
-                if (db->providedDeps.provides(requiredDep.first, requiredDep.second)) {
-                    return true;
-                }
-            }
-            return false;
-        };
+        // skip if dependency is provided by a database this database depends on or the protected version of this db
         auto providedByAnotherDb = false;
-        for (const auto &dbName : dependencies) {
-            if ((providedByAnotherDb = checkDb(dbName))) {
+        for (const auto *db : deps) {
+            if ((providedByAnotherDb = db->providedDeps.provides(requiredDep.first, requiredDep.second))) {
                 break;
             }
         }
         if (providedByAnotherDb) {
-            continue;
-        }
-
-        // skip if dependency is provided by the protected version of this db
-        if (checkDb(name + "-protected")) {
             continue;
         }
 
@@ -287,27 +284,14 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
             continue;
         }
 
-        // skip if dependency is provided by a database this database depends on
-        const auto checkDb = [this, &config, &requiredLib = requiredLib](const std::string &dbName) {
-            if (const auto *const db = config.findDatabase(dbName, arch)) {
-                if (db->providedLibs.find(requiredLib) != db->providedLibs.end()) {
-                    return true;
-                }
-            }
-            return false;
-        };
+        // skip if dependency is provided by a database this database depends on or the protected version of this db
         auto providedByAnotherDb = false;
-        for (const auto &dbName : dependencies) {
-            if ((providedByAnotherDb = checkDb(dbName))) {
+        for (const auto *db : deps) {
+            if ((providedByAnotherDb = db->providedLibs.find(requiredLib) != db->providedLibs.end())) {
                 break;
             }
         }
         if (providedByAnotherDb) {
-            continue;
-        }
-
-        // skip if library is provided by the protected version of this db
-        if (checkDb(name + "-protected")) {
             continue;
         }
 
