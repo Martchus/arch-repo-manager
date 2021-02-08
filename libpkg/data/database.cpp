@@ -191,14 +191,18 @@ void Database::replacePackages(const std::vector<std::shared_ptr<Package>> &newP
 }
 
 /*!
- * \brief Determines which packages are unresolvable.
+ * \brief Determines which packages are unresolvable assuming new packages are added to the database and certain provides are removed.
  * \param config The configuration supposed to contain database dependencies.
- * \param newPackages Packages which should be added to the database.
- * \param removedProvides Provides which will be removed from the database.
- * \remarks "Resolvable" means here (so far) just that all dependencies are present. It does not mean "installable".
+ * \param newPackages Packages which are assumed to be added to the database.
+ * \param removedProvides Provides which are assumed to be removed from the database.
+ * \param depsToIgnore Specifies dependencies to be ignored if missing (version constraints not supported).
+ * \param libsToIgnore Specifies libraries to be ignored if missing.
+ * \remarks "Resolvable" means here (so far) just that all dependencies are present. It does not mean a package is "installable" because
+ *          conflicts between dependencies might still prevent that.
  */
-std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::detectUnresolvedPackages(
-    Config &config, const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedProvides)
+std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::detectUnresolvedPackages(Config &config,
+    const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedProvides,
+    const std::unordered_set<std::string_view> &depsToIgnore, const std::unordered_set<std::string_view> &libsToIgnore)
 {
     std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> unresolvedPackages;
 
@@ -219,6 +223,11 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
     for (const auto &requiredDep : requiredDeps) {
         const auto &[dependencyName, dependencyDetail] = requiredDep;
         const auto &affectedPackages = dependencyDetail.relevantPackages;
+
+        // skip dependencies to ignore
+        if (depsToIgnore.find(dependencyName) != depsToIgnore.end()) {
+            continue;
+        }
 
         // skip if new packages provide dependency
         if (newProvides.provides(dependencyName, dependencyDetail)) {
@@ -263,20 +272,25 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
     // check whether all required libraries are still provided
     for (const auto &[requiredLib, affectedPackages] : requiredLibs) {
 
+        // skip libs to ignore
+        if (libsToIgnore.find(requiredLib) != libsToIgnore.end()) {
+            continue;
+        }
+
         // skip if new packages provide dependency
-        if (newLibProvides.count(requiredLib)) {
+        if (newLibProvides.find(requiredLib) != newLibProvides.end()) {
             continue;
         }
 
         // skip if db provides dependency
-        if (providedLibs.count(requiredLib)) {
+        if (providedLibs.find(requiredLib) != providedLibs.end()) {
             continue;
         }
 
         // skip if dependency is provided by a database this database depends on
         const auto checkDb = [this, &config, &requiredLib = requiredLib](const std::string &dbName) {
             if (const auto *const db = config.findDatabase(dbName, arch)) {
-                if (db->providedLibs.count(requiredLib)) {
+                if (db->providedLibs.find(requiredLib) != db->providedLibs.end()) {
                     return true;
                 }
             }

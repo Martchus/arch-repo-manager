@@ -246,7 +246,18 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .name = "Check for problems",
             .type = "check-for-problems",
             .flags = {},
-            .settings = {},
+            .settings = {
+                BuildActionSettingMetaInfo{
+                    .name = "Dependencies to ignore",
+                    .desc = "A white-space separated list of dependencies not to care about if missing (version constraints not supported)",
+                    .param = "ignore-optdepts",
+                },
+                BuildActionSettingMetaInfo{
+                    .name = "Libraries to ignore",
+                    .desc = "A white-space separated list of library dependencies not to care about if missing",
+                    .param = "ignore-libdeps",
+                },
+            },
             .directory = true,
             .sourceDb = false,
             .destinationDb = true,

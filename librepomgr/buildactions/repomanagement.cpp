@@ -378,6 +378,16 @@ CheckForProblems::CheckForProblems(ServiceSetup &setup, const std::shared_ptr<Bu
 
 void CheckForProblems::run()
 {
+    // read settings
+    auto &metaInfo = m_setup.building.metaInfo;
+    auto metaInfoLock = metaInfo.lockToRead();
+    const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::CheckForProblems);
+    const auto ignoreDepsSetting = typeInfo.settings[static_cast<std::size_t>(CheckForProblemsSettings::IgnoreDeps)].param;
+    const auto ignoreLibDepsSetting = typeInfo.settings[static_cast<std::size_t>(CheckForProblemsSettings::IgnoreLibDeps)].param;
+    metaInfoLock.unlock();
+    const auto ignoreDeps = splitStringSimple<std::unordered_set<std::string_view>>(std::string_view(findSetting(ignoreDepsSetting)), " ");
+    const auto ignoreLibDeps = splitStringSimple<std::unordered_set<std::string_view>>(std::string_view(findSetting(ignoreLibDepsSetting)), " ");
+
     // initialize build action
     auto configReadLock = init(BuildActionAccess::ReadConfig, RequiredDatabases::OneOrMoreDestinations, RequiredParameters::None);
     if (std::holds_alternative<std::monostate>(configReadLock)) {
@@ -419,8 +429,8 @@ void CheckForProblems::run()
         }
         // check for unresolved dependencies and missing libraries
     checkForUnresolvedPackages:
-        auto unresolvedPackages
-            = db->detectUnresolvedPackages(m_setup.config, std::vector<std::shared_ptr<LibPkg::Package>>(), LibPkg::DependencySet());
+        auto unresolvedPackages = db->detectUnresolvedPackages(
+            m_setup.config, std::vector<std::shared_ptr<LibPkg::Package>>(), LibPkg::DependencySet(), ignoreDeps, ignoreLibDeps);
         for (auto &[package, unresolvedDeps] : unresolvedPackages) {
             problems.emplace_back(RepositoryProblem{ .desc = std::move(unresolvedDeps), .pkg = package->name });
         }
