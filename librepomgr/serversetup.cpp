@@ -467,7 +467,7 @@ std::size_t ServiceSetup::restoreState()
         cacheFile.open(cacheFilePath.data(), ios_base::in | ios_base::binary);
         ReflectiveRapidJSON::BinaryReflector::BinaryDeserializer deserializer(&cacheFile);
         deserializer.read(config);
-        hasConfig = false;
+        hasConfig = true;
         if (!hasBuildActions) {
             deserializer.read(building.actions);
             hasBuildActions = true;
