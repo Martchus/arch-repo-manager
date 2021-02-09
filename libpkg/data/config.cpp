@@ -45,7 +45,7 @@ DatabaseStatistics::DatabaseStatistics(const Database &db)
 }
 
 static std::string addDatabaseDependencies(
-    Config &config, Database &database, std::vector<Database *> &result, std::unordered_map<Database *, bool> &visited)
+    Config &config, Database &database, std::vector<Database *> &result, std::unordered_map<Database *, bool> &visited, bool addSelf)
 {
     // abort if ...
     const auto insertion = visited.emplace(make_pair(&database, false));
@@ -63,13 +63,15 @@ static std::string addDatabaseDependencies(
             return argsToString(
                 "database \"", dependency, "\" required by \"", database.name, "\" does not exist (architecture ", database.arch, ')');
         }
-        if (auto error = addDatabaseDependencies(config, *requiredDb, result, visited); !error.empty()) {
+        if (auto error = addDatabaseDependencies(config, *requiredDb, result, visited, true); !error.empty()) {
             return error;
         }
     }
 
     // add database itself
-    result.emplace_back(&database);
+    if (addSelf) {
+        result.emplace_back(&database);
+    }
 
     // consider this db done; if something else depends on it is o.k. and not a cycle
     visited[&database] = true;
@@ -77,12 +79,12 @@ static std::string addDatabaseDependencies(
     return string();
 }
 
-std::variant<std::vector<Database *>, std::string> Config::computeDatabaseDependencyOrder(Database &database)
+std::variant<std::vector<Database *>, std::string> Config::computeDatabaseDependencyOrder(Database &database, bool addSelf)
 {
     std::vector<Database *> result;
     std::unordered_map<Database *, bool> visited;
     result.reserve(database.dependencies.size());
-    auto error = addDatabaseDependencies(*this, database, result, visited);
+    auto error = addDatabaseDependencies(*this, database, result, visited, addSelf);
     if (!error.empty()) {
         return move(error);
     }

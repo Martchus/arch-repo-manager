@@ -254,15 +254,15 @@ void DataTests::testComputingFileName()
 
 void DataTests::testDetectingUnresolved()
 {
-    auto &db1(m_config.databases[0]);
+    auto &db1 = m_config.databases[0];
 
     CPPUNIT_ASSERT_EQUAL(0_st, db1.detectUnresolvedPackages(m_config, {}, {}).size());
 
     // upgrade bar to 5.6, foo should be unresolvable
     m_pkg2->version = "5.6";
-    DependencySet removedPackages;
+    auto removedPackages = DependencySet();
     removedPackages.add(Dependency("bar", "5.5"), m_pkg2);
-    const auto failures(db1.detectUnresolvedPackages(m_config, { m_pkg2 }, removedPackages));
+    const auto failures = db1.detectUnresolvedPackages(m_config, { m_pkg2 }, removedPackages);
     CPPUNIT_ASSERT_EQUAL(1_st, failures.size());
     CPPUNIT_ASSERT_EQUAL(m_pkg1, failures.begin()->first);
 }

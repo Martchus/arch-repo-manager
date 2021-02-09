@@ -221,7 +221,7 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
 
     // determine dependencies and "protected" database
     auto deps = std::vector<Database *>();
-    const auto depOrder = config.computeDatabaseDependencyOrder(*this);
+    const auto depOrder = config.computeDatabaseDependencyOrder(*this, false);
     if (auto *const dbs = std::get_if<std::vector<Database *>>(&depOrder)) {
         deps = std::move(*dbs);
     }

@@ -118,7 +118,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     Status computeStatus() const;
     BuildOrderResult computeBuildOrder(const std::vector<std::string> &dependencyDenotations, BuildOrderOptions options);
     LicenseResult computeLicenseInfo(const std::vector<std::string> &dependencyDenotations);
-    std::variant<std::vector<Database *>, std::string> computeDatabaseDependencyOrder(Database &database);
+    std::variant<std::vector<Database *>, std::string> computeDatabaseDependencyOrder(Database &database, bool addSelf = true);
     std::vector<Database *> computeDatabasesRequiringDatabase(Database &database);
     void pullDependentPackages(const std::vector<Dependency> &dependencies, const std::shared_ptr<Package> &relevantPackage,
         const std::unordered_set<LibPkg::Database *> &relevantDbs, std::unordered_set<Package *> &runtimeDependencies,
