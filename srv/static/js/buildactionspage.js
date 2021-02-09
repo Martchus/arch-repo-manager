@@ -716,13 +716,7 @@ function renderBuildActionArtefacts(array, obj)
     });
 }
 
-function isBuildActionSourceAur(buildActionInfo)
-{
-    const sourceDbs = typeof buildActionInfo === 'object' ? buildActionInfo.sourceDbs : undefined;
-    return Array.isArray(sourceDbs) && sourceDbs.length === 1 && sourceDbs[0] == 'aur';
-}
-
-function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionInfo, sourceFromAur)
+function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionInfo, sourceDbs, newVersion)
 {
     const inputElement = document.createElement('input');
     inputElement.type = 'checkbox';
@@ -730,17 +724,25 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
     inputElement.value = packageName;
     const labelElement = document.createElement('label');
     labelElement.htmlFor = id;
-    if (sourceFromAur && newPackageName) {
+    if (newVersion && newPackageName) {
         const packageNameLink = document.createElement('a');
-        packageNameLink.href = 'https://aur.archlinux.org/packages/' + newPackageName;
-        packageNameLink.target = '_blank';
+        let from = newVersion.db;
+        if (newVersion.db === 'aur') {
+            packageNameLink.href = 'https://aur.archlinux.org/packages/' + encodeURIComponent(newPackageName);
+            packageNameLink.target = '_blank';
+            from = 'AUR';
+        } else {
+            packageNameLink.href = '#package-details-section&' + encodeURIComponent(newVersion.db + '@' + newVersion.arch + '/' + newPackageName);
+        }
         packageNameLink.appendChild(document.createTextNode(newPackageName));
         if (newPackageName !== packageName) {
             labelElement.appendChild(document.createTextNode(packageName + ' ('));
         }
         labelElement.appendChild(packageNameLink);
         if (newPackageName !== packageName) {
-            labelElement.appendChild(document.createTextNode(')'));
+            labelElement.appendChild(document.createTextNode(sourceDbs.length ? ' from ' + from + ')' : ')'));
+        } else if (sourceDbs.length) {
+            labelElement.appendChild(document.createTextNode(' from ' + from));
         }
         labelElement.appendChild(document.createTextNode(': ' + versionInfo));
     } else if (newPackageName && packageName !== newPackageName) {
@@ -816,7 +818,8 @@ function renderOrphanPackage(value, obj, level, row)
             'update-info-checkbox-' + packageName + '-' + package.version,
             packageName,
             undefined,
-            package.version
+            package.version,
+            row.sourceDbs,
         );
         return document.createTextNode();
     }, function(package1, package2) {
@@ -826,7 +829,6 @@ function renderOrphanPackage(value, obj, level, row)
 
 function renderUpdateOrDowngrade(value, obj, level, row)
 {
-    const sourceFromAur = isBuildActionSourceAur(row);
     return renderCustomList(value, function(updateInfo) {
         const oldVersion = updateInfo.oldVersion;
         const newVersion = updateInfo.newVersion;
@@ -836,7 +838,8 @@ function renderUpdateOrDowngrade(value, obj, level, row)
             packageName,
             newVersion.name,
             oldVersion.version + ' → ' + newVersion.version,
-            sourceFromAur
+            row.sourceDbs,
+            newVersion
         );
     }, function(updateInfo1, updateInfo2) {
         return updateInfo1.oldVersion.name.localeCompare(updateInfo2.oldVersion.name);
