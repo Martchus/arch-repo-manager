@@ -498,7 +498,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
             },
             resultData: function(value, row) {
                 switch(value.index) {
-                case 3: // update info
+                case 3: { // update info
                     const formElement = document.createElement('form');
                     formElement.className = 'update-info-form';
                     formElement.appendChild(renderTableFromJsonObject({
@@ -534,6 +534,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                     };
                     formElement.appendChild(addSelectedInput);
                     return formElement;
+                }
                 case 4: // build preparation info
                     return renderTableFromJsonObject({
                         data: value.data,
@@ -547,7 +548,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                             },
                         },
                     });
-                case 7: // reporitory problems
+                case 7: { // reporitory problems
                     const container = document.createElement('div');
                     container.className = 'repo-problems';
                     for (const [database, problems] of Object.entries(value.data)) {
@@ -578,6 +579,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                         container.appendChild(table);
                     }
                     return container;
+                }
                 default:
                     return renderStandardTableCell(value.data);
                 }
@@ -821,7 +823,6 @@ function renderOrphanPackage(value, obj, level, row)
             package.version,
             row.sourceDbs,
         );
-        return document.createTextNode();
     }, function(package1, package2) {
         return package1.name.localeCompare(package2.name);
     });

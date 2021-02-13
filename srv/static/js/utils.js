@@ -75,7 +75,7 @@ function alterFormSelection(form, command)
                 break;
             }
         });
-    };
+    }
 }
 
 function getProperty(object, property, fallback)

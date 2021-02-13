@@ -217,7 +217,7 @@ function renderTextPossiblyElidingTheEnd(value)
     element.appendChild(elipses);
     element.onclick = function () {
         element.removeChild(element.lastChild);
-        (expaned = !expaned) ? element.appendChild(remainingText) : element.appendChild(elipses);
+        ((expaned = !expaned)) ? element.appendChild(remainingText) : element.appendChild(elipses);
     };
     return element;
 }
