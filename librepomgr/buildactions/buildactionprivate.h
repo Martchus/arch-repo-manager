@@ -554,7 +554,8 @@ private:
         PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeMakepkgToMakeSourcePackage(const BatchProcessingSession::SharedPointerType &downloadsSession,
         const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
-    InvocationResult invokeMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName);
+    InvocationResult invokeMakechrootpkg(
+        const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, bool hasFailuresInPreviousBatches);
     void addPackageToRepo(
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, PackageBuildProgress &packageProgress);
     void checkDownloadErrorsAndMakePackages(BatchProcessingSession::ContainerType &&failedPackages);

@@ -689,11 +689,12 @@ void ConductBuild::enqueueMakechrootpkg(const BatchProcessingSession::SharedPoin
     }
     assert(maxParallelInvocations == 1); // FIXME: parallel builds not implemented yet (required unique working copies and locking repo-add)
     for (std::size_t invocations = 0; invocations < maxParallelInvocations;) {
+        const auto hasFailuresInPreviousBatches = makepkgchrootSession->hasFailuresInPreviousBatches();
         const auto *const packageName = makepkgchrootSession->getCurrentPackageNameIfValidAndRelevantAndSelectNext();
         if (!packageName) {
             break;
         }
-        switch (invokeMakechrootpkg(makepkgchrootSession, *packageName)) {
+        switch (invokeMakechrootpkg(makepkgchrootSession, *packageName, hasFailuresInPreviousBatches)) {
         case InvocationResult::Ok:
             invocations += 1;
             break;
@@ -823,7 +824,7 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
 }
 
 InvocationResult ConductBuild::invokeMakechrootpkg(
-    const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName)
+    const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, bool hasFailuresInPreviousBatches)
 {
     auto lock = lockToRead();
     auto &packageProgress = m_buildProgress.progressByPackage[packageName];
@@ -847,7 +848,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     // check whether we can build this package when building as far as possible or when the build order has been
     // manuall specified (otherwise we don't need to check because we take it as given that all packages in the
     // previous batch have been built and that the order batch compution is correct)
-    if ((m_buildAsFarAsPossible || m_buildPreparation.manuallyOrdered) && makepkgchrootSession->hasFailuresInPreviousBatches()) {
+    if ((m_buildAsFarAsPossible || m_buildPreparation.manuallyOrdered) && hasFailuresInPreviousBatches) {
         const auto &buildData = m_buildPreparation.buildData[packageName];
         std::vector<const std::vector<LibPkg::Dependency> *> dependencies;
         dependencies.reserve(buildData.packages.size() + 2);
