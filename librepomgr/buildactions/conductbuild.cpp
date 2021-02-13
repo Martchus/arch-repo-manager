@@ -701,8 +701,8 @@ void ConductBuild::enqueueMakechrootpkg(const BatchProcessingSession::SharedPoin
             {
                 auto lock = lockToRead();
                 auto errorMessage = formattedPhraseString(Phrases::ErrorMessage) % "Unable to start build of " % *packageName
-                        % formattedPhraseString(Phrases::End) % "->  reason: "
-                    + m_buildProgress.progressByPackage[*packageName].error;
+                        % formattedPhraseString(Phrases::End) % "->  reason: " % m_buildProgress.progressByPackage[*packageName].error
+                    + '\n';
                 lock.unlock();
                 m_buildAction->log()(std::move(errorMessage));
             }
