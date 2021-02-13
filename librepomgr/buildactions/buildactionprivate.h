@@ -510,7 +510,7 @@ struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::strin
 private:
     const std::unordered_set<std::string_view> &m_relevantPackages;
     std::mutex m_mutex;
-    std::vector<std::vector<std::string>>::iterator m_batchIterator, m_batchEnd;
+    std::vector<std::vector<std::string>>::iterator m_batchBegin, m_batchIterator, m_batchEnd;
     std::vector<std::string>::iterator m_packageIterator, m_packageEnd;
     bool m_skipBatchesAfterFailure;
     bool m_hasFailuresInPreviousBatches;

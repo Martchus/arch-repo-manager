@@ -75,6 +75,7 @@ BatchProcessingSession::BatchProcessingSession(const std::unordered_set<string_v
     bool skipBatchesAfterFailure)
     : MultiSession<std::string>(ioContext, std::move(handler))
     , m_relevantPackages(relevantPackages)
+    , m_batchBegin(batches.begin())
     , m_batchIterator(batches.begin())
     , m_batchEnd(batches.end())
     , m_packageIterator(m_batchIterator != m_batchEnd ? m_batchIterator->begin() : decltype(m_packageIterator)())
@@ -168,7 +169,7 @@ const std::string *BatchProcessingSession::getCurrentPackageNameIfValidAndReleva
 /*!
  * \brief
  * Enables staging for the next batch. Enables staging for the current batch if the current package is the first package of
- * current batch.
+ * current batch and the current batch is not the first batch.
  * \remarks
  * - The behavior regarding the current batch was chosen because we call selectNextPackage() *before* enableStagingInNextBatch().
  * - This function might be called from multiple threads at the same time.
@@ -178,7 +179,7 @@ void BatchProcessingSession::enableStagingInNextBatch()
     m_enableStagingInNextBatch = true;
     if (!m_stagingEnabled) {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_stagingEnabled = m_batchIterator != m_batchEnd && m_packageIterator == m_batchIterator->begin();
+        m_stagingEnabled = m_batchIterator != m_batchEnd && m_batchIterator != m_batchBegin && m_packageIterator == m_batchIterator->begin();
     }
 }
 
