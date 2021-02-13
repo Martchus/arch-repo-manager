@@ -548,7 +548,8 @@ private:
     void downloadSourcesAndContinueBuilding();
     void enqueueDownloads(const BatchProcessingSession::SharedPointerType &downloadsSession, std::size_t maxParallelDownloads);
     void enqueueMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, std::size_t maxParallelInvocations);
-    bool checkForFailedDependency(const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const;
+    bool checkForFailedDependency(
+        const std::string &packageNameToCheck, const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const;
     InvocationResult invokeUpdatePkgSums(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeMakepkgToMakeSourcePackage(const BatchProcessingSession::SharedPointerType &downloadsSession,

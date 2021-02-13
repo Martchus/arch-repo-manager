@@ -714,10 +714,15 @@ void ConductBuild::enqueueMakechrootpkg(const BatchProcessingSession::SharedPoin
     dumpBuildProgress();
 }
 
-bool ConductBuild::checkForFailedDependency(const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const
+bool ConductBuild::checkForFailedDependency(
+    const std::string &packageNameToCheck, const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const
 {
     // check whether any of the specified dependencies are provided by packages which are supposed to be built but failed
     for (const auto &[packageName, buildData] : m_buildPreparation.buildData) {
+        // ignore the package we're checking for failed dependencies
+        if (packageName == packageNameToCheck) {
+            continue;
+        }
         // ignore packages which have been added to the repository successfully and treat any other packages as failed
         const auto buildProgress = m_buildProgress.progressByPackage.find(packageName);
         if (buildProgress != m_buildProgress.progressByPackage.end() && buildProgress->second.addedToRepo) {
@@ -850,7 +855,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         for (const auto &package : buildData.packages) {
             dependencies.emplace_back(&package->dependencies);
         }
-        if (checkForFailedDependency(dependencies)) {
+        if (checkForFailedDependency(packageName, dependencies)) {
             const auto writeLock = lockToWrite(lock);
             packageProgress.error = "unable to build because dependency failed";
             return InvocationResult::Error;
