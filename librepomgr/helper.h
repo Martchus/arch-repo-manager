@@ -50,9 +50,9 @@ inline void convertValue(const std::multimap<std::string, std::string> &multimap
     if (const char *const value = getLastValue(multimap, key)) {
         boost::system::error_code error;
         const auto ip = boost::asio::ip::make_address(value, error);
-        if (ip.is_unspecified()) {
-            cerr << Phrases::Error << "Specified IP address \"" << value << "\" for key \"" << key << "\" is invalid" << Phrases::End << "    "
-                 << error.message() << endl;
+        if (error) {
+            cerr << Phrases::ErrorMessage << "Specified IP address \"" << value << "\" for key \"" << key << "\" is invalid" << Phrases::End
+                 << Phrases::SubError << error.message() << Phrases::End;
             exit(-1);
         }
         result = ip;
@@ -69,7 +69,7 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
         try {
             result = stringToNumber<unsigned short>(value);
         } catch (const ConversionException &) {
-            cerr << Phrases::Error << "Specified number \"" << value << "\" for key \"" << key << "\" is invalid." << Phrases::End;
+            cerr << Phrases::ErrorMessage << "Specified number \"" << value << "\" for key \"" << key << "\" is invalid." << Phrases::End;
             exit(-1);
         }
     }
@@ -91,7 +91,7 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
         try {
             result = value;
         } catch (const regex_error &e) {
-            cerr << Phrases::Error << "Specified regex \"" << value << "\" for key \"" << key << "\" is invalid: " << Phrases::End;
+            cerr << Phrases::ErrorMessage << "Specified regex \"" << value << "\" for key \"" << key << "\" is invalid: " << Phrases::End;
             cerr << e.what() << '\n';
             exit(-1);
         }
