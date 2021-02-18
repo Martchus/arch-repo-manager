@@ -62,7 +62,6 @@
 }
 
 .pagination {
-    position: sticky;
     border-top: 1px solid #999;
     background-color: white;
     bottom: 0px;
@@ -72,12 +71,10 @@
     max-width: 0px;
 }
 .pagination a.prev {
-    position: sticky;
     margin-left: 0px;
     left: -1px;
 }
 .pagination a.next {
-    position: sticky;
     margin-right: 0px;
     right: 0px;
 }
@@ -107,6 +104,17 @@
     margin-right: 0px;
     padding-right: 0px;
     border-right: none;
+}
+.pagination, .pagination a.prev, .pagination a.next {
+    position: sticky;
+}
+@-moz-document url-prefix() {
+    /* disable sticky pagination on Firefox mobile as it does not work well */
+    @media (pointer:coarse) {
+        .pagination, .pagination a.prev, .pagination a.next {
+            position: initial !important;
+        }
+    }
 }
 
 .compact-heading {
