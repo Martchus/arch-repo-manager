@@ -343,6 +343,10 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
         deduplicateVector(db.mirrors);
     }
 
+    // clear unused locks because locks might not be useful anymore with the new config (e.g. the lock was for a
+    // repository directory which has been removed)
+    locks.clear(); // FIXME: Do this regularly to avoid the locks table growing potentially endlessly?
+
     // log the most important config values
     cerr << Phrases::InfoMessage << "Working directory: " << workingDirectory << Phrases::EndFlush;
     cerr << Phrases::InfoMessage << "Package cache directory: " << building.packageCacheDir << Phrases::EndFlush;
@@ -646,6 +650,17 @@ void ServiceSetup::run()
     }
 
     saveState();
+}
+
+void ServiceSetup::Locks::clear()
+{
+    const auto lock = std::lock_guard(m_mutex);
+    for (auto i = m_locksByName.begin(), end = m_locksByName.end(); i != end; ++i) {
+        if (auto lock2 = i->second.tryLockToWrite()) { // check whether nobody holds the lock anymore
+            lock2.unlock(); // ~shared_mutex(): The behavior is undefined if the mutex is owned by any thread [...].
+            m_locksByName.erase(i); // we can be sure no other thead aquires i->second in the meantime because we're holding m_mutex
+        }
+    }
 }
 
 ServiceStatus::ServiceStatus(const ServiceSetup &setup)

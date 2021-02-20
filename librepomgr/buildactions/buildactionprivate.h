@@ -133,11 +133,12 @@ public:
     using BufferPoolType = BufferPool<StorageType>;
     using BufferType = BufferPoolType::BufferType;
 
-    explicit BuildProcessSession(
-        BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&displayName, std::string &&logFilePath, Handler &&handler);
+    explicit BuildProcessSession(BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&displayName, std::string &&logFilePath,
+        Handler &&handler, AssociatedLocks &&locks = AssociatedLocks());
     template <typename... ChildArgs> void launch(ChildArgs &&...childArgs);
     void registerWebSession(std::shared_ptr<WebAPI::Session> &&webSession);
     void registerNewDataHandler(std::function<void(BufferType, std::size_t)> &&handler);
+    void assignLocks(AssociatedLocks &&locks = AssociatedLocks());
     bool hasExited() const;
 
 private:
@@ -186,6 +187,7 @@ private:
     BuffersToWrite m_logFileBuffers;
     std::unordered_map<std::shared_ptr<WebAPI::Session>, std::unique_ptr<DataForWebSession>> m_registeredWebSessions;
     std::function<void(BufferType, std::size_t)> m_newDataHandler;
+    AssociatedLocks m_locks;
     std::atomic_bool m_exited = false;
 };
 
@@ -201,15 +203,21 @@ inline std::size_t BuildProcessSession::DataForWebSession::bytesToSendFromFile()
 }
 
 inline BuildProcessSession::BuildProcessSession(BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&displayName,
-    std::string &&logFilePath, BaseProcessSession::Handler &&handler)
+    std::string &&logFilePath, BaseProcessSession::Handler &&handler, AssociatedLocks &&locks)
     : BaseProcessSession(ioContext, std::move(handler))
     , m_buildAction(buildAction ? buildAction->weak_from_this() : std::weak_ptr<BuildAction>())
     , m_pipe(ioContext)
     , m_bufferPool(bufferSize)
-    , m_displayName(displayName)
+    , m_displayName(std::move(displayName))
     , m_logFilePath(std::move(logFilePath))
     , m_logFileDescriptor(ioContext)
+    , m_locks(std::move(locks))
 {
+}
+
+inline void BuildProcessSession::assignLocks(AssociatedLocks &&locks)
+{
+    m_locks = std::move(locks);
 }
 
 inline bool BuildProcessSession::hasExited() const
