@@ -250,7 +250,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                 BuildActionSettingMetaInfo{
                     .name = "Dependencies to ignore",
                     .desc = "A white-space separated list of dependencies not to care about if missing (version constraints not supported)",
-                    .param = "ignore-optdepts",
+                    .param = "ignore-deps",
                 },
                 BuildActionSettingMetaInfo{
                     .name = "Libraries to ignore",
