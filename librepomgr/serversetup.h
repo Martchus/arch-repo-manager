@@ -125,6 +125,8 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         [[nodiscard]] std::unique_lock<std::shared_mutex> acquireToWrite(const std::string &lockName);
         [[nodiscard]] std::unique_lock<std::shared_mutex> acquireToWrite(std::shared_lock<std::shared_mutex> &readLock, const std::string &lockName);
         void clear();
+        static std::string forDatabase(std::string_view dbName, std::string_view dbArch);
+        static std::string forDatabase(const LibPkg::Database &db);
 
     private:
         std::mutex m_mutex;

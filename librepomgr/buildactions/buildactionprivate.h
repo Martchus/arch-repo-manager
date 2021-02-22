@@ -138,7 +138,7 @@ public:
     template <typename... ChildArgs> void launch(ChildArgs &&...childArgs);
     void registerWebSession(std::shared_ptr<WebAPI::Session> &&webSession);
     void registerNewDataHandler(std::function<void(BufferType, std::size_t)> &&handler);
-    void assignLocks(AssociatedLocks &&locks = AssociatedLocks());
+    AssociatedLocks &locks();
     bool hasExited() const;
 
 private:
@@ -215,9 +215,9 @@ inline BuildProcessSession::BuildProcessSession(BuildAction *buildAction, boost:
 {
 }
 
-inline void BuildProcessSession::assignLocks(AssociatedLocks &&locks)
+inline AssociatedLocks &BuildProcessSession::locks()
 {
-    m_locks = std::move(locks);
+    return m_locks;
 }
 
 inline bool BuildProcessSession::hasExited() const
@@ -341,8 +341,10 @@ private:
 protected:
     std::string m_sourceRepoDirectory;
     std::string m_sourceDatabaseFile;
+    std::string m_sourceDatabaseLockName;
     std::string m_destinationRepoDirectory;
     std::string m_destinationDatabaseFile;
+    std::string m_destinationDatabaseLockName;
     std::string m_workingDirectory;
     std::vector<std::string> m_fileNames;
     PackageMovementResult m_result;

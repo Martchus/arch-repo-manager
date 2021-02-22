@@ -55,10 +55,12 @@ bool PackageMovementAction::prepareRepoAction(RequiredDatabases requiredDatabase
     const auto *const destinationDb = *m_destinationDbs.begin();
     m_destinationRepoDirectory = destinationDb->localPkgDir;
     m_destinationDatabaseFile = fileName(destinationDb->path);
+    m_destinationDatabaseLockName = ServiceSetup::Locks::forDatabase(*destinationDb);
     if (requiredDatabases & RequiredDatabases::OneSource) {
         const auto *const sourceDb = *m_sourceDbs.begin();
         m_sourceRepoDirectory = sourceDb->localPkgDir;
         m_sourceDatabaseFile = fileName(sourceDb->path);
+        m_sourceDatabaseLockName = ServiceSetup::Locks::forDatabase(*sourceDb);
     }
     locatePackages();
     configReadLock = std::monostate();
@@ -154,6 +156,7 @@ void RemovePackages::run()
     // remove package from database file
     auto repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
         std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2));
+    repoRemoveProcess->locks().emplace_back(m_setup.locks.acquireToWrite(m_destinationDatabaseLockName));
     repoRemoveProcess->launch(
         boost::process::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
     m_buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", m_destinationRepoDirectory, "\" for \"", m_destinationDatabaseFile,
@@ -270,11 +273,13 @@ void MovePackages::run()
     // add packages to database file of destination repo
     auto repoAddProcess = m_buildAction->makeBuildProcess("repo-add", m_workingDirectory + "/repo-add.log",
         std::bind(&MovePackages::handleRepoAddResult, this, processSession, std::placeholders::_1, std::placeholders::_2));
+    repoAddProcess->locks().emplace_back(m_setup.locks.acquireToWrite(m_destinationDatabaseLockName));
     repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
 
     // remove package from database file of source repo
     auto repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
         std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2));
+    repoRemoveProcess->locks().emplace_back(m_setup.locks.acquireToWrite(m_sourceDatabaseLockName));
     repoRemoveProcess->launch(boost::process::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
 
     m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", m_destinationRepoDirectory, "\" for \"", m_destinationDatabaseFile,

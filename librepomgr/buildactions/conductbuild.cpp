@@ -901,19 +901,6 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         return InvocationResult::Error;
     }
 
-    // FIXME: lock the chroot directory to prevent other build tasks from using it (or does makechrootpkg already lock it?)
-
-    // copy config files into chroot directory
-    try {
-        std::filesystem::copy_file(makepkgchrootSession->isStagingEnabled() ? m_pacmanStagingConfigPath : m_pacmanConfigPath,
-            buildRoot + "/etc/pacman.conf", std::filesystem::copy_options::overwrite_existing);
-        std::filesystem::copy_file(m_makepkgConfigPath, buildRoot + "/etc/makepkg.conf", std::filesystem::copy_options::overwrite_existing);
-    } catch (const std::filesystem::filesystem_error &e) {
-        auto writeLock = lockToWrite(lock);
-        packageProgress.error = "Unable to configure chroot \"" % buildRoot % "\": " + e.what();
-        return InvocationResult::Error;
-    }
-
     // determine options/variables to pass
     std::vector<std::string> makechrootpkgFlags, makepkgFlags;
     // -> cleanup/upgrade
@@ -936,16 +923,35 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         makepkgFlags.emplace_back("TEST_FILE_PATH=/testfiles");
     }
 
-    // invoke makechrootpkg to build package
-    m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
+    // prepare process session
     auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
         std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
             std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
     processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
         std::bind(&ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1)));
+    processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "done", std::string_view(),
+        [processSession = processSession.get()](std::string &&) { processSession->locks().clear(); }));
+
+    // lock the chroot directory to prevent other build tasks from using it
+    m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
+    auto chrootLock = m_setup.locks.acquireToWrite(buildRoot);
+
+    // copy config files into chroot directory
+    try {
+        std::filesystem::copy_file(makepkgchrootSession->isStagingEnabled() ? m_pacmanStagingConfigPath : m_pacmanConfigPath,
+            buildRoot + "/etc/pacman.conf", std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(m_makepkgConfigPath, buildRoot + "/etc/makepkg.conf", std::filesystem::copy_options::overwrite_existing);
+    } catch (const std::filesystem::filesystem_error &e) {
+        auto writeLock = lockToWrite(lock);
+        packageProgress.error = "Unable to configure chroot \"" % buildRoot % "\": " + e.what();
+        return InvocationResult::Error;
+    }
+
+    // invoke makechrootpkg to build package
     m_buildAction->log()(Phrases::InfoMessage, "Invoking makechrootpkg for ", packageName, " via ", m_makeChrootPkgPath.string(), '\n',
         ps(Phrases::SubMessage), "build dir: ", packageProgress.buildDirectory, '\n', ps(Phrases::SubMessage), "chroot dir: ", chrootDir, '\n',
         ps(Phrases::SubMessage), "chroot user: ", packageProgress.chrootUser, '\n');
+    processSession->locks().emplace_back(std::move(chrootLock));
     processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, makechrootpkgFlags, "-C",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
         packageProgress.makepkgFlags);
@@ -1111,6 +1117,8 @@ void ConductBuild::addPackageToRepo(
     auto processSession = m_buildAction->makeBuildProcess("repo-add for " + packageName, packageProgress.buildDirectory + "/repo-add.log",
         std::bind(&ConductBuild::handleRepoAddErrorsAndMakeNextPackage, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress),
             std::placeholders::_1, std::placeholders::_2));
+    processSession->locks().emplace_back(m_setup.locks.acquireToWrite(
+        ServiceSetup::Locks::forDatabase(needsStaging ? m_buildPreparation.targetDb : m_buildPreparation.stagingDb, m_buildPreparation.targetArch)));
     processSession->launch(boost::process::start_dir(repoPath), m_repoAddPath, dbFilePath, binaryPackageNames);
     m_buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage), "repo path: ", repoPath, '\n',
         ps(Phrases::SubMessage), "db path: ", dbFilePath, '\n', ps(Phrases::SubMessage), "package(s): ", joinStrings(binaryPackageNames), '\n');

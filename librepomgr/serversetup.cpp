@@ -663,6 +663,16 @@ void ServiceSetup::Locks::clear()
     }
 }
 
+std::string ServiceSetup::Locks::forDatabase(std::string_view dbName, std::string_view dbArch)
+{
+    return dbName % '@' + dbArch;
+}
+
+std::string ServiceSetup::Locks::forDatabase(const LibPkg::Database &db)
+{
+    return forDatabase(db.name, db.arch);
+}
+
 ServiceStatus::ServiceStatus(const ServiceSetup &setup)
     : version(applicationInfo.version)
     , config(setup.config.computeStatus())
