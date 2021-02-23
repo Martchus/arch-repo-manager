@@ -34,6 +34,8 @@ void CustomCommand::run()
     auto metaInfoLock = metaInfo.lockToRead();
     const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::CustomCommand);
     const auto commandSetting = typeInfo.settings[static_cast<std::size_t>(CustomCommandSettings::Command)].param;
+    const auto sharedLocksSetting = typeInfo.settings[static_cast<std::size_t>(CustomCommandSettings::SharedLocks)].param;
+    const auto exclusiveLocksSetting = typeInfo.settings[static_cast<std::size_t>(CustomCommandSettings::ExclusiveLocks)].param;
     metaInfoLock.unlock();
     const auto &command = findSetting(commandSetting);
     if (command.empty()) {
@@ -54,7 +56,7 @@ void CustomCommand::run()
 
     m_buildAction->appendOutput(Phrases::InfoMessage, "Running custom command: ", command, '\n');
 
-    // launch process, pass finish handler
+    // prepare process and finish handler
     auto process
         = m_buildAction->makeBuildProcess("command", m_workingDirectory + "/the.log", [this](boost::process::child &&, ProcessResult &&result) {
               if (result.errorCode) {
@@ -71,6 +73,25 @@ void CustomCommand::run()
               const auto buildLock = m_setup.building.lockToWrite();
               reportSuccess();
           });
+
+    // acquire locks
+    // note: Using an std::set here (instead of a std::vector) to ensure we don't attempt to acquire the same lock twice and to ensure
+    //       locks are always acquired in the same order (to prevent deadlocks).
+    const auto sharedLockNames = splitStringSimple<std::set<std::string>>(findSetting(sharedLocksSetting), ",");
+    const auto exclusiveLockNames = splitStringSimple<std::set<std::string>>(findSetting(exclusiveLocksSetting), ",");
+    auto &locks = process->locks();
+    locks.reserve(sharedLockNames.size() + exclusiveLockNames.size());
+    for (const auto &lockName : sharedLockNames) {
+        if (!lockName.empty()) {
+            locks.emplace_back(m_setup.locks.acquireToRead(lockName));
+        }
+    }
+    for (const auto &lockName : exclusiveLockNames) {
+        if (!lockName.empty()) {
+            locks.emplace_back(m_setup.locks.acquireToWrite(lockName));
+        }
+    }
+
     process->launch(boost::process::start_dir(m_workingDirectory), boost::process::search_path("bash"), "-ec", command);
 }
 

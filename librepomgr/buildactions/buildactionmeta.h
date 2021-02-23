@@ -81,7 +81,7 @@ enum class CleanRepositoryFlags : BuildActionFlagType {
 enum class CheckForProblemsSettings : std::size_t { IgnoreDeps, IgnoreLibDeps };
 enum class PrepareBuildSettings : std::size_t { PKGBUILDsDirs };
 enum class ConductBuildSettings : std::size_t { ChrootDir, ChrootDefaultUser, CCacheDir, PackageCacheDir, TestFilesDir };
-enum class CustomCommandSettings : std::size_t { Command };
+enum class CustomCommandSettings : std::size_t { Command, SharedLocks, ExclusiveLocks };
 
 struct LIBREPOMGR_EXPORT BuildActionFlagMetaInfo : public ReflectiveRapidJSON::JsonSerializable<BuildActionFlagMetaInfo> {
     const BuildActionFlagType id = 0;

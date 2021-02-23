@@ -306,6 +306,16 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "The command to execute via Bash",
                     .param = "cmd",
                 },
+                BuildActionSettingMetaInfo{
+                    .name = "Shared locks",
+                    .desc = "A comma-separated list of shared lock names to acquire",
+                    .param = "shared-locks",
+                },
+                BuildActionSettingMetaInfo{
+                    .name = "Unique locks",
+                    .desc = "A comma-separated list of exclusive lock names to acquire",
+                    .param = "exclusive-locks",
+                },
             },
             .directory = true,
             .sourceDb = false,
