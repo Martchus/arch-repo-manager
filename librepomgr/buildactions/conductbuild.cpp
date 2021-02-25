@@ -929,7 +929,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
             std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
     processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
         std::bind(&ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1)));
-    processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "done", std::string_view(),
+    processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "\n", std::string_view(),
         [processSession = processSession.get()](std::string &&) { processSession->locks().clear(); }));
 
     // lock the chroot directory to prevent other build tasks from using it
@@ -1118,7 +1118,7 @@ void ConductBuild::addPackageToRepo(
         std::bind(&ConductBuild::handleRepoAddErrorsAndMakeNextPackage, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress),
             std::placeholders::_1, std::placeholders::_2));
     processSession->locks().emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(),
-        ServiceSetup::Locks::forDatabase(needsStaging ? m_buildPreparation.targetDb : m_buildPreparation.stagingDb, m_buildPreparation.targetArch)));
+        ServiceSetup::Locks::forDatabase(needsStaging ? m_buildPreparation.stagingDb : m_buildPreparation.targetDb, m_buildPreparation.targetArch)));
     processSession->launch(boost::process::start_dir(repoPath), m_repoAddPath, dbFilePath, binaryPackageNames);
     m_buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage), "repo path: ", repoPath, '\n',
         ps(Phrases::SubMessage), "db path: ", dbFilePath, '\n', ps(Phrases::SubMessage), "package(s): ", joinStrings(binaryPackageNames), '\n');
