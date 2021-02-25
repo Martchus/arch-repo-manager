@@ -80,15 +80,16 @@ void CustomCommand::run()
     const auto sharedLockNames = splitStringSimple<std::set<std::string>>(findSetting(sharedLocksSetting), ",");
     const auto exclusiveLockNames = splitStringSimple<std::set<std::string>>(findSetting(exclusiveLocksSetting), ",");
     auto &locks = process->locks();
+    auto &log = m_buildAction->log();
     locks.reserve(sharedLockNames.size() + exclusiveLockNames.size());
     for (const auto &lockName : sharedLockNames) {
         if (!lockName.empty()) {
-            locks.emplace_back(m_setup.locks.acquireToRead(lockName));
+            locks.emplace_back(m_setup.locks.acquireToRead(log, std::string(lockName)));
         }
     }
     for (const auto &lockName : exclusiveLockNames) {
         if (!lockName.empty()) {
-            locks.emplace_back(m_setup.locks.acquireToWrite(lockName));
+            locks.emplace_back(m_setup.locks.acquireToWrite(log, std::string(lockName)));
         }
     }
 

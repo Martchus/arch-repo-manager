@@ -74,11 +74,11 @@ void ReloadDatabase::run()
                 m_buildAction->appendOutput(
                     Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch, "\" from local file \"", dbPath, "\"\n");
                 try {
-                    auto dbFileLock = m_setup.locks.acquireToRead({ ServiceSetup::Locks::forDatabase(dbName, dbArch) });
+                    auto dbFileLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(dbName, dbArch));
                     const auto lastModified = LibPkg::lastModified(dbPath);
                     auto dbFile = LibPkg::extractFiles(dbPath, &LibPkg::Database::isFileRelevant);
                     auto packages = LibPkg::Package::fromDatabaseFile(move(dbFile));
-                    dbFileLock.unlock();
+                    dbFileLock.lock().unlock();
                     const auto configLock = m_setup.config.lockToWrite();
                     auto *const db = m_setup.config.findDatabase(dbName, dbArch);
                     if (!db) {

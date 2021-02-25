@@ -6,8 +6,10 @@ set(HEADER_FILES
     serversetup.h
     helper.h
     json.h
+    logcontext.h
     logging.h
     multisession.h
+    namedlockable.h
     authentication.h
     webapi/server.h
     webapi/session.h
@@ -30,6 +32,7 @@ set(SRC_FILES
     json.cpp
     errorhandling.cpp
     serversetup.cpp
+    namedlockable.cpp
     authentication.cpp
     webapi/server.cpp
     webapi/session.cpp

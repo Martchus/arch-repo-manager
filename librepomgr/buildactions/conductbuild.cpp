@@ -934,7 +934,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
 
     // lock the chroot directory to prevent other build tasks from using it
     m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
-    auto chrootLock = m_setup.locks.acquireToWrite(buildRoot);
+    auto chrootLock = m_setup.locks.acquireToWrite(m_buildAction->log(), std::string(buildRoot));
 
     // copy config files into chroot directory
     try {
@@ -1117,7 +1117,7 @@ void ConductBuild::addPackageToRepo(
     auto processSession = m_buildAction->makeBuildProcess("repo-add for " + packageName, packageProgress.buildDirectory + "/repo-add.log",
         std::bind(&ConductBuild::handleRepoAddErrorsAndMakeNextPackage, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress),
             std::placeholders::_1, std::placeholders::_2));
-    processSession->locks().emplace_back(m_setup.locks.acquireToWrite(
+    processSession->locks().emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(),
         ServiceSetup::Locks::forDatabase(needsStaging ? m_buildPreparation.targetDb : m_buildPreparation.stagingDb, m_buildPreparation.targetArch)));
     processSession->launch(boost::process::start_dir(repoPath), m_repoAddPath, dbFilePath, binaryPackageNames);
     m_buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage), "repo path: ", repoPath, '\n',

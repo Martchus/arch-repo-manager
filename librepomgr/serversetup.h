@@ -4,6 +4,7 @@
 #include "./authentication.h"
 #include "./buildactions/buildaction.h"
 #include "./buildactions/buildactiontemplate.h"
+#include "./namedlockable.h"
 
 #include "../libpkg/data/config.h"
 #include "../libpkg/data/lockable.h"
@@ -121,16 +122,15 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     } auth;
 
     struct LIBREPOMGR_EXPORT Locks {
-        [[nodiscard]] std::shared_lock<std::shared_mutex> acquireToRead(const std::string &lockName);
-        [[nodiscard]] std::unique_lock<std::shared_mutex> acquireToWrite(const std::string &lockName);
-        [[nodiscard]] std::unique_lock<std::shared_mutex> acquireToWrite(std::shared_lock<std::shared_mutex> &readLock, const std::string &lockName);
+        [[nodiscard]] SharedNamedLock acquireToRead(LogContext &log, std::string &&lockName);
+        [[nodiscard]] UniqueNamedLock acquireToWrite(LogContext &log, std::string &&lockName);
         void clear();
         static std::string forDatabase(std::string_view dbName, std::string_view dbArch);
         static std::string forDatabase(const LibPkg::Database &db);
 
     private:
         std::mutex m_mutex;
-        std::unordered_map<std::string, LibPkg::Lockable> m_locksByName;
+        std::unordered_map<std::string, NamedLockable> m_locksByName;
     } locks;
 
     void loadConfigFiles(bool restoreStateAndDiscardDatabases);
@@ -149,23 +149,16 @@ inline std::shared_ptr<BuildAction> ServiceSetup::BuildSetup::getBuildAction(Bui
     return id < actions.size() ? actions[id] : nullptr;
 }
 
-inline std::shared_lock<std::shared_mutex> ServiceSetup::Locks::acquireToRead(const std::string &lockName)
+inline SharedNamedLock ServiceSetup::Locks::acquireToRead(LogContext &log, std::string &&lockName)
 {
     const auto lock = std::lock_guard(m_mutex);
-    return m_locksByName[lockName].lockToRead();
+    return m_locksByName[lockName].lockToRead(log, std::move(lockName));
 }
 
-inline std::unique_lock<std::shared_mutex> ServiceSetup::Locks::acquireToWrite(const std::string &lockName)
+inline UniqueNamedLock ServiceSetup::Locks::acquireToWrite(LogContext &log, std::string &&lockName)
 {
     const auto lock = std::lock_guard(m_mutex);
-    return m_locksByName[lockName].lockToWrite();
-}
-
-inline std::unique_lock<std::shared_mutex> ServiceSetup::Locks::acquireToWrite(
-    std::shared_lock<std::shared_mutex> &readLock, const std::string &lockName)
-{
-    readLock.unlock();
-    return acquireToWrite(lockName);
+    return m_locksByName[lockName].lockToWrite(log, std::move(lockName));
 }
 
 struct LIBREPOMGR_EXPORT ServiceStatus : public ReflectiveRapidJSON::JsonSerializable<ServiceStatus> {

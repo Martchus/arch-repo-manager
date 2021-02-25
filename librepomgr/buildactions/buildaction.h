@@ -7,6 +7,9 @@
 
 #include "../webapi/routes.h"
 
+#include "../logcontext.h"
+#include "../namedlockable.h"
+
 #include "../../libpkg/data/config.h"
 #include "../../libpkg/data/lockable.h"
 
@@ -35,22 +38,6 @@ class BuildActionsTests;
 
 namespace LibRepoMgr {
 
-struct LogContext {
-    explicit LogContext(BuildAction *buildAction = nullptr);
-    LogContext &operator=(const LogContext &) = delete;
-    template <typename... Args> LogContext &operator()(CppUtilities::EscapeCodes::Phrases phrase, Args &&...args);
-    template <typename... Args> LogContext &operator()(Args &&...args);
-    template <typename... Args> LogContext &operator()(std::string &&msg);
-
-private:
-    BuildAction *const m_buildAction;
-};
-
-inline LogContext::LogContext(BuildAction *buildAction)
-    : m_buildAction(buildAction)
-{
-}
-
 struct ServiceSetup;
 
 namespace WebAPI {
@@ -60,7 +47,7 @@ class Session;
 
 struct InternalBuildAction;
 
-using AssociatedLocks = std::vector<std::variant<std::shared_lock<std::shared_mutex>, std::unique_lock<std::shared_mutex>>>;
+using AssociatedLocks = std::vector<std::variant<SharedNamedLock, UniqueNamedLock>>;
 
 struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSerializable<PackageBuildData>,
                                             public ReflectiveRapidJSON::BinarySerializable<PackageBuildData> {
@@ -362,3 +349,6 @@ struct LIBREPOMGR_EXPORT BuildActionBasicInfo : public ReflectiveRapidJSON::Json
 } // namespace LibRepoMgr
 
 #endif // LIBREPOMGR_BUILD_ACTION_H
+
+// avoid making LogContext available without also defining overloads for operator() which would possibly lead to linker errors
+#include "../logging.h"
