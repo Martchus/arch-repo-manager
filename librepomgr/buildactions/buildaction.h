@@ -7,8 +7,8 @@
 
 #include "../webapi/routes.h"
 
+#include "../globallock.h"
 #include "../logcontext.h"
-#include "../namedlockable.h"
 
 #include "../../libpkg/data/config.h"
 #include "../../libpkg/data/lockable.h"
@@ -47,7 +47,7 @@ class Session;
 
 struct InternalBuildAction;
 
-using AssociatedLocks = std::vector<std::variant<SharedNamedLock, UniqueNamedLock>>;
+using AssociatedLocks = std::vector<std::variant<SharedLoggingLock, UniqueLoggingLock>>;
 
 struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSerializable<PackageBuildData>,
                                             public ReflectiveRapidJSON::BinarySerializable<PackageBuildData> {

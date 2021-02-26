@@ -9,7 +9,7 @@ set(HEADER_FILES
     logcontext.h
     logging.h
     multisession.h
-    namedlockable.h
+    globallock.h
     authentication.h
     webapi/server.h
     webapi/session.h
@@ -32,7 +32,7 @@ set(SRC_FILES
     json.cpp
     errorhandling.cpp
     serversetup.cpp
-    namedlockable.cpp
+    globallock.cpp
     authentication.cpp
     webapi/server.cpp
     webapi/session.cpp
@@ -58,7 +58,7 @@ set(SRC_FILES
     buildactions/preparebuild.cpp
     buildactions/conductbuild.cpp)
 set(TEST_HEADER_FILES tests/parser_helper.h)
-set(TEST_SRC_FILES tests/cppunit.cpp tests/buildactions.cpp tests/webapi.cpp tests/parser_helper.cpp)
+set(TEST_SRC_FILES tests/cppunit.cpp tests/buildactions.cpp tests/utils.cpp tests/webapi.cpp tests/parser_helper.cpp)
 
 # meta data
 set(META_PROJECT_NAME librepomgr)
