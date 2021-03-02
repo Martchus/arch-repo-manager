@@ -942,7 +942,8 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
             buildRoot + "/etc/pacman.conf", std::filesystem::copy_options::overwrite_existing);
         std::filesystem::copy_file(m_makepkgConfigPath, buildRoot + "/etc/makepkg.conf", std::filesystem::copy_options::overwrite_existing);
     } catch (const std::filesystem::filesystem_error &e) {
-        auto writeLock = lockToWrite(lock);
+        chrootLock.lock().unlock();
+        const auto writeLock = lockToWrite(lock);
         packageProgress.error = "Unable to configure chroot \"" % buildRoot % "\": " + e.what();
         return InvocationResult::Error;
     }
