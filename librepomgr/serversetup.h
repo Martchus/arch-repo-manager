@@ -122,15 +122,18 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     } auth;
 
     struct LIBREPOMGR_EXPORT Locks {
+        using LockTable = std::unordered_map<std::string, GlobalLockable>;
+
         [[nodiscard]] SharedLoggingLock acquireToRead(LogContext &log, std::string &&lockName);
         [[nodiscard]] UniqueLoggingLock acquireToWrite(LogContext &log, std::string &&lockName);
+        [[nodiscard]] std::pair<LockTable *, std::unique_lock<std::mutex>> acquireLockTable();
         void clear();
         static std::string forDatabase(std::string_view dbName, std::string_view dbArch);
         static std::string forDatabase(const LibPkg::Database &db);
 
     private:
         std::mutex m_mutex;
-        std::unordered_map<std::string, GlobalLockable> m_locksByName;
+        LockTable m_locksByName;
     } locks;
 
     void loadConfigFiles(bool restoreStateAndDiscardDatabases);
@@ -159,6 +162,11 @@ inline UniqueLoggingLock ServiceSetup::Locks::acquireToWrite(LogContext &log, st
 {
     const auto lock = std::lock_guard(m_mutex);
     return m_locksByName[lockName].lockToWrite(log, std::move(lockName));
+}
+
+inline std::pair<ServiceSetup::Locks::LockTable *, std::unique_lock<std::mutex>> ServiceSetup::Locks::acquireLockTable()
+{
+    return std::make_pair(&m_locksByName, std::unique_lock(m_mutex));
 }
 
 struct LIBREPOMGR_EXPORT ServiceStatus : public ReflectiveRapidJSON::JsonSerializable<ServiceStatus> {

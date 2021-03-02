@@ -1,5 +1,6 @@
 #include "../globallock.h"
 #include "../logging.h"
+#include "../serversetup.h"
 
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/io/misc.h>
@@ -20,9 +21,11 @@ using namespace LibRepoMgr;
 class UtilsTests : public TestFixture {
     CPPUNIT_TEST_SUITE(UtilsTests);
     CPPUNIT_TEST(testGlobalLock);
+    CPPUNIT_TEST(testLockTable);
     CPPUNIT_TEST_SUITE_END();
 
     void testGlobalLock();
+    void testLockTable();
 
 public:
     UtilsTests();
@@ -68,4 +71,18 @@ void UtilsTests::testGlobalLock()
     mutex.unlock_shared();
     CPPUNIT_ASSERT_MESSAGE("try_lock() possible if mutex not locked", mutex.try_lock());
     mutex.unlock();
+}
+
+void UtilsTests::testLockTable()
+{
+    auto log = LogContext();
+    auto locks = ServiceSetup::Locks();
+    auto readLock = locks.acquireToRead(log, "foo");
+    locks.clear(); // should not deadlock (and simply ignore the still acquired lock)
+    readLock.lock().unlock();
+    auto lockTable = locks.acquireLockTable();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("read lock still present", 1_st, lockTable.first->size());
+    lockTable.second.unlock();
+    locks.clear(); // should free up all locks now
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("read lock cleared", 0_st, lockTable.first->size());
 }

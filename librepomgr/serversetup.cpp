@@ -656,10 +656,12 @@ void ServiceSetup::Locks::clear()
 {
     auto log = LogContext();
     const auto lock = std::lock_guard(m_mutex);
-    for (auto i = m_locksByName.begin(), end = m_locksByName.end(); i != end; ++i) {
+    for (auto i = m_locksByName.begin(), end = m_locksByName.end(); i != end;) {
         if (auto lock2 = i->second.tryLockToWrite(log, std::string(i->first)); lock2.lock()) { // check whether nobody holds the lock anymore
             lock2.lock().unlock(); // ~shared_mutex(): The behavior is undefined if the mutex is owned by any thread [...].
-            m_locksByName.erase(i); // we can be sure no other thead aquires i->second in the meantime because we're holding m_mutex
+            m_locksByName.erase(i++); // we can be sure no other thead aquires i->second in the meantime because we're holding m_mutex
+        } else {
+            ++i;
         }
     }
 }
