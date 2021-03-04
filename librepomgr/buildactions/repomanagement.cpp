@@ -2,6 +2,8 @@
 
 #include "../logging.h"
 
+#include "../libpkg/parser/utils.h"
+
 #include <c++utilities/chrono/datetime.h>
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
@@ -13,6 +15,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <ranges>
 
 using namespace std;
 using namespace std::literals::string_view_literals;
@@ -401,6 +404,11 @@ void CheckForProblems::run()
 
     auto result = std::unordered_map<std::string, std::vector<RepositoryProblem>>();
     for (auto *const db : m_destinationDbs) {
+        // acquire locks
+        const auto archLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(*db));
+        const auto anyLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(db->name, "any"));
+        const auto srcLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(db->name, "src"));
+
         // check whether files exist
         auto &problems = result[db->name];
         try {
@@ -432,6 +440,7 @@ void CheckForProblems::run()
         } catch (const std::filesystem::filesystem_error &e) {
             problems.emplace_back(RepositoryProblem{ .desc = argsToString("unable to check presence of files: ", e.what()) });
         }
+
         // check for unresolved dependencies and missing libraries
     checkForUnresolvedPackages:
         auto unresolvedPackages = db->detectUnresolvedPackages(
@@ -471,7 +480,9 @@ void CleanRepository::run()
         return;
     }
 
-    // find relevant repository directories
+    // find relevant repository directories and acquire locks
+    // note: Only using a shared lock here because the cleanup isn't supposed to touch any files which actually still belong to
+    //       the repository.
     enum class RepoDirType {
         New,
         ArchSpecific,
@@ -483,6 +494,7 @@ void CleanRepository::run()
         std::vector<std::pair<std::filesystem::path, std::string>> toArchive; // old packages not belonging to the DB anymore
         std::vector<std::filesystem::path> toDelete; // non-package junk files
         std::unordered_set<LibPkg::Database *> relevantDbs;
+        std::variant<std::monostate, SharedLoggingLock, UniqueLoggingLock> lock;
         RepoDirType type = RepoDirType::New;
     };
     std::unordered_map<std::string, RepoDir> repoDirs;
@@ -494,6 +506,8 @@ void CleanRepository::run()
             auto &anyDir = repoDirs[anyPath.string()];
             if (anyDir.type == RepoDirType::New) {
                 anyDir.type = RepoDirType::Any;
+                anyDir.lock.emplace<SharedLoggingLock>(
+                    m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(db.name, "any")));
                 anyDir.canonicalPath = std::move(anyPath);
             }
             anyDir.relevantDbs.emplace(&db);
@@ -506,6 +520,8 @@ void CleanRepository::run()
             auto &srcDir = repoDirs[srcPath.string()];
             if (srcDir.type == RepoDirType::New) {
                 srcDir.type = RepoDirType::Src;
+                srcDir.lock.emplace<SharedLoggingLock>(
+                    m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(db.name, "src")));
                 srcDir.canonicalPath = std::move(srcPath);
             }
             srcDir.relevantDbs.emplace(&db);
@@ -522,10 +538,20 @@ void CleanRepository::run()
         auto parentPath = std::filesystem::path();
         try {
             auto archSpecificPath = std::filesystem::canonical(db->localPkgDir);
+            const auto dbFile = argsToString(archSpecificPath, '/', db->name + ".db");
+            const auto lastModified = LibPkg::lastModified(dbFile);
+            if (lastModified != db->lastUpdate) {
+                m_messages.errors.emplace_back("The db file's last modification (" % lastModified.toString() % ") does not match the last db update ("
+                        % db->lastUpdate.toString()
+                    + ").");
+                fatalError = true;
+            }
             auto &archSpecificDir = repoDirs[archSpecificPath.string()];
             parentPath = archSpecificPath.parent_path();
             if (archSpecificDir.type == RepoDirType::New) {
                 archSpecificDir.type = RepoDirType::ArchSpecific;
+                archSpecificDir.lock.emplace<SharedLoggingLock>(
+                    m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(*db)));
                 archSpecificDir.canonicalPath = std::move(archSpecificPath);
             }
             archSpecificDir.relevantDbs.emplace(db);
@@ -559,12 +585,12 @@ void CleanRepository::run()
     }
 
     // find relevant databases for repo dirs discovered in "find other directories next to …" step
-    std::vector<std::unique_ptr<LibPkg::Database>> otherDbs;
+    auto otherDbs = std::vector<std::unique_ptr<LibPkg::Database>>();
     for (auto &[dirName, dirInfo] : repoDirs) {
         if (dirInfo.type != RepoDirType::New) {
             continue;
         }
-        std::vector<std::string> dbFileNames;
+        auto dbFilePaths = std::vector<std::filesystem::path>();
         try {
             // find the database file
             dirInfo.canonicalPath = std::filesystem::canonical(dirName);
@@ -573,20 +599,36 @@ void CleanRepository::run()
                     continue;
                 }
                 if (repoItem.path().extension() == ".db") {
-                    dbFileNames.emplace_back(repoItem.path().filename());
+                    dbFilePaths.emplace_back(repoItem.path());
                 }
             }
-            if (dbFileNames.empty()) {
+            if (dbFilePaths.empty()) {
                 throw std::runtime_error("no *.db file present");
             }
-            if (dbFileNames.size() > 1) {
-                throw std::runtime_error("multiple/ambigous *.db files present: " + joinStrings(dbFileNames, ", "));
+            if (dbFilePaths.size() > 1) {
+                auto dbFileNames
+#if defined(__GNUC__) && !defined(__clang__)
+                    = dbFilePaths | std::views::transform([](const std::filesystem::path &path) { return std::string(path.filename()); });
+#else
+                    = [&dbFilePaths] {
+                          auto res = std::vector<std::string>();
+                          res.reserve(dbFilePaths.size());
+                          for (const auto &path : dbFilePaths) {
+                              res.emplace_back(path.filename());
+                          }
+                          return res;
+                      }();
+#endif
+                throw std::runtime_error(
+                    "multiple/ambigous *.db files present: " + joinStrings<decltype(dbFileNames), std::string>(dbFileNames, ", "));
             }
             // initialize temporary database object for the repository
-            auto &db
-                = otherDbs.emplace_back(std::make_unique<LibPkg::Database>(dirName, argsToString(dirInfo.canonicalPath, '/', dbFileNames.front())));
+            auto &db = otherDbs.emplace_back(std::make_unique<LibPkg::Database>(dbFilePaths.front().stem(), dbFilePaths.front()));
+            db->arch = dirInfo.canonicalPath.stem();
             db->loadPackages();
             dirInfo.relevantDbs.emplace(db.get());
+            // acquire lock for db directory
+            dirInfo.lock.emplace<SharedLoggingLock>(m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(*db)));
             // find the "any" and "src" directory
             db->localPkgDir = dirInfo.canonicalPath.string();
             addAnyAndSrcDir(*db);
@@ -729,6 +771,7 @@ void CleanRepository::run()
         }
         m_buildAction->appendOutput(Phrases::InfoMessage, "Archived/deleted ", processesItems, " files in \"", dirName, '\"', '\n');
     }
+    repoDirs.clear();
 
     const auto buildLock = m_setup.building.lockToWrite();
     m_buildAction->resultData = std::move(m_messages);

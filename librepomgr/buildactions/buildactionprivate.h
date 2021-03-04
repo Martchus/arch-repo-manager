@@ -313,8 +313,8 @@ protected:
 
     ServiceSetup &m_setup;
     std::shared_ptr<BuildAction> m_buildAction;
-    std::set<LibPkg::Database *> m_sourceDbs;
-    std::set<LibPkg::Database *> m_destinationDbs;
+    std::set<LibPkg::Database *> m_sourceDbs; // ordering important to prevent deadlocks when acquiring locks for DBs
+    std::set<LibPkg::Database *> m_destinationDbs; // ordering important to prevent deadlocks when acquiring locks for DBs
     bool m_fromAur = false;
     bool m_toAur = false;
     bool m_hasError = false;
