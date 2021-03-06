@@ -113,7 +113,7 @@ void BuildProcessSession::registerWebSession(std::shared_ptr<WebAPI::Session> &&
 void BuildProcessSession::registerNewDataHandler(std::function<void(BuildProcessSession::BufferType, std::size_t)> &&handler)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
-    m_newDataHandler = std::move(handler);
+    m_newDataHandlers.emplace_back(std::move(handler));
 }
 
 void BuildProcessSession::prpareLogFile()
@@ -176,8 +176,10 @@ void BuildProcessSession::writeDataFromPipe(boost::system::error_code ec, std::s
                 sessionInfo->outstandingBuffersToSend.emplace_back(std::pair(m_buffer, bytesTransferred));
             }
         }
-        if (m_newDataHandler) {
-            m_newDataHandler(m_buffer, bytesTransferred);
+        for (const auto &handler : m_newDataHandlers) {
+            if (handler) {
+                handler(m_buffer, bytesTransferred);
+            }
         }
     }
     // continue reading from the pipe unless there was an error

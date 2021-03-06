@@ -186,7 +186,7 @@ private:
     std::mutex m_mutex;
     BuffersToWrite m_logFileBuffers;
     std::unordered_map<std::shared_ptr<WebAPI::Session>, std::unique_ptr<DataForWebSession>> m_registeredWebSessions;
-    std::function<void(BufferType, std::size_t)> m_newDataHandler;
+    std::vector<std::function<void(BufferType, std::size_t)>> m_newDataHandlers;
     AssociatedLocks m_locks;
     std::atomic_bool m_exited = false;
 };
