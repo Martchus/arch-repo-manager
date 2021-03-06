@@ -930,7 +930,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
         std::bind(&ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1)));
     processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "\n", std::string_view(),
-        [processSession = processSession.get()](std::string &&) { processSession->locks().clear(); }));
+        [processSession = processSession.get()](std::string &&) { processSession->locks().pop_back(); }));
 
     // lock the chroot directory to prevent other build tasks from using it
     m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
@@ -952,7 +952,10 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     m_buildAction->log()(Phrases::InfoMessage, "Invoking makechrootpkg for ", packageName, " via ", m_makeChrootPkgPath.string(), '\n',
         ps(Phrases::SubMessage), "build dir: ", packageProgress.buildDirectory, '\n', ps(Phrases::SubMessage), "chroot dir: ", chrootDir, '\n',
         ps(Phrases::SubMessage), "chroot user: ", packageProgress.chrootUser, '\n');
-    processSession->locks().emplace_back(std::move(chrootLock));
+    auto &locks = processSession->locks();
+    locks.reserve(2);
+    locks.emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(), chrootDir % '/' + packageProgress.chrootUser));
+    locks.emplace_back(std::move(chrootLock));
     processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, makechrootpkgFlags, "-C",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
         packageProgress.makepkgFlags);
