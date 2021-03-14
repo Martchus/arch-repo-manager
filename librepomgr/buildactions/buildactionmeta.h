@@ -74,6 +74,10 @@ enum class ConductBuildFlags : BuildActionFlagType {
     UpdateChecksums = (1 << 2),
     AutoStaging = (1 << 3),
 };
+enum class CheckForProblemsFlags : BuildActionFlagType {
+    None,
+    RequirePackageSignatures = (1 << 0),
+};
 enum class CleanRepositoryFlags : BuildActionFlagType {
     None,
     DryRun = (1 << 0),
@@ -176,5 +180,6 @@ CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ReloadLibraryDependen
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::PrepareBuildFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ConductBuildFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::CleanRepositoryFlags)
+CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::CheckForProblemsFlags)
 
 #endif // LIBREPOMGR_BUILD_ACTION_META_H

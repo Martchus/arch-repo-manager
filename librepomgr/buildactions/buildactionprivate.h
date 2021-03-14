@@ -432,6 +432,9 @@ private:
 struct LIBREPOMGR_EXPORT CheckForProblems : public InternalBuildAction {
     CheckForProblems(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction);
     void run();
+
+private:
+    bool m_requirePackageSignatures = false;
 };
 
 struct LIBREPOMGR_EXPORT CleanRepository : public InternalBuildAction {

@@ -192,20 +192,30 @@ void RemovePackages::handleRepoRemoveResult(boost::process::child &&child, Proce
 void RemovePackages::movePackagesToArchive()
 {
     m_buildAction->log()(Phrases::InfoMessage, "Moving packages to archive directory");
-    std::filesystem::path archivePath;
+    std::filesystem::path archivePath, destPath, signatureFile;
     auto processedPackageIterator = m_result.processedPackages.begin();
     for (const auto &[packageName, packageLocation, ok] : m_packageLocations) {
         try {
             archivePath = packageLocation.pathWithinRepo.parent_path() / "archive";
+            destPath = archivePath / packageLocation.pathWithinRepo.filename();
+            signatureFile = argsToString(packageLocation.pathWithinRepo, ".sig");
             std::filesystem::create_directory(archivePath);
-            std::filesystem::rename(packageLocation.pathWithinRepo, archivePath / packageLocation.pathWithinRepo.filename());
+            std::filesystem::rename(packageLocation.pathWithinRepo, destPath);
+            if (std::filesystem::exists(signatureFile)) {
+                std::filesystem::rename(signatureFile, argsToString(destPath, ".sig"));
+            }
             if (packageLocation.storageLocation.empty()) {
                 continue;
             }
             // FIXME: The file at the storage location *might* still be used elsewhere. Better leave that to a repo cleanup task (to be implemented later).
             archivePath = packageLocation.storageLocation.parent_path() / "archive";
+            destPath = archivePath / packageLocation.storageLocation.filename();
+            signatureFile = argsToString(packageLocation.storageLocation, ".sig");
             std::filesystem::create_directory(archivePath);
-            std::filesystem::rename(packageLocation.storageLocation, archivePath / packageLocation.storageLocation.filename());
+            std::filesystem::rename(packageLocation.storageLocation, destPath);
+            if (std::filesystem::exists(signatureFile)) {
+                std::filesystem::rename(signatureFile, argsToString(destPath, ".sig"));
+            }
             ++processedPackageIterator;
         } catch (const std::filesystem::filesystem_error &e) {
             processedPackageIterator = m_result.processedPackages.erase(processedPackageIterator);
@@ -236,8 +246,13 @@ void MovePackages::run()
     m_result.processedPackages.reserve(m_packageLocations.size());
     for (auto &[packageName, packageLocation, ok] : m_packageLocations) {
         try {
+            const auto destPath = m_destinationRepoDirectory / packageLocation.pathWithinRepo.filename();
+            const auto signatureFile = std::filesystem::path(argsToString(packageLocation.pathWithinRepo, ".sig"));
             if (packageLocation.storageLocation.empty()) {
-                std::filesystem::copy_file(packageLocation.pathWithinRepo, m_destinationRepoDirectory / packageLocation.pathWithinRepo.filename());
+                std::filesystem::copy_file(packageLocation.pathWithinRepo, destPath);
+                if (std::filesystem::exists(signatureFile)) {
+                    std::filesystem::copy_file(signatureFile, argsToString(destPath, ".sig"));
+                }
             } else {
                 const auto symlinkTarget = std::filesystem::read_symlink(packageLocation.pathWithinRepo);
                 if (symlinkTarget.is_absolute()) {
@@ -248,11 +263,17 @@ void MovePackages::run()
                     continue;
                 }
                 const auto newStorageLocation = m_destinationRepoDirectory / symlinkTarget;
+                const auto storageSignatureFile = std::filesystem::path(argsToString(packageLocation.storageLocation, ".sig"));
                 std::filesystem::create_directory(
                     newStorageLocation.parent_path()); // ensure the parent, e.g. the "any" directory exists; assume further parents already exist
-                std::filesystem::copy(packageLocation.pathWithinRepo, m_destinationRepoDirectory / packageLocation.pathWithinRepo.filename(),
-                    std::filesystem::copy_options::copy_symlinks);
+                std::filesystem::copy(packageLocation.pathWithinRepo, destPath, std::filesystem::copy_options::copy_symlinks);
                 std::filesystem::copy_file(packageLocation.storageLocation, newStorageLocation);
+                if (std::filesystem::exists(signatureFile)) {
+                    std::filesystem::copy(signatureFile, argsToString(destPath, ".sig"), std::filesystem::copy_options::copy_symlinks);
+                }
+                if (std::filesystem::exists(storageSignatureFile)) {
+                    std::filesystem::copy_file(storageSignatureFile, argsToString(newStorageLocation, ".sig"));
+                }
             }
         } catch (const std::filesystem::filesystem_error &e) {
             ok = false;
@@ -387,6 +408,8 @@ CheckForProblems::CheckForProblems(ServiceSetup &setup, const std::shared_ptr<Bu
 void CheckForProblems::run()
 {
     // read settings
+    const auto flags = static_cast<CheckForProblemsFlags>(m_buildAction->flags);
+    m_requirePackageSignatures = flags & CheckForProblemsFlags::RequirePackageSignatures;
     auto &metaInfo = m_setup.building.metaInfo;
     auto metaInfoLock = metaInfo.lockToRead();
     const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::CheckForProblems);
@@ -435,6 +458,13 @@ void CheckForProblems::run()
                 if (!packageLocation.exists) {
                     problems.emplace_back(
                         RepositoryProblem{ .desc = "binary package \"" % pkg->packageInfo->fileName + "\" not present", .pkg = pkgName });
+                }
+                if (m_requirePackageSignatures) {
+                    const auto signatureLocation = db->locatePackage(pkg->packageInfo->fileName + ".sig");
+                    if (!signatureLocation.exists) {
+                        problems.emplace_back(RepositoryProblem{
+                            .desc = "signature file for package \"" % pkg->packageInfo->fileName + "\" not present", .pkg = pkgName });
+                    }
                 }
             }
         } catch (const std::filesystem::filesystem_error &e) {
@@ -739,7 +769,11 @@ void CleanRepository::run()
         for (auto &toDelete : dirInfo.toDelete) {
             try {
                 if (!m_dryRun) {
+                    const auto signatureFile = std::filesystem::path(argsToString(toDelete, ".sig"));
                     std::filesystem::remove(toDelete);
+                    if (std::filesystem::exists(signatureFile)) {
+                        std::filesystem::remove(signatureFile);
+                    }
                 }
                 ++processesItems;
                 m_messages.notes.emplace_back("Deleted " + toDelete.string());
@@ -760,7 +794,12 @@ void CleanRepository::run()
         for (const auto &[path, referencedPath] : dirInfo.toArchive) {
             try {
                 if (!m_dryRun) {
-                    std::filesystem::rename(path, archiveDir / path.filename());
+                    const auto destPath = archiveDir / path.filename();
+                    const auto signatureFile = std::filesystem::path(argsToString(path, ".sig"));
+                    std::filesystem::rename(path, destPath);
+                    if (std::filesystem::exists(signatureFile)) {
+                        std::filesystem::rename(signatureFile, argsToString(destPath, ".sig"));
+                    }
                 }
                 ++processesItems;
                 m_messages.notes.emplace_back(

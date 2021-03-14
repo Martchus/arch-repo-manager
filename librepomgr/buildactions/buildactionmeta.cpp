@@ -245,7 +245,14 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .category = "Repo management",
             .name = "Check for problems",
             .type = "check-for-problems",
-            .flags = {},
+            .flags = {
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(CheckForProblemsFlags::RequirePackageSignatures),
+                    .name = "Require package signatures",
+                    .desc = "Checks whether package signatures are present",
+                    .param = "require-pkg-signatures",
+                },
+            },
             .settings = {
                 BuildActionSettingMetaInfo{
                     .name = "Dependencies to ignore",

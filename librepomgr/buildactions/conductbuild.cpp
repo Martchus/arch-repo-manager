@@ -1092,19 +1092,33 @@ void ConductBuild::addPackageToRepo(
         std::filesystem::create_directories(sourceRepoPath);
         std::filesystem::copy(sourcePackagePath, sourceRepoPath / sourcePackageName, std::filesystem::copy_options::update_existing);
         for (const auto &binaryPackage : binaryPackages) {
+            const auto signaturePath = std::filesystem::path(argsToString(binaryPackage.path, ".sig"));
             if (!binaryPackage.isAny) {
                 std::filesystem::copy(binaryPackage.path, repoPath % '/' + *binaryPackage.fileName, std::filesystem::copy_options::update_existing);
+                if (std::filesystem::exists(signaturePath)) {
+                    std::filesystem::copy(
+                        signaturePath, repoPath % '/' % *binaryPackage.fileName + ".sig", std::filesystem::copy_options::update_existing);
+                }
                 continue;
             }
             if (anyRepoPath.empty()) {
                 std::filesystem::create_directories(anyRepoPath = repoPath + "/../any");
             }
             std::filesystem::copy(binaryPackage.path, anyRepoPath / *binaryPackage.fileName, std::filesystem::copy_options::update_existing);
-            const std::filesystem::path symlink = repoPath % '/' + *binaryPackage.fileName;
+            const auto symlink = std::filesystem::path(repoPath % '/' + *binaryPackage.fileName);
             if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
                 std::filesystem::remove(symlink);
             }
             std::filesystem::create_symlink("../any/" + *binaryPackage.fileName, symlink);
+            if (std::filesystem::exists(signaturePath)) {
+                std::filesystem::copy(
+                    signaturePath, argsToString(anyRepoPath, '/', *binaryPackage.fileName, ".sig"), std::filesystem::copy_options::update_existing);
+                const auto symlink = std::filesystem::path(argsToString(repoPath, '/', *binaryPackage.fileName, ".sig"));
+                if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
+                    std::filesystem::remove(symlink);
+                }
+                std::filesystem::create_symlink("../any/" % *binaryPackage.fileName + ".sig", symlink);
+            }
         }
     } catch (const std::filesystem::filesystem_error &e) {
         auto writeLock = lockToWrite(readLock);
