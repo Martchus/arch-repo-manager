@@ -107,10 +107,12 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     convertValue(multimap, "updpkgsums_path", updatePkgSumsPath);
     convertValue(multimap, "repo_add_path", repoAddPath);
     convertValue(multimap, "repo_remove_path", repoRemovePath);
+    convertValue(multimap, "gpg_path", gpgPath);
     convertValue(multimap, "ccache_dir", ccacheDir);
     convertValue(multimap, "chroot_dir", chrootDir);
     convertValue(multimap, "chroot_root_user", chrootRootUser);
     convertValue(multimap, "chroot_default_user", chrootDefaultUser);
+    convertValue(multimap, "default_gpg_key", defaultGpgKey);
     convertValue(multimap, "pacman_config_file_path", pacmanConfigFilePath);
     convertValue(multimap, "makepkg_config_file_path", makepkgConfigFilePath);
     convertValue(multimap, "makechrootpkg_flags", makechrootpkgFlags);

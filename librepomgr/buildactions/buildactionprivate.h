@@ -532,8 +532,8 @@ private:
 };
 
 struct BinaryPackageInfo {
-    const std::string *const name;
-    const std::string *const fileName;
+    const std::string name;
+    const std::string fileName;
     std::filesystem::path path;
     const bool isAny = false;
     bool artefactAlreadyPresent = false;
@@ -554,6 +554,12 @@ struct LIBREPOMGR_EXPORT ConductBuild
     void run();
 
 private:
+    struct BuildResult {
+        std::vector<std::string> binaryPackageNames;
+        const std::string *repoPath = nullptr, *dbFilePath = nullptr;
+        bool needsStaging = false;
+    };
+
     void makeMakepkgConfigFile(const std::filesystem::path &makepkgConfigPath);
     void makePacmanConfigFile(
         const std::filesystem::path &pacmanConfigPath, const std::vector<std::pair<std::string, std::multimap<std::string, std::string>>> &dbConfig);
@@ -571,7 +577,14 @@ private:
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, bool hasFailuresInPreviousBatches);
     void addPackageToRepo(
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, PackageBuildProgress &packageProgress);
+    void invokeGpg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+        PackageBuildProgress &packageProgress, std::vector<BinaryPackageInfo> &&binaryPackages, BuildResult &&buildResult);
+    void invokeRepoAdd(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+        PackageBuildProgress &packageProgress, BuildResult &&buildResult);
     void checkDownloadErrorsAndMakePackages(BatchProcessingSession::ContainerType &&failedPackages);
+    void checkGpgErrorsAndContinueAddingPackagesToRepo(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
+        const std::string &packageName, PackageBuildProgress &packageProgress, BuildResult &&buildResult,
+        MultiSession<std::string>::ContainerType &&failedPackages);
     void handleMakechrootpkgErrorsAndAddPackageToRepo(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
         const std::string &packageName, PackageBuildProgress &packageProgress, boost::process::child &&child, ProcessResult &&result);
     void handleRepoAddErrorsAndMakeNextPackage(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
@@ -593,11 +606,13 @@ private:
     std::string m_globalCcacheDir;
     std::string m_globalPackageCacheDir;
     std::string m_globalTestFilesDir;
+    std::string m_gpgKey;
     std::string m_chrootRootUser;
     boost::filesystem::path m_makePkgPath;
     boost::filesystem::path m_makeChrootPkgPath;
     boost::filesystem::path m_updatePkgSumsPath;
     boost::filesystem::path m_repoAddPath;
+    boost::filesystem::path m_gpgPath;
     std::filesystem::path m_makepkgConfigPath;
     std::filesystem::path m_pacmanConfigPath;
     std::filesystem::path m_pacmanStagingConfigPath;

@@ -89,10 +89,12 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::string updatePkgSumsPath = "updpkgsums";
         std::string repoAddPath = "repo-add";
         std::string repoRemovePath = "repo-remove";
+        std::string gpgPath = "gpg";
         std::string ccacheDir;
         std::string chrootDir;
         std::string chrootRootUser = "root";
         std::string chrootDefaultUser = "buildservice";
+        std::string defaultGpgKey;
         std::string pacmanConfigFilePath; // FIXME: not useful after all?; using config-$arch directory within chrootDir instead
         std::string makepkgConfigFilePath; // FIXME: not useful after all?; using config-$arch directory within chrootDir instead
         std::vector<std::string> makechrootpkgFlags;

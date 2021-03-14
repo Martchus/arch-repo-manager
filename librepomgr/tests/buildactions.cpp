@@ -106,6 +106,8 @@ void BuildActionsTests::loadBasicTestSetup()
     m_setup.building.makeChrootPkgPath = std::filesystem::absolute(testFilePath("scripts/fake_makechrootpkg.sh"));
     m_setup.building.updatePkgSumsPath = std::filesystem::absolute(testFilePath("scripts/fake_updatepkgsums.sh"));
     m_setup.building.repoAddPath = std::filesystem::absolute(testFilePath("scripts/fake_repo_add.sh"));
+    m_setup.building.gpgPath = std::filesystem::absolute(testFilePath("scripts/fake_gpg.sh"));
+    m_setup.building.defaultGpgKey = "1234567890";
     m_setup.configFilePath = std::filesystem::absolute(testFilePath("test-config/server.conf"));
 
     std::filesystem::remove_all(m_setup.workingDirectory);
@@ -546,6 +548,13 @@ void BuildActionsTests::testConductingBuild()
         "no staging needed: package added to repo (1)", std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst"));
     CPPUNIT_ASSERT_MESSAGE("no staging needed: package added to repo (2)",
         std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"));
+    CPPUNIT_ASSERT_MESSAGE("no staging needed: signature added to repo (0)",
+        std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+    CPPUNIT_ASSERT_MESSAGE("no staging needed: signature added to repo (1)",
+        std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: signature looks as expected",
+        "fake signature with GPG key 1234567890 boost-libs-1.73.0-1-x86_64.pkg.tar.zst\n"s,
+        readFile("repos/boost/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
 
     // add packages needing a rebuild to trigger auto-staging
     m_setup.config.loadAllPackages(false);
@@ -594,4 +603,8 @@ void BuildActionsTests::testConductingBuild()
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst"));
     CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (2)",
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"));
+    CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (0)",
+        std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+    CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
+        std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
 }

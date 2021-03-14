@@ -210,6 +210,11 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "The test files directory to use (instead of the globally configured one)",
                     .param = "test-files-dir",
                 },
+                BuildActionSettingMetaInfo{
+                    .name = "GPG key to sign packages",
+                    .desc = "The GPG key to sign packages (instead of the globally configured one)",
+                    .param = "gpg-key",
+                },
             },
             .directory = true,
             .sourceDb = false,
