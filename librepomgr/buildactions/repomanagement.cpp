@@ -707,6 +707,14 @@ void CleanRepository::run()
                     continue;
                 }
 
+                // delete orphaned signatures, otherwise skip signatures as they are handled alongside the related package
+                if (fileName.ends_with(".sig")) {
+                    if (!std::filesystem::exists(dirInfo.canonicalPath / std::string_view(fileName.data(), fileName.data() + fileName.size() - 4))) {
+                        dirInfo.toDelete.emplace_back(fileName);
+                    }
+                    continue;
+                }
+
                 // determine package name from file name
                 const auto [packageName, error] = [&fileName] {
                     try {
