@@ -821,9 +821,10 @@ void CleanRepository::run()
     }
     repoDirs.clear();
 
+    const auto res = m_messages.errors.empty() ? BuildActionResult::Success : BuildActionResult::Failure;
     const auto buildLock = m_setup.building.lockToWrite();
     m_buildAction->resultData = std::move(m_messages);
-    reportResult(m_messages.errors.empty() ? BuildActionResult::Success : BuildActionResult::Failure);
+    reportResult(res);
 }
 
 } // namespace LibRepoMgr
