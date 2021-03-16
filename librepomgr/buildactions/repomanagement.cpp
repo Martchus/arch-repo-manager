@@ -334,9 +334,10 @@ void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType 
         if (!ok) {
             continue;
         }
-        // delete package within source repo; leave package at storage location because some other repo might still link to it
+        // delete package within source repo; leave package at storage location because some other repo might still link to it (cleanup action takes care of that)
         try {
             std::filesystem::remove(packageLocation.pathWithinRepo);
+            std::filesystem::remove(argsToString(packageLocation.pathWithinRepo, ".sig"));
         } catch (const std::runtime_error &e) {
             ok = false;
             m_result.failedPackages.emplace_back(packageName, argsToString("unable to remove from source repo: ", e.what()));
