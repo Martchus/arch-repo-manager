@@ -4,9 +4,7 @@ function initPackageDetails(sectionElement, sectionData, newPackages)
     const hasNewPackages = newPackages.length >= 1;
     if (!hasNewPackages) {
         if (currentPackage !== undefined) {
-            window.preventHandlingHashChange = true;
-            window.location.hash = '#package-details-section&' + encodeURIComponent(currentPackage);
-            window.preventHandlingHashChange = false;
+            updateHashPreventingChangeHandler('#package-details-section?' + encodeURIComponent(currentPackage));
         }
         return true;
     }
@@ -15,7 +13,10 @@ function initPackageDetails(sectionElement, sectionData, newPackages)
         return true;
     }
     const packageParts = packageStr.split('/');
-    const package = {db: packageParts[0], name: packageParts[1]};
+    const package = {
+        db: packageParts[0],
+        name: packageParts[1]
+    };
     queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(packageStr), function(ajaxRequest) {
         showPackageDetails(ajaxRequest, package);
     });
@@ -37,9 +38,7 @@ function queryPackageDetails(value, row)
 function switchToPackageDetails(packageID)
 {
     sections['package-details'].state.package = packageID;
-    window.preventSectionInitializer = true;
-    window.location.hash = '#package-details-section&' + encodeURIComponent(packageID);
-    window.preventSectionInitializer = false;
+    updateHashPreventingSectionInitializer('#package-details-section?' + encodeURIComponent(packageID));
 }
 
 function showPackageDetails(ajaxRequest, row)
@@ -83,8 +82,8 @@ function renderPackage(package, withoutBasics)
             db: function(value, row) {
                 return document.createTextNode(makeRepoName(value, row.dbArch));
             },
-            upstreamUrl: function (value, row) {
-                return renderLink(value, row, function (value) {
+            upstreamUrl: function(value, row) {
+                return renderLink(value, row, function(value) {
                     window.open(value);
                 });
             },
@@ -99,7 +98,7 @@ function renderPackage(package, withoutBasics)
             libdepends: renderArrayAsCommaSeparatedString,
             'sourceInfo.makeDependencies': renderDependency,
             'sourceInfo.checkDependencies': renderDependency,
-            'packageInfo.arch': function (value, row) {
+            'packageInfo.arch': function(value, row) {
                 const sourceInfo = row.sourceInfo;
                 const sourceArchs = sourceInfo !== undefined ? sourceInfo.archs : undefined;
                 if (Array.isArray(sourceArchs) && sourceArchs.length) {

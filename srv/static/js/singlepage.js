@@ -41,10 +41,28 @@ function handleHashChange()
     });
 }
 
+/// \brief Updates the #hash without triggering the handler.
+function updateHashPreventingChangeHandler(newHash)
+{
+    window.preventHandlingHashChange = true;
+    window.location.hash = newHash;
+    window.preventHandlingHashChange = false;
+}
+
+/// \brief Updates the #hash without triggering the section initializer.
+function updateHashPreventingSectionInitializer(newHash)
+{
+    window.preventSectionInitializer = true;
+    window.location.hash = newHash;
+    window.preventSectionInitializer = false;
+}
+
 const sections = {
     'global': {
     },
     'package-search': {
+        initializer: initPackageSearch,
+        state: {params: undefined},
     },
     'package-details': {
         initializer: initPackageDetails,

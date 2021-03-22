@@ -1,7 +1,7 @@
 function splitHashParts()
 {
     const currentHash = location.hash.substr(1);
-    const hashParts = currentHash.split('&');
+    const hashParts = currentHash.split('?');
     for (let i = 0, len = hashParts.length; i != len; ++i) {
         hashParts[i] = decodeURIComponent(hashParts[i]);
     }
@@ -11,7 +11,7 @@ function splitHashParts()
 function hashAsObject()
 {
     const hashObject = {};
-    location.hash.substr(1).split('&').forEach(function(hashPart) {
+    location.hash.substr(1).split('?').forEach(function(hashPart) {
         const parts = hashPart.split('=', 2);
         if (parts.length < 1) {
             return;

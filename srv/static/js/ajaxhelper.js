@@ -36,8 +36,19 @@ function queryRoute(method, path, callback)
 /// \brief Makes an AJAX query for the specified form.
 function startFormQuery(formId, handler)
 {
+    return startFormQueryEx(formId, handler).ajaxRequest;
+}
+
+/// \brief Makes an AJAX query for the specified form.
+function startFormQueryEx(formId, handler)
+{
     const form = document.getElementById(formId);
-    return queryRoute(form.method, form.getAttribute('action') + makeFormQueryParameter(form), handler);
+    const params = makeFormQueryParameter(form);
+    return {
+        ajaxRequest: queryRoute(form.method, form.getAttribute('action') + params, handler),
+        form: form,
+        params, params,
+    };
 }
 
 /// \brief Returns the query parameter for the specified \a form element.

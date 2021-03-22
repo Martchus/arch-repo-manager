@@ -302,7 +302,7 @@ function showBuildActions(ajaxRequest)
                 return renderLink(value, row, function() {
                     queryBuildActionDetails(row.id);
                     return false;
-                }, 'Show details', undefined, '#build-action-details-section&' + row.id);
+                }, 'Show details', undefined, '#build-action-details-section?' + row.id);
             },
             taskName: function (value) {
                 if (!value) {
@@ -397,20 +397,14 @@ function showBuildActions(ajaxRequest)
 function switchToBuildActionDetails(buildActionIds)
 {
     sections['build-action-details'].state.ids = buildActionIds;
-    window.preventSectionInitializer = true;
-    if (!Array.isArray(buildActionIds) || buildActionIds.length === 0) {
-        window.location.hash = '#build-action-details-section';
-    } else {
-        window.location.hash = '#build-action-details-section&' + encodeURIComponent(buildActionIds.join(','));
-    }
-    window.preventSectionInitializer = false;
+    updateHashPreventingSectionInitializer(!Array.isArray(buildActionIds) || buildActionIds.length === 0
+        ? '#build-action-details-section'
+        : '#build-action-details-section?' + encodeURIComponent(buildActionIds.join(',')));
 }
 
 function switchToBuildActions()
 {
-    window.preventSectionInitializer = true;
-    window.location.hash = '#build-action-section';
-    window.preventSectionInitializer = false;
+    updateHashPreventingSectionInitializer('#build-action-section');
 }
 
 function showBuildActionDetails(ajaxRequest)
@@ -734,7 +728,7 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
             packageNameLink.target = '_blank';
             from = 'AUR';
         } else {
-            packageNameLink.href = '#package-details-section&' + encodeURIComponent(newVersion.db + '@' + newVersion.arch + '/' + newPackageName);
+            packageNameLink.href = '#package-details-section?' + encodeURIComponent(newVersion.db + '@' + newVersion.arch + '/' + newPackageName);
         }
         packageNameLink.appendChild(document.createTextNode(newPackageName));
         if (newPackageName !== packageName) {
@@ -892,7 +886,7 @@ function initBuildActionDetails(sectionElement, sectionData, newHashParts)
     if (!newHashParts.length) {
         if (hasCurrentlyBuildActions) {
             window.preventHandlingHashChange = true;
-            window.location.hash = '#build-action-details-section&' + encodeURIComponent(currentBuildActionIds.join(','));
+            window.location.hash = '#build-action-details-section?' + encodeURIComponent(currentBuildActionIds.join(','));
             window.preventHandlingHashChange = false;
         }
         return true;

@@ -1,6 +1,57 @@
+function initPackageSearch(sectionElement, sectionData, newParams)
+{
+    const currentParams = sectionData.state.params;
+    const hasNewParams = newParams.length >= 1;
+    if (!hasNewParams) {
+        if (currentParams !== undefined) {
+            updateHashPreventingChangeHandler('#package-search-section' + currentParams);
+        }
+        return true;
+    }
+    const searchParams = sections['package-search'].state.params = '?' + newParams[0];
+    if (currentParams === searchParams) {
+        return true;
+    }
+    if (!window.globalInfo) {
+        window.functionsPostponedUntilGlobalInfo.push(searchForPackagesFromParams.bind(this, searchParams));
+    } else {
+        searchForPackagesFromParams(searchParams);
+    }
+    return true;
+}
+
+function searchForPackagesFromParams(searchParams)
+{
+    const params = new URLSearchParams(searchParams);
+    const form = document.getElementById('package-search-form');
+    form.reset();
+    params.forEach(function(value, key) {
+        const formElement = form[key];
+        if (!formElement) {
+            return;
+        }
+        if (formElement.multiple) {
+            Array.from(formElement.options).forEach(function(optionElement) {
+                if (optionElement.value === value) {
+                    optionElement.selected = true;
+                    return;
+                }
+            });
+        } else {
+            formElement.value = value;
+        }
+    });
+    const res = startFormQueryEx('package-search-form', showPackageSearchResults);
+    sections['package-search'].state.params = res.params;
+    return res;
+}
+
 function searchForPackages()
 {
-    return startFormQuery('package-search-form', showPackageSearchResults);
+    const res = startFormQueryEx('package-search-form', showPackageSearchResults);
+    const params = sections['package-search'].state.params = res.params;
+    updateHashPreventingSectionInitializer('#package-search-section' + params);
+    return res.ajaxRequest;
 }
 
 function showPackageSearchResults(ajaxRequest)
@@ -19,7 +70,7 @@ function showPackageSearchResults(ajaxRequest)
         customRenderer: {
             name: function (value, row) {
                 return renderLink(value, row, queryPackageDetails, 'Show package details', undefined,
-                    '#package-details-section&' + encodeURIComponent(row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + value));
+                    '#package-details-section?' + encodeURIComponent(row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + value));
             },
             checkbox: function(value, row) {
                 return renderCheckBoxForTableRow(value, row, function(row) {
