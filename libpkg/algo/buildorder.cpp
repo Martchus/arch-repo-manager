@@ -94,17 +94,17 @@ bool Config::addDepsRecursivelyInTopoOrder(vector<unique_ptr<TopoSortItem>> &all
     const auto *const runtimeDependencies = &pkg->dependencies;
     const auto *const makeDependencies = addBuildDependencies ? &pkg->sourceInfo->makeDependencies : nullptr;
     const auto *const checkDependencies = addBuildDependencies ? &pkg->sourceInfo->checkDependencies : nullptr;
-    for (const auto *dependencies : { runtimeDependencies, makeDependencies, checkDependencies }) {
-        if (!dependencies) {
+    for (const auto *dependenciesOfDependency : { runtimeDependencies, makeDependencies, checkDependencies }) {
+        if (!dependenciesOfDependency) {
             continue;
         }
-        for (const auto &dependency : *dependencies) {
+        for (const auto &dependencyOfDependency : *dependenciesOfDependency) {
             // skip dependencies provided by the current package itself (FIXME: right now python 3.n depends on python<3.(n+1) which should be fixed)
-            if (pkg->providesDependency(dependency)) {
+            if (pkg->providesDependency(dependencyOfDependency)) {
                 continue;
             }
 
-            if (!addDepsRecursivelyInTopoOrder(allItems, finishedItems, ignored, cycleTracking, dependency, options, true)) {
+            if (!addDepsRecursivelyInTopoOrder(allItems, finishedItems, ignored, cycleTracking, dependencyOfDependency, options, true)) {
                 // skip if a cycle has been detected
                 return false;
             }

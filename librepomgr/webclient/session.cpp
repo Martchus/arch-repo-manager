@@ -118,7 +118,8 @@ void Session::received(boost::beast::error_code ec, std::size_t bytesTransferred
 void SslSession::run(const char *host, const char *port, http::verb verb, const char *target, unsigned int version)
 {
     // set SNI Hostname (many hosts need this to handshake successfully)
-    if (!SSL_set_tlsext_host_name(m_stream.native_handle(), const_cast<char *>(host))) {
+    if (!SSL_ctrl(
+            m_stream.native_handle(), SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, reinterpret_cast<void *>(const_cast<char *>(host)))) {
         m_handler(*this,
             HttpClientError(
                 "setting SNI hostname", boost::beast::error_code{ static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() }));
@@ -233,17 +234,17 @@ std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runS
     const std::string &target, std::function<void(SessionData, const HttpClientError &)> &&handler, std::string &&destinationPath,
     std::string_view userName, std::string_view password, ArgType &&...args)
 {
-    auto session = make_shared<SessionType>(args..., [handler{ move(handler) }](auto &session, const HttpClientError &error) mutable {
-        handler(SessionData{ session.shared_from_this(), session.request, session.response, session.destinationFilePath }, error);
+    auto session = make_shared<SessionType>(args..., [handler{ move(handler) }](auto &session2, const HttpClientError &error) mutable {
+        handler(SessionData{ session2.shared_from_this(), session2.request, session2.response, session2.destinationFilePath }, error);
     });
     if (!userName.empty()) {
         const auto authInfo = userName % ":" + password;
         session->request.set(boost::beast::http::field::authorization,
-            "Basic " + encodeBase64(reinterpret_cast<const std::uint8_t *>(authInfo.data()), authInfo.size()));
+            "Basic " + encodeBase64(reinterpret_cast<const std::uint8_t *>(authInfo.data()), static_cast<std::uint32_t>(authInfo.size())));
     }
     session->destinationFilePath = move(destinationPath);
     session->run(host.data(), port.data(), http::verb::get, target.data());
-    return move(session);
+    return std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>>(std::move(session));
 }
 
 std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runSessionFromUrl(boost::asio::io_context &ioContext,

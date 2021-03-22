@@ -114,9 +114,9 @@ void ReloadLibraryDependencies::run()
             } else if (std::filesystem::exists(cachePath = cacheDir % arch % '/' + fileName, ec)) {
                 path = std::move(cachePath);
             } else {
-                for (const auto &cachePath : m_setup.config.packageCacheDirs) {
-                    std::error_code ec;
-                    if (std::filesystem::exists(path = cachePath % '/' + fileName, ec)) {
+                for (const auto &possibleCachePath : m_setup.config.packageCacheDirs) {
+                    std::error_code ecFileExists;
+                    if (std::filesystem::exists(path = possibleCachePath % '/' + fileName, ecFileExists)) {
                         break;
                     }
                     path.clear();
@@ -125,10 +125,10 @@ void ReloadLibraryDependencies::run()
             if (path.empty() && !db->mirrors.empty()) {
                 const auto &mirror = db->mirrors.front(); // just use the first mirror for now
                 if (startsWith(mirror, "file:")) {
-                    std::error_code ec;
-                    const auto canonPath
-                        = std::filesystem::canonical(argsToString(std::string_view(mirror.data() + 5, mirror.size() - 5), '/', fileName), ec);
-                    if (!ec) {
+                    std::error_code ecCanonical;
+                    const auto canonPath = std::filesystem::canonical(
+                        argsToString(std::string_view(mirror.data() + 5, mirror.size() - 5), '/', fileName), ecCanonical);
+                    if (!ecCanonical) {
                         path = canonPath.string();
                     }
                 } else {

@@ -22,9 +22,9 @@ namespace Traits = CppUtilities::Traits;
 inline const char *getLastValue(const std::multimap<std::string, std::string> &multimap, const std::string &key)
 {
     using namespace std;
-    const auto i = find_if(multimap.crbegin(), multimap.crend(), [&key](const pair<string, string> &i) { return i.first == key; });
-    if (i != multimap.rend()) {
-        return i->second.data();
+    const auto it = find_if(multimap.crbegin(), multimap.crend(), [&key](const pair<string, string> &i) { return i.first == key; });
+    if (it != multimap.rend()) {
+        return it->second.data();
     }
     return nullptr;
 }
@@ -32,9 +32,9 @@ inline const char *getLastValue(const std::multimap<std::string, std::string> &m
 inline std::optional<std::string_view> getLastValueSv(const std::multimap<std::string, std::string> &multimap, const std::string &key)
 {
     using namespace std;
-    const auto i = find_if(multimap.crbegin(), multimap.crend(), [&key](const pair<string, string> &i) { return i.first == key; });
-    if (i != multimap.rend()) {
-        return i->second.data();
+    const auto it = find_if(multimap.crbegin(), multimap.crend(), [&key](const pair<string, string> &i) { return i.first == key; });
+    if (it != multimap.rend()) {
+        return it->second.data();
     }
     return std::nullopt;
 }

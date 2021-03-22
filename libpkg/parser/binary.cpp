@@ -203,9 +203,9 @@ void Binary::load(const string &fileContent, const string &fileName)
     }
 }
 
-static constexpr unsigned char toLower(const unsigned char c)
+static constexpr auto toLower(auto c)
 {
-    return (c >= 'A' && c <= 'Z') ? (c + ('a' - 'A')) : c;
+    return static_cast<decltype(c)>((c >= 'A' && c <= 'Z') ? (c + ('a' - 'A')) : c);
 }
 
 static std::string toLower(std::string str)
@@ -349,35 +349,35 @@ void Binary::parseElf(BinaryReader &reader, const string *fileContent)
     // skip flags
     stream.seekg(4, ios_base::cur);
     // read sizes
-    const std::uint16_t elfHeaderSize = readElfInt16(reader);
-    const std::uint16_t programHeaderEntrySize = readElfInt16(reader);
+    /*const std::uint16_t elfHeaderSize = */ readElfInt16(reader);
+    /*const std::uint16_t programHeaderEntrySize = */ readElfInt16(reader);
     const std::uint16_t programHeaderEntryCount = readElfInt16(reader);
-    const std::uint16_t sectionHeaderSize = readElfInt16(reader);
+    /*const std::uint16_t sectionHeaderSize = */ readElfInt16(reader);
     const std::uint16_t sectionHeaderCount = readElfInt16(reader);
-    const std::uint16_t nameTableIndex = readElfInt16(reader);
+    /*const std::uint16_t nameTableIndex = */ readElfInt16(reader);
 
     // read program header
     stream.seekg(static_cast<istream::off_type>(programHeaderOffset));
     virtualAddressMapping.reserve(2);
     for (std::uint16_t programHeaderIndex = 0; programHeaderIndex != programHeaderEntryCount; ++programHeaderIndex) {
-        std::uint64_t fileOffset, virtualAddr, physicalAddr, fileSize, virtualSize, flags, align;
+        std::uint64_t fileOffset, virtualAddr, /*physicalAddr,*/ fileSize, virtualSize /*, flags, align*/;
         const std::uint32_t type = readElfInt32(reader);
         if (binaryClass == BinaryClass::Class32Bit) {
             fileOffset = readElfInt32(reader);
             virtualAddr = readElfInt32(reader);
-            physicalAddr = readElfInt32(reader);
+            /*physicalAddr = */ readElfInt32(reader);
             fileSize = readElfInt32(reader);
             virtualSize = readElfInt32(reader);
-            flags = readElfInt32(reader);
-            align = readElfInt32(reader);
+            /*flags = */ readElfInt32(reader);
+            /*align = */ readElfInt32(reader);
         } else {
-            flags = readElfInt32(reader);
+            /*flags = */ readElfInt32(reader);
             fileOffset = readElfAddress(reader);
             virtualAddr = readElfAddress(reader);
-            physicalAddr = readElfAddress(reader);
+            /*physicalAddr = */ readElfAddress(reader);
             fileSize = readElfAddress(reader);
             virtualSize = readElfAddress(reader);
-            align = readElfAddress(reader);
+            /*align = */ readElfAddress(reader);
         }
         switch (type) {
         case ProgramHeaderTypes::Load:
@@ -387,26 +387,26 @@ void Binary::parseElf(BinaryReader &reader, const string *fileContent)
     }
 
     // read section header
-    std::uint64_t stringTableOffset = 0, stringTableSize = 0;
+    /*std::uint64_t stringTableOffset = 0, stringTableSize = 0;*/
     stream.seekg(static_cast<istream::off_type>(sectionTableOffset));
     for (std::uint16_t sectionHeaderIndex = 0; sectionHeaderIndex != sectionHeaderCount; ++sectionHeaderIndex) {
-        const std::uint32_t nameOffset = readElfInt32(reader);
+        /*const std::uint32_t nameOffset = */ readElfInt32(reader);
         const std::uint32_t type = readElfInt32(reader);
-        const std::uint64_t attributes = readElfAddress(reader);
-        const std::uint64_t virtualMemoryAddress = readElfAddress(reader);
+        /*const std::uint64_t attributes = */ readElfAddress(reader);
+        /*const std::uint64_t virtualMemoryAddress = */ readElfAddress(reader);
         const std::uint64_t offset = readElfAddress(reader);
         const std::uint64_t size = readElfAddress(reader);
-        const std::uint32_t indexInAssociatedSection = readElfInt32(reader);
-        const std::uint32_t extraInfo = readElfInt32(reader);
-        const std::uint64_t requiredAlignment = readElfAddress(reader);
-        const std::uint64_t entrySize = readElfAddress(reader);
+        /*const std::uint32_t indexInAssociatedSection = */ readElfInt32(reader);
+        /*const std::uint32_t extraInfo = */ readElfInt32(reader);
+        /*const std::uint64_t requiredAlignment = */ readElfAddress(reader);
+        /*const std::uint64_t entrySize = */ readElfAddress(reader);
         const auto nextSectionHeaderOffset = stream.tellg();
 
         // read section
         switch (type) {
         case BinarySectionTypes::StringTable: {
-            stringTableOffset = offset;
-            stringTableSize = size;
+            /*stringTableOffset = offset;
+            stringTableSize = size;*/
             break;
         }
         case BinarySectionTypes::DynamicLinkingInfo: {
@@ -541,29 +541,29 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
 
     // read rest of COFF header
     const auto numberOfSections = reader.readUInt16LE();
-    const auto timeDateStamp = reader.readUInt32LE();
-    const auto symbolTableOffset = reader.readUInt32LE();
-    const auto symbolTableSize = reader.readUInt32LE();
+    /*const auto timeDateStamp = */ reader.readUInt32LE();
+    /*const auto symbolTableOffset = */ reader.readUInt32LE();
+    /*const auto symbolTableSize = */ reader.readUInt32LE();
     const auto optionHeaderSize = reader.readUInt16LE();
-    const auto characteristics = reader.readUInt16LE();
+    /*const auto characteristics = */ reader.readUInt16LE();
 
     // read PE optional header
-    int64_t exportDirVirtualAddress = -1, exportDirSize = -1, importDirVirtualAddress = -1, importDirSize = -1;
+    int64_t /*exportDirVirtualAddress = -1, exportDirSize = -1, */ importDirVirtualAddress = -1 /*, importDirSize = -1*/;
     if (optionHeaderSize) {
         const auto optionHeaderStart = static_cast<long>(stream.tellg());
         unsigned char minPeHeaderSize;
-        uint64_t imageBase;
+        /*uint64_t imageBase;*/
         switch (reader.readUInt16LE()) {
         case 0x020b:
             binaryClass = BinaryClass::Class64Bit;
             stream.seekg(optionHeaderStart + 24, ios_base::beg);
-            imageBase = reader.readUInt64LE();
+            /*imageBase = */ reader.readUInt64LE();
             minPeHeaderSize = 112;
             break;
         case 0x010b:
             binaryClass = BinaryClass::Class32Bit;
             stream.seekg(optionHeaderStart + 28, ios_base::beg);
-            imageBase = reader.readUInt32LE();
+            /*imageBase = */ reader.readUInt32LE();
             minPeHeaderSize = 96;
             break;
             // case 0x0107: ROM image, not relevant
@@ -579,22 +579,22 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
         if (numberOfDirs < 16) {
             throw runtime_error("expected at least 16 directories in PE file");
         }
-        exportDirVirtualAddress = reader.readUInt32LE();
-        exportDirSize = reader.readUInt32LE();
+        /*exportDirVirtualAddress = */ reader.readUInt32LE();
+        /*exportDirSize = */ reader.readUInt32LE();
         importDirVirtualAddress = reader.readUInt32LE();
-        importDirSize = reader.readUInt32LE();
+        /*importDirSize = */ reader.readUInt32LE();
         // skip remaining dirs (not relevant here)
         stream.seekg(optionHeaderStart + optionHeaderSize, ios_base::beg);
     }
 
     // read section table for mapping virtual addresses to file offsets
     PeSectionData importDataSection;
-    std::int64_t dllNameOffset = -1, dllNameSize = -1;
+    std::int64_t importLibraryDllNameOffset = -1, importLibraryDllNameSize = -1;
     for (auto sectionsLeft = numberOfSections; sectionsLeft; --sectionsLeft) {
         importDataSection.read(reader);
         if (!strncmp(importDataSection.name, ".idata$7", 8)) {
-            dllNameOffset = importDataSection.fileOffset;
-            dllNameSize = importDataSection.fileSize;
+            importLibraryDllNameOffset = importDataSection.fileOffset;
+            importLibraryDllNameSize = importDataSection.fileSize;
         }
         virtualAddressMapping.emplace_back(
             importDataSection.fileOffset, importDataSection.fileSize, importDataSection.virtualAddress, importDataSection.virtualSize);
@@ -629,9 +629,9 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
     }
 
     // read import library name
-    if (dllNameOffset >= 0) {
-        stream.seekg(baseFileOffset + dllNameOffset, ios_base::beg);
-        name = reader.readTerminatedString(static_cast<size_t>(dllNameSize), 0);
+    if (importLibraryDllNameOffset >= 0) {
+        stream.seekg(baseFileOffset + importLibraryDllNameOffset, ios_base::beg);
+        name = reader.readTerminatedString(static_cast<size_t>(importLibraryDllNameSize), 0);
     }
 }
 
@@ -663,6 +663,7 @@ void Binary::parseAr(BinaryReader &reader)
         }
 
         const auto fileOffset = reader.stream()->tellg();
+        static_assert(std::is_scalar_v<std::decay_t<decltype(fileSizeStr)>>);
         const auto fileSize = stringToNumber<iostream::off_type>(fileSizeStr);
         const auto nextFileOffset = fileOffset + fileSize;
         if (endsWith(string_view(fileName), ".o")) {

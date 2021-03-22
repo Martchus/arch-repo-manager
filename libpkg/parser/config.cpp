@@ -19,9 +19,9 @@ namespace LibPkg {
 
 static void moveLastValue(string &target, multimap<string, string> &multimap, const string &key)
 {
-    const auto i = find_if(multimap.rbegin(), multimap.rend(), [&key](const pair<string, string> &i) { return i.first == key; });
-    if (i != multimap.rend()) {
-        target = move(i->second);
+    const auto it = find_if(multimap.rbegin(), multimap.rend(), [&key](const pair<string, string> &i) { return i.first == key; });
+    if (it != multimap.rend()) {
+        target = move(it->second);
     }
 }
 
@@ -102,8 +102,8 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
                 }
             }
             // add included mirrors
-            for (auto range = scope.second.equal_range("Include"); range.first != range.second; ++range.first) {
-                const auto &path = range.first->second;
+            for (auto includeRange = scope.second.equal_range("Include"); includeRange.first != includeRange.second; ++includeRange.first) {
+                const auto &path = includeRange.first->second;
                 auto &includedIni = includedInis[path];
                 if (includedIni.data().empty()) {
                     try {
@@ -120,9 +120,9 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
                     if (!nestedScope.first.empty()) {
                         continue;
                     }
-                    for (auto range = nestedScope.second.equal_range("Server"); range.first != range.second; ++range.first) {
+                    for (auto serverRange = nestedScope.second.equal_range("Server"); serverRange.first != serverRange.second; ++serverRange.first) {
                         for (const auto &arch : architectures) {
-                            string url = range.first->second;
+                            string url = serverRange.first->second;
                             findAndReplace<string>(url, "$repo", db->name);
                             findAndReplace<string>(url, "$arch", arch);
                             db->mirrors.emplace_back(move(url));

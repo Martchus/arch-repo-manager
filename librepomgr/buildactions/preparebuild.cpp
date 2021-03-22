@@ -179,23 +179,23 @@ void PrepareBuild::run()
         auto existingPackages = m_setup.config.findPackages(packageName);
         auto foundSourcePackage = false;
         auto packageBuildData = PackageBuildData();
-        for (auto &package : existingPackages) {
+        for (auto &existingPackage : existingPackages) {
             // skip if package not relevant
-            if (!isExistingPackageRelevant(packageName, package, packageBuildData, *destinationDb)) {
+            if (!isExistingPackageRelevant(packageName, existingPackage, packageBuildData, *destinationDb)) {
                 continue;
             }
             // skip if package has no source info
-            const auto &sourceInfo = package.pkg->sourceInfo;
+            const auto &sourceInfo = existingPackage.pkg->sourceInfo;
             if (!sourceInfo || sourceInfo->name.empty()) {
                 continue;
             }
             //
             auto &buildData = m_buildDataByPackage[sourceInfo->name];
             buildData.specifiedIndex = currentIndex++;
-            buildData.existingPackages.emplace_back(package.pkg);
+            buildData.existingPackages.emplace_back(existingPackage.pkg);
             if (buildData.existingVersion.empty()
-                || LibPkg::PackageVersion::isNewer(LibPkg::PackageVersion::compare(package.pkg->version, buildData.existingVersion))) {
-                buildData.existingVersion = package.pkg->version;
+                || LibPkg::PackageVersion::isNewer(LibPkg::PackageVersion::compare(existingPackage.pkg->version, buildData.existingVersion))) {
+                buildData.existingVersion = existingPackage.pkg->version;
             }
             // assume we don't have sources if going to clean up the source directory
             // FIXME: It is a little bit inconsistent that in other places existing PackageBuildData is overridden and here it is re-used.
@@ -203,7 +203,7 @@ void PrepareBuild::run()
                 buildData.hasSource = false;
             }
             foundSourcePackage = true;
-            if (std::get<LibPkg::Database *>(package.db) == destinationDb) {
+            if (std::get<LibPkg::Database *>(existingPackage.db) == destinationDb) {
                 break;
             }
         }
@@ -670,16 +670,16 @@ void BatchItem::addNeededBatchItemsForPackage(LibPkg::Config &config, const std:
         // check other packages recursively
         auto foundPackage = false;
         const auto existingPackages = config.findPackages(dep);
-        for (const auto &package : existingPackages) {
+        for (const auto &existingPackage : existingPackages) {
             // skip if packge is not from any database available within that build
-            const auto *const db = std::get<LibPkg::Database *>(package.db);
+            const auto *const db = std::get<LibPkg::Database *>(existingPackage.db);
             if (requiredDbs.find(db->name) == requiredDbs.end()) {
                 continue;
             }
             if (db->arch != destinationDb->arch) {
                 continue;
             }
-            addNeededBatchItemsForPackage(config, requiredDbs, destinationDb, batchItems, visitedPackages, *package.pkg);
+            addNeededBatchItemsForPackage(config, requiredDbs, destinationDb, batchItems, visitedPackages, *existingPackage.pkg);
             foundPackage = true;
         }
         if (!foundPackage) {

@@ -80,14 +80,14 @@ void ReloadDatabase::run()
                     auto packages = LibPkg::Package::fromDatabaseFile(move(dbFile));
                     dbFileLock.lock().unlock();
                     const auto configLock = m_setup.config.lockToWrite();
-                    auto *const db = m_setup.config.findDatabase(dbName, dbArch);
-                    if (!db) {
+                    auto *const destinationDb = m_setup.config.findDatabase(dbName, dbArch);
+                    if (!destinationDb) {
                         m_buildAction->appendOutput(
                             Phrases::ErrorMessage, "Loaded database file for \"", dbName, '@', dbArch, "\" but it no longer exists; discarding\n");
                         session->addResponse(std::move(dbName));
                         return;
                     }
-                    db->replacePackages(packages, lastModified);
+                    destinationDb->replacePackages(packages, lastModified);
                 } catch (const std::runtime_error &e) {
                     m_buildAction->appendOutput(Phrases::ErrorMessage, "An error occurred when reloading database \"", dbName, '@', dbArch,
                         "\" from local file \"", dbPath, "\": ", e.what(), '\n');

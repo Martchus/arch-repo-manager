@@ -984,8 +984,9 @@ PackageNameData PackageNameData::decompose(std::string_view packageName)
     if (!regex_match(packageName.cbegin(), packageName.cend(), match, packageNameRegex)) {
         return data;
     }
-    static constexpr auto matchToStringView = [](auto match, std::size_t offset = 0) {
-        return std::string_view(match.first + offset, static_cast<std::size_t>(match.length() - offset));
+    static constexpr auto matchToStringView = [](auto regexMatch, std::size_t offset = 0) {
+        return std::string_view(
+            regexMatch.first + offset, static_cast<std::size_t>(regexMatch.length() - static_cast<std::cmatch::difference_type>(offset)));
     };
     data.targetPrefix = matchToStringView(match[2]);
     data.actualName = matchToStringView(match[3]);

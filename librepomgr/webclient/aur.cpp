@@ -41,14 +41,14 @@ void searchAurPackages(LogContext &log, ServiceSetup &setup, const std::string &
     std::shared_ptr<AurQuerySession> &multiSession)
 {
     auto session = std::make_shared<WebClient::SslSession>(ioContext, setup.webServer.sslContext,
-        [&log, &setup, multiSession](WebClient::SslSession &session, const WebClient::HttpClientError &error) mutable {
+        [&log, &setup, multiSession](WebClient::SslSession &session2, const WebClient::HttpClientError &error) mutable {
             if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
                 log(Phrases::ErrorMessage, "Failed to search AUR: ", error.what(), '\n');
                 return;
             }
 
             // parse retrieved JSON
-            const auto &body = get<Response>(session.response).body();
+            const auto &body = get<Response>(session2.response).body();
             try {
                 const auto packages = Package::fromAurRpcJson(body.data(), body.size(), PackageOrigin::AurRpcSearch);
 
@@ -89,38 +89,38 @@ std::shared_ptr<AurQuerySession> queryAurPackagesInternal(LogContext &log, Servi
 
     for (auto i = packages.cbegin(), end = packages.cend(); i != end;) {
         auto session = make_shared<WebClient::SslSession>(ioContext, setup.webServer.sslContext,
-            [&log, &setup, multiSession](WebClient::SslSession &session, const WebClient::HttpClientError &error) mutable {
+            [&log, &setup, multiSession](WebClient::SslSession &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
                     log(Phrases::ErrorMessage, "Failed to retrieve AUR packages from RPC: ", error.what(), '\n');
                     return;
                 }
 
                 // parse retrieved JSON
-                const auto &body = get<Response>(session.response).body();
+                const auto &body = get<Response>(session2.response).body();
                 try {
-                    const auto packages = Package::fromAurRpcJson(body.data(), body.size());
+                    const auto packagesFromAur = Package::fromAurRpcJson(body.data(), body.size());
 
                     // cache the AUR packages
                     auto lock = setup.config.lockToWrite();
-                    for (auto &package : packages) {
+                    for (auto &package : packagesFromAur) {
                         setup.config.aur.updatePackage(package);
                     }
                     lock.unlock();
 
-                    multiSession->addResponses(packages);
+                    multiSession->addResponses(packagesFromAur);
                 } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
                     log(Phrases::ErrorMessage, "Unable to parse AUR package from RPC: ", serializeParseError(e), '\n');
                 }
             });
 
         const auto url = [&] {
-            stringstream url;
-            url << "/rpc/?v=5&type=info";
+            stringstream urlSteam;
+            urlSteam << "/rpc/?v=5&type=info";
             for (size_t batchIndex = 0; batchIndex != packagesPerQuery && i != end; ++batchIndex, ++i) {
-                url << "&arg[]=";
-                url << WebAPI::Url::encodeValue(packageNameFromIterator(i));
+                urlSteam << "&arg[]=";
+                urlSteam << WebAPI::Url::encodeValue(packageNameFromIterator(i));
             }
-            return url.str();
+            return urlSteam.str();
         }();
 
         session->run(aurHost, aurPort, boost::beast::http::verb::get, url.data(), 11);
@@ -192,7 +192,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
     CPP_UTILITIES_UNUSED(log)
     for (const auto &params : queryParams) {
         auto session = std::make_shared<WebClient::SslSession>(ioContext, setup.webServer.sslContext,
-            [multiSession, params](WebClient::SslSession &session, const WebClient::HttpClientError &error) mutable {
+            [multiSession, params](WebClient::SslSession &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode.message() != "stream truncated") {
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
                         .error = "Unable to retrieve AUR snapshot tarball for package " % *params.packageName % ": " + error.what() });
@@ -200,7 +200,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 }
 
                 // parse retrieved archive
-                const auto &response = get<Response>(session.response);
+                const auto &response = get<Response>(session2.response);
                 if (response.result() != boost::beast::http::status::ok) {
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
                         .error
@@ -212,9 +212,9 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 auto snapshotFiles = FileMap{};
                 try {
                     snapshotFiles = extractFilesFromBuffer(body, *params.packageName, [](const char *, const char *, mode_t) { return true; });
-                } catch (const runtime_error &error) {
+                } catch (const std::runtime_error &extractionError) {
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
-                        .error = "Unable to extract AUR snapshot tarball for package " % *params.packageName % ": " + error.what() });
+                        .error = "Unable to extract AUR snapshot tarball for package " % *params.packageName % ": " + extractionError.what() });
                     return;
                 }
                 auto result = AurSnapshotResult{ .packageName = *params.packageName };
@@ -243,9 +243,9 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     const auto targetDir = *params.targetDirectory % '/' + directoryPath;
                     try {
                         filesystem::create_directories(targetDir);
-                    } catch (const filesystem::filesystem_error &error) {
+                    } catch (const filesystem::filesystem_error &fileSystemError) {
                         multiSession->addResponse(WebClient::AurSnapshotResult{
-                            .packageName = *params.packageName, .error = "Unable to make directory " % targetDir % ": " + error.what() });
+                            .packageName = *params.packageName, .error = "Unable to make directory " % targetDir % ": " + fileSystemError.what() });
                         return;
                     }
                     for (const auto &file : directory.second) {
@@ -254,9 +254,9 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                         if (file.type == ArchiveFileType::Link) {
                             try {
                                 filesystem::create_symlink(file.content, targetPath);
-                            } catch (const filesystem::filesystem_error &error) {
-                                multiSession->addResponse(WebClient::AurSnapshotResult{
-                                    .packageName = *params.packageName, .error = "Unable to make symlink " % targetPath % ": " + error.what() });
+                            } catch (const filesystem::filesystem_error &fileSystemError) {
+                                multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                                    .error = "Unable to make symlink " % targetPath % ": " + fileSystemError.what() });
                                 return;
                             }
                             continue;

@@ -121,10 +121,10 @@ std::list<std::string> Config::forEachPackage(const std::function<std::string(Da
     Database *currentDb = &*dbIterator;
     ++dbIterator;
 
-    const auto recordError = [&](auto &&error) {
+    const auto recordError = [&](auto &&errorMessage) {
         lock_guard<mutex> lock(submitFailureMutex);
-        cerr << Phrases::SubError << error << Phrases::End;
-        errorMessages.emplace_back(error);
+        cerr << Phrases::SubError << errorMessage << Phrases::End;
+        errorMessages.emplace_back(errorMessage);
     };
 
     const auto processPackages = [&] {
@@ -140,10 +140,10 @@ std::list<std::string> Config::forEachPackage(const std::function<std::string(Da
                         break;
                     } else if (dbIterator != dbEnd) {
                         // process next database
-                        auto error = processNextDatabase(&*dbIterator);
-                        if (!error.empty()) {
+                        auto errorMessage = processNextDatabase(&*dbIterator);
+                        if (!errorMessage.empty()) {
                             if (error != "skip") {
-                                recordError(move(error));
+                                recordError(std::move(errorMessage));
                             }
                             ++dbIterator;
                             continue;
@@ -161,11 +161,11 @@ std::list<std::string> Config::forEachPackage(const std::function<std::string(Da
 
             // process next package
             try {
-                auto error = processNextPackage(currentDb, currentPackage, dbMutex);
-                if (!error.empty()) {
-                    recordError(move(error));
+                auto errorMessage = processNextPackage(currentDb, currentPackage, dbMutex);
+                if (!errorMessage.empty()) {
+                    recordError(std::move(errorMessage));
                 }
-            } catch (const runtime_error &e) {
+            } catch (const std::runtime_error &e) {
                 recordError(argsToString(currentPackage->name, ':', ' ', e.what()));
                 continue;
             }

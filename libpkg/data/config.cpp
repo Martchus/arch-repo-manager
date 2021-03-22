@@ -86,9 +86,9 @@ std::variant<std::vector<Database *>, std::string> Config::computeDatabaseDepend
     result.reserve(database.dependencies.size());
     auto error = addDatabaseDependencies(*this, database, result, visited, addSelf);
     if (!error.empty()) {
-        return move(error);
+        return std::variant<std::vector<Database *>, std::string>(std::move(error));
     }
-    return move(result);
+    return std::variant<std::vector<Database *>, std::string>(std::move(result));
 }
 
 static void addDatabasesRequiringDatabase(

@@ -73,11 +73,11 @@ void BuildProcessSession::DataForWebSession::writeFileData(
     const auto bytesLeftToRead = m_bytesToSendFromFile - bytesTransferred;
     boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk(boost::asio::buffer(*m_fileBuffer, bytesTransferred)),
         [this, &filePath, session, bytesLeftToRead, moreToRead = !eof && bytesLeftToRead](
-            boost::system::error_code ec, std::size_t bytesTransferred) {
+            boost::system::error_code ecWebClient, std::size_t bytesTransferredToWebClient) {
             // handle error
-            CPP_UTILITIES_UNUSED(bytesTransferred)
-            if (ec) {
-                cerr << Phrases::WarningMessage << "Error sending \"" << filePath << "\" to client: " << ec.message() << Phrases::EndFlush;
+            CPP_UTILITIES_UNUSED(bytesTransferredToWebClient)
+            if (ecWebClient) {
+                cerr << Phrases::WarningMessage << "Error sending \"" << filePath << "\" to client: " << ecWebClient.message() << Phrases::EndFlush;
                 std::lock_guard<std::mutex> lock(m_session.m_mutex);
                 clear();
                 error = true;
@@ -226,10 +226,10 @@ void BuildProcessSession::writeNextBufferToLogFile(const boost::system::error_co
         if (m_logFileBuffers.outstandingBuffersToSend.empty()) {
             // close the logfile when the process exited and we've written all the output
             if (m_exited.load()) {
-                boost::system::error_code error;
-                m_logFile.close(error);
-                if (error) {
-                    cerr << Phrases::WarningMessage << "Error closing \"" << m_logFilePath << "\": " << error.message() << Phrases::EndFlush;
+                boost::system::error_code closeError;
+                m_logFile.close(closeError);
+                if (closeError) {
+                    cerr << Phrases::WarningMessage << "Error closing \"" << m_logFilePath << "\": " << closeError.message() << Phrases::EndFlush;
                 }
             }
             return;

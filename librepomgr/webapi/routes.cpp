@@ -98,26 +98,26 @@ void getDatabases(const Params &params, ResponseHandler &&handler)
 
 void getUnresolved(const Params &params, ResponseHandler &&handler)
 {
-    const auto names(params.target.decodeValues("name"));
+    const auto names = params.target.decodeValues("name");
     if (names.empty()) {
         throw BadRequest("parameter name missing");
     }
 
     namespace JR = ReflectiveRapidJSON::JsonReflector;
     RAPIDJSON_NAMESPACE::Document document(RAPIDJSON_NAMESPACE::kObjectType);
-    RAPIDJSON_NAMESPACE::Document::Object obj(document.GetObject());
+    RAPIDJSON_NAMESPACE::Document::Object documentObj(document.GetObject());
 
     auto lock = params.setup.config.lockToRead();
     const auto newPackages = [&] {
-        const auto names(params.target.decodeValues("add"));
-        vector<shared_ptr<Package>> newPackages;
-        newPackages.reserve(names.size());
-        for (const auto &name : names) {
+        const auto newPackageNames = params.target.decodeValues("add");
+        auto res = std::vector<std::shared_ptr<Package>>();
+        res.reserve(newPackageNames.size());
+        for (const auto &name : newPackageNames) {
             for (auto &package : params.setup.config.findPackages(name)) {
-                newPackages.emplace_back(move(package.pkg));
+                res.emplace_back(move(package.pkg));
             }
         }
-        return newPackages;
+        return res;
     }();
     const auto removedPackages = [&] {
         DependencySet removedProvides;
@@ -311,22 +311,22 @@ void getPackages(const Params &params, ResponseHandler &&handler)
     auto log = LogContext();
     auto handleAurResponse
         = [handler{ std::move(handler) }, params{ std::move(params) }, document{ make_shared<RAPIDJSON_NAMESPACE::Document>(std::move(document)) },
-              details](WebClient::AurQuerySession::ContainerType &&aurPackages) mutable {
+              details](WebClient::AurQuerySession::ContainerType &&queriedAurPackages) mutable {
               std::vector<PackageSearchResult> aurPackageSearchResults;
-              aurPackageSearchResults.reserve(aurPackages.size());
-              auto lock = params.setup.config.lockToRead();
-              auto array = document->GetArray();
+              aurPackageSearchResults.reserve(queriedAurPackages.size());
+              auto configLock = params.setup.config.lockToRead();
+              auto documentArray = document->GetArray();
               if (details) {
-                  for (auto &package : aurPackages) {
-                      ReflectiveRapidJSON::JsonReflector::push(std::move(package), array, document->GetAllocator());
+                  for (auto &package : queriedAurPackages) {
+                      ReflectiveRapidJSON::JsonReflector::push(std::move(package), documentArray, document->GetAllocator());
                   }
-              } else if (!aurPackages.empty()) {
-                  for (auto &package : aurPackages) {
+              } else if (!queriedAurPackages.empty()) {
+                  for (auto &package : queriedAurPackages) {
                       ReflectiveRapidJSON::JsonReflector::push(
-                          PackageSearchResult{ params.setup.config.aur, std::move(package) }, array, document->GetAllocator());
+                          PackageSearchResult{ params.setup.config.aur, std::move(package) }, documentArray, document->GetAllocator());
                   }
               }
-              lock.unlock();
+              configLock.unlock();
               handler(makeJson(params.request(), *document, params.target.hasPrettyFlag()));
           };
     if (mode == Mode::Name) {

@@ -15,7 +15,16 @@
 #include <c++utilities/io/inifile.h>
 #include <c++utilities/io/nativefilestream.h>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#endif
 #include <tabulate/table.hpp>
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 #include <fstream>
 #include <functional>
@@ -122,11 +131,12 @@ void configureColumnWidths(tabulate::Table &table)
     }
     auto totalAverageSize = 0.0;
     for (auto &column : columnStats) {
-        totalAverageSize += (column.averageSize = static_cast<double>(column.totalSize) / column.rows);
+        totalAverageSize += (column.averageSize = static_cast<double>(column.totalSize) / static_cast<double>(column.rows));
     }
     for (auto &column : columnStats) {
         column.averagePercentage = column.averageSize / totalAverageSize;
-        column.width = std::max<std::size_t>(terminalSize.columns * column.averagePercentage, std::min<std::size_t>(column.maxSize, 10));
+        column.width = std::max<std::size_t>(static_cast<std::size_t>(static_cast<double>(terminalSize.columns) * column.averagePercentage),
+            std::min<std::size_t>(column.maxSize, 10u));
     }
     for (std::size_t columnIndex = 0; columnIndex != columnStats.size(); ++columnIndex) {
         table.column(columnIndex).format().width(columnStats[columnIndex].width);

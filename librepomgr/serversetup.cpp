@@ -531,7 +531,7 @@ std::size_t ServiceSetup::restoreState()
         }
     }
     building.actions.resize(newActionsSize);
-    for (std::size_t buildActionId = 0, size = building.actions.size(); buildActionId != size; ++buildActionId) {
+    for (std::size_t buildActionId = 0u, buildActionsSize = building.actions.size(); buildActionId != buildActionsSize; ++buildActionId) {
         if (!building.actions[buildActionId]) {
             building.invalidActions.emplace(buildActionId);
         }
