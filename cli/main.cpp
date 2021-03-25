@@ -284,7 +284,7 @@ int main(int argc, const char *argv[])
             + LibRepoMgr::WebAPI::Url::encodeValue(searchTermArg.values().front());
         printer = printPackageSearchResults;
     });
-    OperationArgument packageArg("package", 'p', "shows detauls about a package");
+    OperationArgument packageArg("package", 'p', "shows details about a package");
     ConfigValueArgument packageNameArg("name", 'n', "specifies the package name", { "name" });
     packageNameArg.setImplicit(true);
     packageNameArg.setRequired(true);
