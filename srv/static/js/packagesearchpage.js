@@ -4,11 +4,11 @@ function initPackageSearch(sectionElement, sectionData, newParams)
     const hasNewParams = newParams.length >= 1;
     if (!hasNewParams) {
         if (currentParams !== undefined) {
-            updateHashPreventingChangeHandler('#package-search-section' + currentParams);
+            updateHashPreventingChangeHandler('#package-search-section?' + encodeURIComponent(currentParams));
         }
         return true;
     }
-    const searchParams = sections['package-search'].state.params = '?' + newParams[0];
+    const searchParams = sections['package-search'].state.params = newParams[0];
     if (currentParams === searchParams) {
         return true;
     }
@@ -49,8 +49,8 @@ function searchForPackagesFromParams(searchParams)
 function searchForPackages()
 {
     const res = startFormQueryEx('package-search-form', showPackageSearchResults);
-    const params = sections['package-search'].state.params = res.params;
-    updateHashPreventingSectionInitializer('#package-search-section' + params);
+    const params = sections['package-search'].state.params = res.params.substr(1);
+    updateHashPreventingSectionInitializer('#package-search-section?' + encodeURIComponent(params));
     return res.ajaxRequest;
 }
 
