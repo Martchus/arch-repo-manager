@@ -1,5 +1,7 @@
 #include "resources/config.h"
 
+#include "../librepomgr/buildactions/buildaction.h"
+#include "../librepomgr/buildactions/buildactionmeta.h"
 #include "../librepomgr/json.h"
 #include "../librepomgr/webapi/params.h"
 #include "../librepomgr/webclient/session.h"
@@ -224,6 +226,33 @@ void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type::value
     std::cout.flush();
 }
 
+void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
+{
+    const auto actions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size());
+    const auto meta = LibRepoMgr::BuildActionMetaInfo();
+    const auto unknown = std::string_view("?");
+    auto t = tabulate::Table();
+    t.format().hide_border();
+    t.add_row(
+        { "ID", "Task", "Type", "Status", "Result", "Created", "Started", "Runtime", "Directory", "Source repo", "Destination repo", "Packages" });
+    for (const auto &a : actions) {
+        const LibRepoMgr::BuildActionTypeMetaInfo *typeInfo = nullptr;
+        if (meta.isTypeIdValid(a.type)) {
+            typeInfo = &meta.typeInfoForId(a.type);
+        }
+        const auto status = static_cast<std::size_t>(a.status) < meta.states.size() ? meta.states[static_cast<std::size_t>(a.status)].name : unknown;
+        const auto result
+            = static_cast<std::size_t>(a.result) < meta.results.size() ? meta.results[static_cast<std::size_t>(a.result)].name : unknown;
+        t.add_row({ numberToString(a.id), a.taskName, (typeInfo ? typeInfo->name : unknown).data(), status.data(), result.data(),
+            a.created.toString(DateTimeOutputFormat::DateAndTime, true), a.started.toString(DateTimeOutputFormat::DateAndTime, true),
+            (a.finished - a.started).toString(TimeSpanOutputFormat::WithMeasures, true), a.directory, joinStrings(a.sourceDbs, ", "),
+            joinStrings(a.destinationDbs, ", "), joinStrings(a.packageNames, ", ") });
+    }
+    t.row(0).format().font_align(tabulate::FontAlign::center).font_style({ tabulate::FontStyle::bold });
+    configureColumnWidths(t);
+    std::cout << t << std::endl;
+}
+
 void printRawData(const LibRepoMgr::WebClient::Response::body_type::value_type &rawData)
 {
     if (!rawData.empty()) {
@@ -293,9 +322,14 @@ int main(int argc, const char *argv[])
         path = "/api/v0/packages?mode=name&details=1&name=" + LibRepoMgr::WebAPI::Url::encodeValue(packageNameArg.values().front());
         printer = printPackageDetails;
     });
+    OperationArgument listActionsArg("list-actions", 'l', "list build actions");
+    listActionsArg.setCallback([&path, &printer](const ArgumentOccurrence &) {
+        path = "/api/v0/build-action";
+        printer = printListOfBuildActions;
+    });
     HelpArgument helpArg(parser);
     NoColorArgument noColorArg;
-    parser.setMainArguments({ &searchArg, &packageArg, &instanceArg, &configFileArg, &noColorArg, &helpArg });
+    parser.setMainArguments({ &searchArg, &packageArg, &listActionsArg, &instanceArg, &configFileArg, &noColorArg, &helpArg });
     parser.parseArgs(argc, argv);
 
     // return early if no operation specified
