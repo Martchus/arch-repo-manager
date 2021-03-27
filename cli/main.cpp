@@ -31,6 +31,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <ranges>
 #include <string_view>
 
 using namespace CppUtilities;
@@ -253,6 +254,69 @@ static void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_
     std::cout << t << std::endl;
 }
 
+static std::string printTimeStamp(const DateTime timeStamp)
+{
+    static const auto now = DateTime::gmtNow();
+    return (now - timeStamp).toString(TimeSpanOutputFormat::WithMeasures, true) % ' ' % '('
+        % timeStamp.toString(DateTimeOutputFormat::DateAndTime, true)
+        + ')';
+}
+
+static void printBuildActions(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
+{
+    const auto buildActions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size());
+    const auto meta = LibRepoMgr::BuildActionMetaInfo();
+    const auto unknown = std::string_view("?");
+    for (const auto &a : buildActions) {
+        const auto typeInfo = meta.isTypeIdValid(a.type) ? &meta.typeInfoForId(a.type) : nullptr;
+        const auto status = static_cast<std::size_t>(a.status) < meta.states.size() ? meta.states[static_cast<std::size_t>(a.status)].name : unknown;
+        const auto result
+            = static_cast<std::size_t>(a.result) < meta.results.size() ? meta.results[static_cast<std::size_t>(a.result)].name : unknown;
+        const auto flags = typeInfo ? &typeInfo->flags : nullptr;
+        const auto startAfter = a.startAfter | std::views::transform([](auto id) { return numberToString(id); });
+
+        std::cout << TextAttribute::Bold << "Build action " << a.id << TextAttribute::Reset << '\n';
+        tabulate::Table t;
+        t.format().hide_border();
+        t.add_row({ "Task", a.taskName });
+        t.add_row({ "Type", (typeInfo ? typeInfo->name : unknown).data() });
+        t.add_row({ "Status", status.data() });
+        t.add_row({ "Result", result.data() });
+        if (std::holds_alternative<std::string>(a.resultData)) {
+            t.add_row({ "Result data", std::get<std::string>(a.resultData) });
+        } else {
+            t.add_row({ "Result data", "(no output formatter for result output type implemented yet)" });
+        }
+        t.add_row({ "Created", printTimeStamp(a.created) });
+        t.add_row({ "Started", printTimeStamp(a.started) });
+        t.add_row({ "Finished", printTimeStamp(a.finished) });
+        t.add_row({ "Start after", joinStrings<decltype(startAfter), std::string>(startAfter, ", ") });
+        t.add_row({ "Directory", a.directory });
+        t.add_row({ "Source repo", joinStrings(a.sourceDbs, "\n") });
+        t.add_row({ "Destination repo", joinStrings(a.destinationDbs, "\n") });
+        t.add_row({ "Packages", joinStrings(a.packageNames, "\n") });
+        if (flags) {
+            auto presentFlags = std::string();
+            presentFlags.reserve(32);
+            for (const auto &flag : *flags) {
+                if (a.flags & flag.id) {
+                    if (!presentFlags.empty()) {
+                        presentFlags += ", ";
+                    }
+                    presentFlags += flag.name;
+                }
+            }
+            t.add_row({ "Flags", std::move(presentFlags) });
+        } else {
+            t.add_row({ "Flags", numberToString(a.flags) });
+        }
+        t.add_row({ "Output", a.output });
+        t.column(0).format().font_align(tabulate::FontAlign::right);
+        std::cout << t << '\n';
+    }
+    std::cout.flush();
+}
+
 static void printRawDataForErrorHandling(const LibRepoMgr::WebClient::Response::body_type::value_type &rawData)
 {
     if (!rawData.empty()) {
@@ -308,6 +372,7 @@ int main(int argc, const char *argv[])
     ConfigValueArgument configFileArg("config-file", 'c', "specifies the path of the config file", { "path" });
     configFileArg.setEnvironmentVariable(PROJECT_VARNAME_UPPER "_CONFIG_FILE");
     ConfigValueArgument instanceArg("instance", 'i', "specifies the instance to connect to", { "instance" });
+    ConfigValueArgument rawArg("raw", 'r', "print the raw output from the server");
     OperationArgument packageArg("package", 'p', "Package-related operations:");
     OperationArgument searchArg("search", 's', "searches for packages");
     ConfigValueArgument searchTermArg("term", 't', "specifies the search term", { "term" });
@@ -337,10 +402,48 @@ int main(int argc, const char *argv[])
         path = "/api/v0/build-action";
         printer = printListOfBuildActions;
     });
-    actionArg.setSubArguments({ &listActionsArg });
+    ConfigValueArgument buildActionIdArg("id", '\0', "specifies the build action ID", { "ID" });
+    buildActionIdArg.setImplicit(true);
+    buildActionIdArg.setRequired(true);
+    OperationArgument showBuildActionArg("show", 'd', "show details about a build action");
+    showBuildActionArg.setCallback([&path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
+        path = "/api/v0/build-action/details?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        printer = printBuildActions;
+    });
+    showBuildActionArg.setSubArguments({ &buildActionIdArg });
+    OperationArgument deleteBuildActionArg("delete", '\0', "deletes a build action");
+    deleteBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
+        verb = boost::beast::http::verb::delete_;
+        path = "/api/v0/build-action?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        printer = printRawData;
+    });
+    deleteBuildActionArg.setSubArguments({ &buildActionIdArg });
+    OperationArgument cloneBuildActionArg("clone", '\0', "clones a build action");
+    cloneBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
+        verb = boost::beast::http::verb::post;
+        path = "/api/v0/build-action/clone?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        printer = printRawData;
+    });
+    cloneBuildActionArg.setSubArguments({ &buildActionIdArg });
+    OperationArgument startBuildActionArg("start", '\0', "starts a build action");
+    startBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
+        verb = boost::beast::http::verb::post;
+        path = "/api/v0/build-action/start?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        printer = printRawData;
+    });
+    startBuildActionArg.setSubArguments({ &buildActionIdArg });
+    OperationArgument stopBuildActionArg("stop", '\0', "stops a build action");
+    stopBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
+        verb = boost::beast::http::verb::post;
+        path = "/api/v0/build-action/stop?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        printer = printRawData;
+    });
+    stopBuildActionArg.setSubArguments({ &buildActionIdArg });
+    actionArg.setSubArguments(
+        { &listActionsArg, &showBuildActionArg, &deleteBuildActionArg, &cloneBuildActionArg, &startBuildActionArg, &stopBuildActionArg });
     HelpArgument helpArg(parser);
     NoColorArgument noColorArg;
-    parser.setMainArguments({ &packageArg, &actionArg, &instanceArg, &configFileArg, &noColorArg, &helpArg });
+    parser.setMainArguments({ &packageArg, &actionArg, &instanceArg, &configFileArg, &rawArg, &noColorArg, &helpArg });
     parser.parseArgs(argc, argv);
 
     // return early if no operation specified
@@ -369,8 +472,9 @@ int main(int argc, const char *argv[])
     sslContext.set_verify_mode(boost::asio::ssl::verify_peer);
     sslContext.set_default_verify_paths();
     LibRepoMgr::WebClient::runSessionFromUrl(ioContext, sslContext, url,
-        std::bind(&handleResponse, std::ref(url), std::placeholders::_1, std::placeholders::_2, printer, std::ref(returnCode)), std::string(),
-        config.userName, config.password, verb);
+        std::bind(&handleResponse, std::ref(url), std::placeholders::_1, std::placeholders::_2, rawArg.isPresent() ? printRawData : printer,
+            std::ref(returnCode)),
+        std::string(), config.userName, config.password, verb);
     ioContext.run();
 
     return 0;

@@ -346,10 +346,6 @@ BuildActionMetaInfo::BuildActionMetaInfo()
         },
         BuildActionStatusMetaInfo{
             .id = BuildActionStatus::AwaitingConfirmation,
-            .name = "Enqueued",
-        },
-        BuildActionStatusMetaInfo{
-            .id = BuildActionStatus::AwaitingConfirmation,
             .name = "Awaiting confirmation",
         },
         BuildActionStatusMetaInfo{
