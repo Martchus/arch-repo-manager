@@ -308,7 +308,8 @@ int main(int argc, const char *argv[])
     ConfigValueArgument configFileArg("config-file", 'c', "specifies the path of the config file", { "path" });
     configFileArg.setEnvironmentVariable(PROJECT_VARNAME_UPPER "_CONFIG_FILE");
     ConfigValueArgument instanceArg("instance", 'i', "specifies the instance to connect to", { "instance" });
-    OperationArgument searchArg("search", 's', "searches packages");
+    OperationArgument packageArg("package", 'p', "Package-related operations:");
+    OperationArgument searchArg("search", 's', "searches for packages");
     ConfigValueArgument searchTermArg("term", 't', "specifies the search term", { "term" });
     searchTermArg.setImplicit(true);
     searchTermArg.setRequired(true);
@@ -320,23 +321,26 @@ int main(int argc, const char *argv[])
             + LibRepoMgr::WebAPI::Url::encodeValue(searchTermArg.values().front());
         printer = printPackageSearchResults;
     });
-    OperationArgument packageArg("package", 'p', "shows details about a package");
     ConfigValueArgument packageNameArg("name", 'n', "specifies the package name", { "name" });
     packageNameArg.setImplicit(true);
     packageNameArg.setRequired(true);
-    packageArg.setSubArguments({ &packageNameArg });
-    packageArg.setCallback([&path, &printer, &packageNameArg](const ArgumentOccurrence &) {
+    OperationArgument packageShowArg("show", 'd', "shows details about a package");
+    packageShowArg.setSubArguments({ &packageNameArg });
+    packageShowArg.setCallback([&path, &printer, &packageNameArg](const ArgumentOccurrence &) {
         path = "/api/v0/packages?mode=name&details=1&name=" + LibRepoMgr::WebAPI::Url::encodeValue(packageNameArg.values().front());
         printer = printPackageDetails;
     });
-    OperationArgument listActionsArg("list-actions", 'l', "list build actions");
+    packageArg.setSubArguments({ &searchArg, &packageShowArg });
+    OperationArgument actionArg("action", 'a', "Build-action-related operations:");
+    OperationArgument listActionsArg("list", 'l', "list build actions");
     listActionsArg.setCallback([&path, &printer](const ArgumentOccurrence &) {
         path = "/api/v0/build-action";
         printer = printListOfBuildActions;
     });
+    actionArg.setSubArguments({ &listActionsArg });
     HelpArgument helpArg(parser);
     NoColorArgument noColorArg;
-    parser.setMainArguments({ &searchArg, &packageArg, &listActionsArg, &instanceArg, &configFileArg, &noColorArg, &helpArg });
+    parser.setMainArguments({ &packageArg, &actionArg, &instanceArg, &configFileArg, &noColorArg, &helpArg });
     parser.parseArgs(argc, argv);
 
     // return early if no operation specified
