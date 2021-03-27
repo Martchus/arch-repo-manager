@@ -232,7 +232,7 @@ void SslSession::closed(boost::beast::error_code ec)
 template <typename SessionType, typename... ArgType>
 std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runSession(const std::string &host, const std::string &port,
     const std::string &target, std::function<void(SessionData, const HttpClientError &)> &&handler, std::string &&destinationPath,
-    std::string_view userName, std::string_view password, ArgType &&...args)
+    std::string_view userName, std::string_view password, boost::beast::http::verb verb, ArgType &&...args)
 {
     auto session = make_shared<SessionType>(args..., [handler{ move(handler) }](auto &session2, const HttpClientError &error) mutable {
         handler(SessionData{ session2.shared_from_this(), session2.request, session2.response, session2.destinationFilePath }, error);
@@ -243,13 +243,13 @@ std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runS
             "Basic " + encodeBase64(reinterpret_cast<const std::uint8_t *>(authInfo.data()), static_cast<std::uint32_t>(authInfo.size())));
     }
     session->destinationFilePath = move(destinationPath);
-    session->run(host.data(), port.data(), http::verb::get, target.data());
+    session->run(host.data(), port.data(), verb, target.data());
     return std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>>(std::move(session));
 }
 
 std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runSessionFromUrl(boost::asio::io_context &ioContext,
     boost::asio::ssl::context &sslContext, std::string_view url, std::function<void(SessionData, const HttpClientError &)> &&handler,
-    std::string &&destinationPath, std::string_view userName, std::string_view password)
+    std::string &&destinationPath, std::string_view userName, std::string_view password, boost::beast::http::verb verb)
 {
     string host, port, target;
     auto ssl = false;
@@ -286,9 +286,9 @@ std::variant<string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runS
     }
 
     if (ssl) {
-        return runSession<SslSession>(host, port, target, move(handler), move(destinationPath), userName, password, ioContext, sslContext);
+        return runSession<SslSession>(host, port, target, move(handler), move(destinationPath), userName, password, verb, ioContext, sslContext);
     } else {
-        return runSession<Session>(host, port, target, move(handler), move(destinationPath), userName, password, ioContext);
+        return runSession<Session>(host, port, target, move(handler), move(destinationPath), userName, password, verb, ioContext);
     }
 }
 

@@ -102,7 +102,7 @@ void ClientConfig::parse(const Argument &configFileArg, const Argument &instance
     }
 }
 
-void configureColumnWidths(tabulate::Table &table)
+static void configureColumnWidths(tabulate::Table &table)
 {
     const auto terminalSize = determineTerminalSize();
     if (!terminalSize.columns) {
@@ -145,7 +145,7 @@ void configureColumnWidths(tabulate::Table &table)
     }
 }
 
-void printPackageSearchResults(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
+static void printPackageSearchResults(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
 {
     const auto packages = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibPkg::PackageSearchResult>>(jsonData.data(), jsonData.size());
     tabulate::Table t;
@@ -167,7 +167,7 @@ template <typename List> inline std::string formatList(const List &list)
     return joinStrings(list, ", ");
 }
 
-std::string formatDependencies(const std::vector<LibPkg::Dependency> &deps)
+static std::string formatDependencies(const std::vector<LibPkg::Dependency> &deps)
 {
     auto asStrings = std::vector<std::string>();
     asStrings.reserve(deps.size());
@@ -177,7 +177,7 @@ std::string formatDependencies(const std::vector<LibPkg::Dependency> &deps)
     return formatList(asStrings);
 }
 
-void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
+static void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
 {
     const auto packages = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibPkg::Package>>(jsonData.data(), jsonData.size());
     for (const auto &package : packages) {
@@ -226,7 +226,7 @@ void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type::value
     std::cout.flush();
 }
 
-void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
+static void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
 {
     const auto actions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size());
     const auto meta = LibRepoMgr::BuildActionMetaInfo();
@@ -253,28 +253,34 @@ void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_type::v
     std::cout << t << std::endl;
 }
 
-void printRawData(const LibRepoMgr::WebClient::Response::body_type::value_type &rawData)
+static void printRawDataForErrorHandling(const LibRepoMgr::WebClient::Response::body_type::value_type &rawData)
 {
     if (!rawData.empty()) {
         std::cerr << Phrases::InfoMessage << "Server replied:" << Phrases::End << rawData << '\n';
     }
 }
 
-void handleResponse(const std::string &url, const LibRepoMgr::WebClient::SessionData &data, const LibRepoMgr::WebClient::HttpClientError &error,
-    void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData), int &returnCode)
+static void printRawData(const LibRepoMgr::WebClient::Response::body_type::value_type &rawData)
+{
+    std::cout << rawData << '\n';
+}
+
+static void handleResponse(const std::string &url, const LibRepoMgr::WebClient::SessionData &data,
+    const LibRepoMgr::WebClient::HttpClientError &error, void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData),
+    int &returnCode)
 {
     const auto &response = std::get<LibRepoMgr::WebClient::Response>(data.response);
     const auto &body = response.body();
     if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
         std::cerr << Phrases::ErrorMessage << "Unable to connect: " << error.what() << Phrases::End;
         std::cerr << Phrases::InfoMessage << "URL was: " << url << Phrases::End;
-        printRawData(body);
+        printRawDataForErrorHandling(body);
         return;
     }
     if (response.result() != boost::beast::http::status::ok) {
         std::cerr << Phrases::ErrorMessage << "HTTP request not successful: " << error.what() << Phrases::End;
         std::cerr << Phrases::InfoMessage << "URL was: " << url << Phrases::End;
-        printRawData(body);
+        printRawDataForErrorHandling(body);
         return;
     }
     try {
@@ -293,7 +299,8 @@ void handleResponse(const std::string &url, const LibRepoMgr::WebClient::Session
 int main(int argc, const char *argv[])
 {
     // define command-specific parameters
-    std::string path;
+    auto verb = boost::beast::http::verb::get;
+    auto path = std::string();
     void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData) = nullptr;
 
     // read CLI args
@@ -359,7 +366,7 @@ int main(int argc, const char *argv[])
     sslContext.set_default_verify_paths();
     LibRepoMgr::WebClient::runSessionFromUrl(ioContext, sslContext, url,
         std::bind(&handleResponse, std::ref(url), std::placeholders::_1, std::placeholders::_2, printer, std::ref(returnCode)), std::string(),
-        config.userName, config.password);
+        config.userName, config.password, verb);
     ioContext.run();
 
     return 0;

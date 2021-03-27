@@ -139,7 +139,8 @@ inline SslSession::SslSession(boost::asio::io_context &ioContext, boost::asio::s
 LIBREPOMGR_EXPORT std::variant<std::string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runSessionFromUrl(
     boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, std::string_view url,
     std::function<void(SessionData data, const HttpClientError &error)> &&handler, std::string &&destinationPath = std::string(),
-    std::string_view userName = std::string_view(), std::string_view password = std::string_view());
+    std::string_view userName = std::string_view(), std::string_view password = std::string_view(),
+    boost::beast::http::verb verb = boost::beast::http::verb::get);
 
 } // namespace WebClient
 } // namespace LibRepoMgr
