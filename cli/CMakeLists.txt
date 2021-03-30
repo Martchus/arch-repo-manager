@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
 # add project files
 set(HEADER_FILES)
-set(SRC_FILES main.cpp)
-set(TEST_HEADER_FILES)
+set(SRC_FILES main.cpp config.cpp)
+set(TEST_HEADER_FILES config.h)
 set(TEST_SRC_FILES tests/cppunit.cpp)
 
 # meta data

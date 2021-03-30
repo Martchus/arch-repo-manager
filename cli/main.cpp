@@ -1,4 +1,4 @@
-#include "resources/config.h"
+#include "./config.h"
 
 #include "../librepomgr/buildactions/buildaction.h"
 #include "../librepomgr/buildactions/buildactionmeta.h"
@@ -9,13 +9,16 @@
 #include "../libpkg/data/database.h"
 #include "../libpkg/data/package.h"
 
+#include "resources/config.h"
+
+#include <reflective_rapidjson/json/errorformatting.h>
+
 #include <c++utilities/application/argumentparser.h>
 #include <c++utilities/application/commandlineutils.h>
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
-#include <c++utilities/io/inifile.h>
-#include <c++utilities/io/nativefilestream.h>
+#include <c++utilities/misc/parseerror.h>
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -38,70 +41,7 @@ using namespace CppUtilities;
 using namespace CppUtilities::EscapeCodes;
 using namespace std;
 
-struct ClientConfig {
-    void parse(const Argument &configFileArg, const Argument &instanceArg);
-
-    const char *path = nullptr;
-    std::string instance;
-    std::string url;
-    std::string userName;
-    std::string password;
-};
-
-void ClientConfig::parse(const Argument &configFileArg, const Argument &instanceArg)
-{
-    // parse connfig file
-    path = configFileArg.firstValue();
-    if (!path || !*path) {
-        path = "/etc/buildservice" PROJECT_CONFIG_SUFFIX "/client.conf";
-    }
-    auto configFile = NativeFileStream();
-    configFile.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-    configFile.open(path, std::ios_base::in);
-    auto configIni = AdvancedIniFile();
-    configIni.parse(configFile);
-    configFile.close();
-
-    // read innstance
-    if (instanceArg.isPresent()) {
-        instance = instanceArg.values().front();
-    }
-    for (const auto &section : configIni.sections) {
-        if (!section.name.starts_with("instance/")) {
-            continue;
-        }
-        if (!instance.empty() && instance != std::string_view(section.name.data() + 9, section.name.size() - 9)) {
-            continue;
-        }
-        instance = section.name;
-        if (const auto url = section.findField("url"); url != section.fieldEnd()) {
-            this->url = std::move(url->value);
-        } else {
-            throw std::runtime_error("Config is invalid: No \"url\" specified within \"" % section.name + "\".");
-        }
-        if (const auto user = section.findField("user"); user != section.fieldEnd()) {
-            this->userName = std::move(user->value);
-        }
-        break;
-    }
-    if (url.empty()) {
-        throw std::runtime_error("Config is invalid: Instance configuration insufficient.");
-    }
-
-    // read user data
-    if (userName.empty()) {
-        return;
-    }
-    if (const auto userSection = configIni.findSection("user/" + userName); userSection != configIni.sectionEnd()) {
-        if (const auto password = userSection->findField("password"); password != userSection->fieldEnd()) {
-            this->password = std::move(password->value);
-        } else {
-            throw std::runtime_error("Config is invalid: No \"password\" specified within \"" % userSection->name + "\".");
-        }
-    } else {
-        throw std::runtime_error("Config is invalid: User \"" % userName + "\" referenced in instance configuration not found.");
-    }
-}
+// helpers for formatting output
 
 static void configureColumnWidths(tabulate::Table &table)
 {
@@ -148,7 +88,10 @@ static void configureColumnWidths(tabulate::Table &table)
 
 static void printPackageSearchResults(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
 {
-    const auto packages = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibPkg::PackageSearchResult>>(jsonData.data(), jsonData.size());
+    auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
+    errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
+    const auto packages
+        = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibPkg::PackageSearchResult>>(jsonData.data(), jsonData.size(), &errors);
     tabulate::Table t;
     t.format().hide_border();
     t.add_row({ "Arch", "Repo", "Name", "Version", "Description", "Build date" });
@@ -180,7 +123,9 @@ static std::string formatDependencies(const std::vector<LibPkg::Dependency> &dep
 
 static void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
 {
-    const auto packages = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibPkg::Package>>(jsonData.data(), jsonData.size());
+    auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
+    errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
+    const auto packages = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibPkg::Package>>(jsonData.data(), jsonData.size(), &errors);
     for (const auto &package : packages) {
         const auto *const pkg = &package;
         std::cout << TextAttribute::Bold << pkg->name << ' ' << pkg->version << TextAttribute::Reset << '\n';
@@ -229,7 +174,10 @@ static void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type
 
 static void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
 {
-    const auto actions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size());
+    auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
+    errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
+    auto actions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size(), &errors);
+    actions.sort([] (const auto &lhs, const auto &rhs) { return lhs.created < rhs.created; });
     const auto meta = LibRepoMgr::BuildActionMetaInfo();
     const auto unknown = std::string_view("?");
     auto t = tabulate::Table();
@@ -254,65 +202,85 @@ static void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_
     std::cout << t << std::endl;
 }
 
-static std::string printTimeStamp(const DateTime timeStamp)
+static std::string formatTimeStamp(const DateTime timeStamp)
 {
     static const auto now = DateTime::gmtNow();
-    return (now - timeStamp).toString(TimeSpanOutputFormat::WithMeasures, true) % ' ' % '('
+    return (now - timeStamp).toString(TimeSpanOutputFormat::WithMeasures, true) % " ago ("
         % timeStamp.toString(DateTimeOutputFormat::DateAndTime, true)
         + ')';
 }
 
+static void printBuildAction(const LibRepoMgr::BuildAction &a, const LibRepoMgr::BuildActionMetaInfo &meta)
+{
+    constexpr auto unknown = std::string_view("?");
+    const auto typeInfo = meta.isTypeIdValid(a.type) ? &meta.typeInfoForId(a.type) : nullptr;
+    const auto status = static_cast<std::size_t>(a.status) < meta.states.size() ? meta.states[static_cast<std::size_t>(a.status)].name : unknown;
+    const auto result = static_cast<std::size_t>(a.result) < meta.results.size() ? meta.results[static_cast<std::size_t>(a.result)].name : unknown;
+    const auto flags = typeInfo ? &typeInfo->flags : nullptr;
+    const auto startAfter = a.startAfter | std::views::transform([](auto id) { return numberToString(id); });
+
+    std::cout << TextAttribute::Bold << "Build action " << a.id << TextAttribute::Reset << '\n';
+    tabulate::Table t;
+    t.format().hide_border();
+    t.add_row({ "Task", a.taskName });
+    t.add_row({ "Type", (typeInfo ? typeInfo->name : unknown).data() });
+    t.add_row({ "Status", status.data() });
+    t.add_row({ "Result", result.data() });
+    if (std::holds_alternative<std::string>(a.resultData)) {
+        t.add_row({ "Result data", std::get<std::string>(a.resultData) });
+    } else {
+        t.add_row({ "Result data", "(no output formatter for result output type implemented yet)" });
+    }
+    t.add_row({ "Created", formatTimeStamp(a.created) });
+    t.add_row({ "Started", formatTimeStamp(a.started) });
+    t.add_row({ "Finished", formatTimeStamp(a.finished) });
+    t.add_row({ "Start after", joinStrings<decltype(startAfter), std::string>(startAfter, ", ") });
+    t.add_row({ "Directory", a.directory });
+    t.add_row({ "Source repo", joinStrings(a.sourceDbs, "\n") });
+    t.add_row({ "Destination repo", joinStrings(a.destinationDbs, "\n") });
+    t.add_row({ "Packages", joinStrings(a.packageNames, "\n") });
+    if (flags) {
+        auto presentFlags = std::string();
+        presentFlags.reserve(32);
+        for (const auto &flag : *flags) {
+            if (a.flags & flag.id) {
+                if (!presentFlags.empty()) {
+                    presentFlags += ", ";
+                }
+                presentFlags += flag.name;
+            }
+        }
+        t.add_row({ "Flags", std::move(presentFlags) });
+    } else {
+        t.add_row({ "Flags", numberToString(a.flags) });
+    }
+    t.add_row({ "Output", a.output });
+    t.column(0).format().font_align(tabulate::FontAlign::right);
+    std::cout << t << '\n';
+}
+
+static void printBuildAction(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
+{
+    auto buildAction = LibRepoMgr::BuildAction();
+    {
+        const auto doc = ReflectiveRapidJSON::JsonReflector::parseJsonDocFromString(jsonData.data(), jsonData.size());
+        auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
+        errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
+        ReflectiveRapidJSON::JsonReflector::pull(buildAction, doc.GetObject(), &errors);
+    }
+    printBuildAction(buildAction, LibRepoMgr::BuildActionMetaInfo());
+}
+
 static void printBuildActions(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData)
 {
-    const auto buildActions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size());
+    auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
+    errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
+    auto buildActions
+        = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size(), &errors);
+    buildActions.sort([] (const auto &lhs, const auto &rhs) { return lhs.created < rhs.created; });
     const auto meta = LibRepoMgr::BuildActionMetaInfo();
-    const auto unknown = std::string_view("?");
     for (const auto &a : buildActions) {
-        const auto typeInfo = meta.isTypeIdValid(a.type) ? &meta.typeInfoForId(a.type) : nullptr;
-        const auto status = static_cast<std::size_t>(a.status) < meta.states.size() ? meta.states[static_cast<std::size_t>(a.status)].name : unknown;
-        const auto result
-            = static_cast<std::size_t>(a.result) < meta.results.size() ? meta.results[static_cast<std::size_t>(a.result)].name : unknown;
-        const auto flags = typeInfo ? &typeInfo->flags : nullptr;
-        const auto startAfter = a.startAfter | std::views::transform([](auto id) { return numberToString(id); });
-
-        std::cout << TextAttribute::Bold << "Build action " << a.id << TextAttribute::Reset << '\n';
-        tabulate::Table t;
-        t.format().hide_border();
-        t.add_row({ "Task", a.taskName });
-        t.add_row({ "Type", (typeInfo ? typeInfo->name : unknown).data() });
-        t.add_row({ "Status", status.data() });
-        t.add_row({ "Result", result.data() });
-        if (std::holds_alternative<std::string>(a.resultData)) {
-            t.add_row({ "Result data", std::get<std::string>(a.resultData) });
-        } else {
-            t.add_row({ "Result data", "(no output formatter for result output type implemented yet)" });
-        }
-        t.add_row({ "Created", printTimeStamp(a.created) });
-        t.add_row({ "Started", printTimeStamp(a.started) });
-        t.add_row({ "Finished", printTimeStamp(a.finished) });
-        t.add_row({ "Start after", joinStrings<decltype(startAfter), std::string>(startAfter, ", ") });
-        t.add_row({ "Directory", a.directory });
-        t.add_row({ "Source repo", joinStrings(a.sourceDbs, "\n") });
-        t.add_row({ "Destination repo", joinStrings(a.destinationDbs, "\n") });
-        t.add_row({ "Packages", joinStrings(a.packageNames, "\n") });
-        if (flags) {
-            auto presentFlags = std::string();
-            presentFlags.reserve(32);
-            for (const auto &flag : *flags) {
-                if (a.flags & flag.id) {
-                    if (!presentFlags.empty()) {
-                        presentFlags += ", ";
-                    }
-                    presentFlags += flag.name;
-                }
-            }
-            t.add_row({ "Flags", std::move(presentFlags) });
-        } else {
-            t.add_row({ "Flags", numberToString(a.flags) });
-        }
-        t.add_row({ "Output", a.output });
-        t.column(0).format().font_align(tabulate::FontAlign::right);
-        std::cout << t << '\n';
+        printBuildAction(a, meta);
     }
     std::cout.flush();
 }
@@ -320,7 +288,13 @@ static void printBuildActions(const LibRepoMgr::WebClient::Response::body_type::
 static void printRawDataForErrorHandling(const LibRepoMgr::WebClient::Response::body_type::value_type &rawData)
 {
     if (!rawData.empty()) {
-        std::cerr << Phrases::InfoMessage << "Server replied:" << Phrases::End << rawData << '\n';
+        std::cerr << Phrases::InfoMessage << "Server replied:";
+        if (rawData.size() > 50 || rawData.find('\n') != std::string::npos) {
+            std::cerr << Phrases::End;
+        } else {
+            std::cerr << TextAttribute::Reset << ' ';
+        }
+        std::cerr << rawData << '\n';
     }
 }
 
@@ -342,21 +316,59 @@ static void handleResponse(const std::string &url, const LibRepoMgr::WebClient::
         return;
     }
     if (response.result() != boost::beast::http::status::ok) {
-        std::cerr << Phrases::ErrorMessage << "HTTP request not successful: " << error.what() << Phrases::End;
+        std::cerr << Phrases::ErrorMessage << "HTTP request not successful: " << response.result() << " ("
+                  << static_cast<std::underlying_type_t<decltype(response.result())>>(response.result()) << " response)" << Phrases::End;
         std::cerr << Phrases::InfoMessage << "URL was: " << url << Phrases::End;
         printRawDataForErrorHandling(body);
         return;
     }
     try {
         std::invoke(printer, body);
+    } catch (const ReflectiveRapidJSON::JsonDeserializationError &e) {
+        std::cerr << Phrases::ErrorMessage << "Unable to make sense of response: " << ReflectiveRapidJSON::formatJsonDeserializationError(e)
+                  << Phrases::End;
+        returnCode = 13;
     } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
         std::cerr << Phrases::ErrorMessage << "Unable to parse responnse: " << tupleToString(LibRepoMgr::serializeParseError(e)) << Phrases::End;
-        std::cerr << Phrases::InfoMessage << "URL was: " << url << std::endl;
         returnCode = 11;
     } catch (const std::runtime_error &e) {
         std::cerr << Phrases::ErrorMessage << "Unable to display response: " << e.what() << Phrases::End;
-        std::cerr << Phrases::InfoMessage << "URL was: " << url << std::endl;
         returnCode = 12;
+    }
+    if (returnCode) {
+        std::cerr << Phrases::InfoMessage << "URL was: " << url << std::endl;
+    }
+}
+
+// helper for turning CLI args into URL query parameters
+
+static std::string asQueryParam(const Argument &cliArg, std::string_view paramName = std::string_view())
+{
+    if (!cliArg.isPresent()) {
+        return std::string();
+    }
+    const auto argValues
+        = cliArg.values(0) | std::views::transform([](const char *argValue) { return LibRepoMgr::WebAPI::Url::encodeValue(argValue); });
+    return joinStrings<decltype(argValues), std::string>(
+        argValues, "&", true, argsToString(paramName.empty() ? std::string_view(cliArg.name()) : paramName, '='));
+}
+
+static void appendAsQueryParam(std::string &path, const Argument &cliArg, std::string_view paramName = std::string_view())
+{
+    auto asParam = asQueryParam(cliArg, paramName);
+    if (asParam.empty()) {
+        return;
+    }
+    if (!(path.empty() || path.ends_with('?'))) {
+        path += '&';
+    }
+    path += std::move(asParam);
+}
+
+static void appendAsQueryParam(std::string &path, std::initializer_list<const Argument *> args)
+{
+    for (const auto *arg : args) {
+        appendAsQueryParam(path, *arg, arg->name());
     }
 }
 
@@ -368,82 +380,136 @@ int main(int argc, const char *argv[])
     void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData) = nullptr;
 
     // read CLI args
-    ArgumentParser parser;
-    ConfigValueArgument configFileArg("config-file", 'c', "specifies the path of the config file", { "path" });
+    auto parser = ArgumentParser();
+    auto configFileArg = ConfigValueArgument("config-file", 'c', "specifies the path of the config file", { "path" });
     configFileArg.setEnvironmentVariable(PROJECT_VARNAME_UPPER "_CONFIG_FILE");
-    ConfigValueArgument instanceArg("instance", 'i', "specifies the instance to connect to", { "instance" });
-    ConfigValueArgument rawArg("raw", 'r', "print the raw output from the server");
-    OperationArgument packageArg("package", 'p', "Package-related operations:");
-    OperationArgument searchArg("search", 's', "searches for packages");
-    ConfigValueArgument searchTermArg("term", 't', "specifies the search term", { "term" });
+    auto instanceArg = ConfigValueArgument("instance", 'i', "specifies the instance to connect to", { "instance" });
+    auto rawArg = ConfigValueArgument("raw", 'r', "print the raw output from the server");
+    auto verboseArg = ConfigValueArgument("verbose", 'v', "prints debugging output");
+    auto packageArg = OperationArgument("package", 'p', "Package-related operations:");
+    auto searchArg = OperationArgument("search", 's', "searches for packages");
+    auto searchTermArg = ConfigValueArgument("term", 't', "specifies the search term", { "term" });
     searchTermArg.setImplicit(true);
     searchTermArg.setRequired(true);
-    ConfigValueArgument searchModeArg("mode", 'm', "specifies the mode", { "name/name-contains/regex/provides/depends/libprovides/libdepends" });
+    auto searchModeArg
+        = ConfigValueArgument("mode", 'm', "specifies the mode", { "name/name-contains/regex/provides/depends/libprovides/libdepends" });
     searchModeArg.setPreDefinedCompletionValues("name name-contains regex provides depends libprovides libdepends");
     searchArg.setSubArguments({ &searchTermArg, &searchModeArg });
     searchArg.setCallback([&path, &printer, &searchTermArg, &searchModeArg](const ArgumentOccurrence &) {
-        path = "/api/v0/packages?mode=" % LibRepoMgr::WebAPI::Url::encodeValue(searchModeArg.firstValueOr("name-contains")) % "&name="
-            + LibRepoMgr::WebAPI::Url::encodeValue(searchTermArg.values().front());
+        path = "/api/v0/packages?mode=" + LibRepoMgr::WebAPI::Url::encodeValue(searchModeArg.firstValueOr("name-contains"));
         printer = printPackageSearchResults;
+        appendAsQueryParam(path, searchTermArg, "name");
     });
-    ConfigValueArgument packageNameArg("name", 'n', "specifies the package name", { "name" });
+    auto packageNameArg = ConfigValueArgument("name", 'n', "specifies the package name", { "name" });
     packageNameArg.setImplicit(true);
     packageNameArg.setRequired(true);
-    OperationArgument packageShowArg("show", 'd', "shows details about a package");
+    auto packageShowArg = OperationArgument("show", 'd', "shows details about a package");
     packageShowArg.setSubArguments({ &packageNameArg });
     packageShowArg.setCallback([&path, &printer, &packageNameArg](const ArgumentOccurrence &) {
-        path = "/api/v0/packages?mode=name&details=1&name=" + LibRepoMgr::WebAPI::Url::encodeValue(packageNameArg.values().front());
+        path = "/api/v0/packages?mode=name&details=1";
         printer = printPackageDetails;
+        appendAsQueryParam(path, packageNameArg, "name");
     });
     packageArg.setSubArguments({ &searchArg, &packageShowArg });
-    OperationArgument actionArg("action", 'a', "Build-action-related operations:");
-    OperationArgument listActionsArg("list", 'l', "list build actions");
+    auto actionArg = OperationArgument("action", 'a', "Build-action-related operations:");
+    auto listActionsArg = OperationArgument("list", 'l', "list build actions");
     listActionsArg.setCallback([&path, &printer](const ArgumentOccurrence &) {
         path = "/api/v0/build-action";
         printer = printListOfBuildActions;
     });
-    ConfigValueArgument buildActionIdArg("id", '\0', "specifies the build action ID", { "ID" });
+    auto buildActionIdArg = ConfigValueArgument("id", '\0', "specifies the build action IDs", { "ID" });
     buildActionIdArg.setImplicit(true);
     buildActionIdArg.setRequired(true);
-    OperationArgument showBuildActionArg("show", 'd', "show details about a build action");
+    buildActionIdArg.setRequiredValueCount(Argument::varValueCount);
+    auto showBuildActionArg = OperationArgument("show", 'd', "show details about a build action");
     showBuildActionArg.setCallback([&path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
-        path = "/api/v0/build-action/details?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        path = "/api/v0/build-action/details?";
         printer = printBuildActions;
+        appendAsQueryParam(path, buildActionIdArg, "id");
     });
     showBuildActionArg.setSubArguments({ &buildActionIdArg });
-    OperationArgument deleteBuildActionArg("delete", '\0', "deletes a build action");
+    auto createBuildActionArg = OperationArgument("create", '\0', "creates and starts a new build action (or pre-defined task)");
+    auto taskArg = ConfigValueArgument("task", '\0', "specifies the pre-defined task to run", { "task" });
+    auto typeArg = ConfigValueArgument("type", '\0', "specifies the action type", { "type" });
+    auto directoryArg = ConfigValueArgument("directory", '\0', "specifies the directory", { "path" });
+    auto startConditionArg = ConfigValueArgument("start-condition", '\0', "specifies the start condition", { "immediately/after/manually" });
+    auto startAfterIdArg
+        = ConfigValueArgument("start-after-id", '\0', "specifies the IDs of existing build actions to start the new action after", { "ID" });
+    auto sourceRepoArg = ConfigValueArgument("source-repo", '\0', "specifies the source repositories", { "database-name" });
+    auto destinationRepoArg = ConfigValueArgument("destination-repo", '\0', "specifies the destination repositories", { "database-name" });
+    auto packagesArg = ConfigValueArgument("package", '\0', "specifies the packages", { "package-name" });
+    startConditionArg.setPreDefinedCompletionValues("immediately after manually");
+    startAfterIdArg.setRequiredValueCount(Argument::varValueCount);
+    sourceRepoArg.setRequiredValueCount(Argument::varValueCount);
+    destinationRepoArg.setRequiredValueCount(Argument::varValueCount);
+    packagesArg.setRequiredValueCount(Argument::varValueCount);
+    createBuildActionArg.setCallback([&verb, &path, &printer, &taskArg, &typeArg, &directoryArg, &startConditionArg, &startAfterIdArg, &sourceRepoArg,
+                                         &destinationRepoArg, &packagesArg](const ArgumentOccurrence &) {
+        verb = boost::beast::http::verb::post;
+        path = "/api/v0/build-action?";
+        printer = printBuildAction;
+        if (taskArg.isPresent() && typeArg.isPresent()) {
+            throw ParseError("The arguments --task and --type can not be combined.");
+        }
+        appendAsQueryParam(path,
+            { &(taskArg.isPresent() ? taskArg : typeArg), &directoryArg, &startConditionArg, &startAfterIdArg, &sourceRepoArg, &destinationRepoArg,
+                &packagesArg });
+    });
+    createBuildActionArg.setSubArguments(
+        { &typeArg, &taskArg, &directoryArg, &startConditionArg, &startAfterIdArg, &sourceRepoArg, &destinationRepoArg, &packagesArg });
+    auto deleteBuildActionArg = OperationArgument("delete", '\0', "deletes a build action");
     deleteBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
         verb = boost::beast::http::verb::delete_;
-        path = "/api/v0/build-action?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        path = "/api/v0/build-action?";
         printer = printRawData;
+        appendAsQueryParam(path, buildActionIdArg, "id");
     });
     deleteBuildActionArg.setSubArguments({ &buildActionIdArg });
-    OperationArgument cloneBuildActionArg("clone", '\0', "clones a build action");
+    auto cloneBuildActionArg = OperationArgument("clone", '\0', "clones a build action");
     cloneBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
         verb = boost::beast::http::verb::post;
-        path = "/api/v0/build-action/clone?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        path = "/api/v0/build-action/clone?";
         printer = printRawData;
+        appendAsQueryParam(path, buildActionIdArg, "id");
     });
     cloneBuildActionArg.setSubArguments({ &buildActionIdArg });
-    OperationArgument startBuildActionArg("start", '\0', "starts a build action");
+    auto startBuildActionArg = OperationArgument("start", '\0', "starts a build action");
     startBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
         verb = boost::beast::http::verb::post;
-        path = "/api/v0/build-action/start?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        path = "/api/v0/build-action/start?";
         printer = printRawData;
+        appendAsQueryParam(path, buildActionIdArg, "id");
     });
     startBuildActionArg.setSubArguments({ &buildActionIdArg });
-    OperationArgument stopBuildActionArg("stop", '\0', "stops a build action");
+    auto stopBuildActionArg = OperationArgument("stop", '\0', "stops a build action");
     stopBuildActionArg.setCallback([&verb, &path, &printer, &buildActionIdArg](const ArgumentOccurrence &) {
         verb = boost::beast::http::verb::post;
-        path = "/api/v0/build-action/stop?id=" + LibRepoMgr::WebAPI::Url::encodeValue(buildActionIdArg.firstValueOr("0"));
+        path = "/api/v0/build-action/stop?";
         printer = printRawData;
+        appendAsQueryParam(path, buildActionIdArg, "id");
     });
     stopBuildActionArg.setSubArguments({ &buildActionIdArg });
-    actionArg.setSubArguments(
-        { &listActionsArg, &showBuildActionArg, &deleteBuildActionArg, &cloneBuildActionArg, &startBuildActionArg, &stopBuildActionArg });
-    HelpArgument helpArg(parser);
-    NoColorArgument noColorArg;
-    parser.setMainArguments({ &packageArg, &actionArg, &instanceArg, &configFileArg, &rawArg, &noColorArg, &helpArg });
+    actionArg.setSubArguments({ &listActionsArg, &showBuildActionArg, &createBuildActionArg, &deleteBuildActionArg, &cloneBuildActionArg,
+        &startBuildActionArg, &stopBuildActionArg });
+    auto apiArg = OperationArgument("api", '\0', "Invoke a generic API request:");
+    auto pathArg = ConfigValueArgument("path", '\0', "specifies the route's path without prefix", { "path/of/route?foo=bar&bar=foo" });
+    pathArg.setImplicit(true);
+    pathArg.setRequired(true);
+    auto methodArg = ConfigValueArgument("method", 'x', "specifies the method", { "GET/POST/PUT/DELETE" });
+    methodArg.setPreDefinedCompletionValues("GET POST PUT DELETE");
+    apiArg.setCallback([&verb, &path, &printer, &pathArg, &methodArg](const ArgumentOccurrence &) {
+        const auto *rawVerb = methodArg.firstValueOr("GET");
+        verb = boost::beast::http::string_to_verb(rawVerb);
+        if (verb == boost::beast::http::verb::unknown) {
+            throw ParseError(argsToString('\"', rawVerb, "\" is not a valid method."));
+        }
+        path = argsToString("/api/v0/", pathArg.values(0).front());
+        printer = printRawData;
+    });
+    apiArg.setSubArguments({ &pathArg, &methodArg });
+    auto helpArg = HelpArgument(parser);
+    auto noColorArg = NoColorArgument();
+    parser.setMainArguments({ &packageArg, &actionArg, &apiArg, &instanceArg, &configFileArg, &rawArg, &verboseArg, &noColorArg, &helpArg });
     parser.parseArgs(argc, argv);
 
     // return early if no operation specified
@@ -458,6 +524,9 @@ int main(int argc, const char *argv[])
     auto config = ClientConfig();
     try {
         config.parse(configFileArg, instanceArg);
+        if (verboseArg.isPresent()) {
+            std::cerr << Phrases::InfoMessage << "Read config from: " << config.path << std::endl;
+        }
     } catch (const std::runtime_error &e) {
         std::cerr << Phrases::ErrorMessage << "Unable to parse config: " << e.what() << Phrases::End;
         std::cerr << Phrases::InfoMessage << "Path of config file was: " << (config.path ? config.path : "[none]") << Phrases::End;
@@ -471,11 +540,13 @@ int main(int argc, const char *argv[])
     auto returnCode = 0;
     sslContext.set_verify_mode(boost::asio::ssl::verify_peer);
     sslContext.set_default_verify_paths();
+    if (verboseArg.isPresent()) {
+        std::cerr << Phrases::InfoMessage << verb << ':' << ' ' << url << std::endl;
+    }
     LibRepoMgr::WebClient::runSessionFromUrl(ioContext, sslContext, url,
         std::bind(&handleResponse, std::ref(url), std::placeholders::_1, std::placeholders::_2, rawArg.isPresent() ? printRawData : printer,
             std::ref(returnCode)),
         std::string(), config.userName, config.password, verb);
     ioContext.run();
-
-    return 0;
+    return returnCode;
 }
