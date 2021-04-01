@@ -177,7 +177,7 @@ static void printListOfBuildActions(const LibRepoMgr::WebClient::Response::body_
     auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
     errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
     auto actions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size(), &errors);
-    actions.sort([] (const auto &lhs, const auto &rhs) { return lhs.created < rhs.created; });
+    actions.sort([](const auto &lhs, const auto &rhs) { return lhs.created < rhs.created; });
     const auto meta = LibRepoMgr::BuildActionMetaInfo();
     const auto unknown = std::string_view("?");
     auto t = tabulate::Table();
@@ -275,9 +275,8 @@ static void printBuildActions(const LibRepoMgr::WebClient::Response::body_type::
 {
     auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
     errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
-    auto buildActions
-        = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size(), &errors);
-    buildActions.sort([] (const auto &lhs, const auto &rhs) { return lhs.created < rhs.created; });
+    auto buildActions = ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(jsonData.data(), jsonData.size(), &errors);
+    buildActions.sort([](const auto &lhs, const auto &rhs) { return lhs.created < rhs.created; });
     const auto meta = LibRepoMgr::BuildActionMetaInfo();
     for (const auto &a : buildActions) {
         printBuildAction(a, meta);
