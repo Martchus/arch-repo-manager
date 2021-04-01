@@ -653,6 +653,53 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
     handler(makeJson(params.request(), response));
 }
 
+static std::string allocateNewBuildAction(const BuildActionMetaInfo &metaInfo, const std::string &taskName,
+    const std::vector<std::string> &packageNames, const std::string &directory,
+    const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, std::vector<std::shared_ptr<BuildAction>> &newBuildActions,
+    const std::string &actionName)
+{
+    const auto actionTemplateIterator = actionTemplates.find(actionName);
+    if (actionTemplateIterator == actionTemplates.end()) {
+        return "the action \"" % actionName + "\" of the specified task is not configured";
+    }
+    const auto &actionTemplate = actionTemplateIterator->second;
+    const auto buildActionType = actionTemplate.type;
+    if (!metaInfo.isTypeIdValid(buildActionType)) {
+        return argsToString(
+            "the type \"", static_cast<std::size_t>(buildActionType), "\" of action \"", actionName, "\" of the specified task is invalid");
+    }
+    const auto &typeInfo = metaInfo.typeInfoForId(actionTemplate.type);
+    auto &buildAction = newBuildActions.emplace_back(std::make_shared<BuildAction>()); // a real ID is set later
+    buildAction->taskName = taskName;
+    buildAction->directory = !typeInfo.directory || directory.empty() ? actionTemplate.directory : directory;
+    buildAction->type = buildActionType;
+    buildAction->sourceDbs = actionTemplate.sourceDbs;
+    buildAction->destinationDbs = actionTemplate.destinationDbs;
+    buildAction->packageNames = !typeInfo.packageNames || packageNames.empty() ? actionTemplate.packageNames : packageNames;
+    buildAction->flags = actionTemplate.flags;
+    buildAction->settings = actionTemplate.settings;
+    return std::string();
+}
+
+static std::string allocateNewBuildActionSequence(const BuildActionMetaInfo &metaInfo, const std::string &taskName,
+    const std::vector<std::string> &packageNames, const std::string &directory,
+    const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, std::vector<std::shared_ptr<BuildAction>> &newBuildActions,
+    const BuildActionSequence &actionSequence)
+{
+    auto error = std::string();
+    for (const auto &actionNode : actionSequence.actions) {
+        if (const auto *const actionName = std::get_if<std::string>(&actionNode)) {
+            error = allocateNewBuildAction(metaInfo, taskName, packageNames, directory, actionTemplates, newBuildActions, *actionName);
+        } else if (const auto *const actionSequence = std::get_if<BuildActionSequence>(&actionNode)) {
+            error = allocateNewBuildActionSequence(metaInfo, taskName, packageNames, directory, actionTemplates, newBuildActions, *actionSequence);
+        }
+        if (!error.empty()) {
+            return error;
+        }
+    }
+    return error;
+}
+
 void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, const std::string &taskName, const std::string &directory,
     const std::vector<BuildActionIdType> &startAfterIds, bool startImmediately)
 {
@@ -681,7 +728,6 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
         return;
     }
     const auto &task = taskIterator->second;
-    const auto &actionsToCreate = task.actions;
     const auto &actionTemplates = presets.templates;
     if (task.actions.empty()) {
         setupLock.unlock();
@@ -691,43 +737,18 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
 
     // allocate a vector to store build actions (temporarily) in
     auto newBuildActions = std::vector<std::shared_ptr<BuildAction>>();
-    newBuildActions.reserve(actionsToCreate.size());
+    newBuildActions.reserve(task.actions.size());
 
     // copy data from templates into new build actions
     auto &metaInfo = params.setup.building.metaInfo;
     auto metaInfoLock = metaInfo.lockToRead();
-    for (const auto &actionName : actionsToCreate) {
-        const auto actionTemplateIterator = actionTemplates.find(actionName);
-        if (actionTemplateIterator == actionTemplates.end()) {
-            metaInfoLock.unlock();
-            auto errorMessage = "the action \"" % actionName + "\" of the specified task is not configured";
-            setupLock.unlock();
-            handler(makeBadRequest(params.request(), std::move(errorMessage)));
-            return;
-        }
-        const auto &actionTemplate = actionTemplateIterator->second;
-        const auto buildActionType = actionTemplate.type;
-        if (!metaInfo.isTypeIdValid(buildActionType)) {
-            metaInfoLock.unlock();
-            auto errorMessage = argsToString(
-                "the type \"", static_cast<std::size_t>(buildActionType), "\" of action \"", actionName, "\" of the specified task is invalid");
-            setupLock.unlock();
-            handler(makeBadRequest(params.request(), std::move(errorMessage)));
-            return;
-        }
-        const auto &typeInfo = metaInfo.typeInfoForId(actionTemplate.type);
-        auto &buildAction = newBuildActions.emplace_back(std::make_shared<BuildAction>()); // a real ID is set later
-        buildAction->taskName = taskName;
-        buildAction->directory = !typeInfo.directory || directory.empty() ? actionTemplate.directory : directory;
-        buildAction->type = buildActionType;
-        buildAction->sourceDbs = actionTemplate.sourceDbs;
-        buildAction->destinationDbs = actionTemplate.destinationDbs;
-        buildAction->packageNames = !typeInfo.packageNames || packageNames.empty() ? actionTemplate.packageNames : packageNames;
-        buildAction->flags = actionTemplate.flags;
-        buildAction->settings = actionTemplate.settings;
-    }
+    auto error = allocateNewBuildActionSequence(metaInfo, taskName, packageNames, directory, actionTemplates, newBuildActions, task);
     metaInfoLock.unlock();
     setupLock.unlock();
+    if (!error.empty()) {
+        handler(makeBadRequest(params.request(), std::move(error)));
+        return;
+    }
 
     // allocate build action IDs and populate "start after ID"
     BuildAction *lastBuildAction = nullptr;

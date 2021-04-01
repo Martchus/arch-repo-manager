@@ -136,13 +136,13 @@ void ServiceSetup::BuildSetup::readPresets(const std::string &configFilePath, co
         errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
         presets = BuildPresets::fromJson(readFile(presetsFilePath), &errors);
     } catch (const ReflectiveRapidJSON::JsonDeserializationError &e) {
-        cerr << Phrases::ErrorMessage << "Unable to deserialize presets file " << presetsFilePath << Phrases::SubMessage
-             << ReflectiveRapidJSON::formatJsonDeserializationError(e) << Phrases::End;
+        cerr << Phrases::ErrorMessage << "Unable to deserialize presets file " << presetsFilePath << '\n'
+             << Phrases::SubMessage << ReflectiveRapidJSON::formatJsonDeserializationError(e) << Phrases::End;
     } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
-        cerr << Phrases::ErrorMessage << "Unable to parse presets file " << presetsFilePath << Phrases::SubMessage << "parse error at " << e.Offset()
-             << ": " << RAPIDJSON_NAMESPACE::GetParseError_En(e.Code()) << Phrases::End;
+        cerr << Phrases::ErrorMessage << "Unable to parse presets file " << presetsFilePath << '\n'
+             << Phrases::SubMessage << "parse error at " << e.Offset() << ": " << RAPIDJSON_NAMESPACE::GetParseError_En(e.Code()) << Phrases::End;
     } catch (const std::runtime_error &e) {
-        cerr << Phrases::ErrorMessage << "Unable to read presets file " << presetsFilePath << Phrases::SubMessage << e.what() << Phrases::End;
+        cerr << Phrases::ErrorMessage << "Unable to read presets file " << presetsFilePath << '\n' << Phrases::SubMessage << e.what() << Phrases::End;
     }
 }
 
