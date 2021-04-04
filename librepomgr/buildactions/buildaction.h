@@ -180,6 +180,7 @@ public:
     bool isAborted() const;
     void start(ServiceSetup &setup);
     void startAfterOtherBuildActions(ServiceSetup &setup, const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
+    void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
     void abort();
     void appendOutput(std::string &&output);
     void appendOutput(std::string_view output);

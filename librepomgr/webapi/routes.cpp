@@ -653,23 +653,30 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
     handler(makeJson(params.request(), response));
 }
 
+struct SequencedBuildActions {
+    std::string_view name;
+    std::vector<std::variant<std::shared_ptr<BuildAction>, SequencedBuildActions>> actions;
+    bool concurrent = false;
+};
+
 static std::string allocateNewBuildAction(const BuildActionMetaInfo &metaInfo, const std::string &taskName,
     const std::vector<std::string> &packageNames, const std::string &directory,
-    const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, std::vector<std::shared_ptr<BuildAction>> &newBuildActions,
-    const std::string &actionName)
+    const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, SequencedBuildActions &newActionSequence,
+    std::vector<std::shared_ptr<BuildAction>> &allocatedActions, const std::string &actionTemplateToAllocate)
 {
-    const auto actionTemplateIterator = actionTemplates.find(actionName);
+    const auto actionTemplateIterator = actionTemplates.find(actionTemplateToAllocate);
     if (actionTemplateIterator == actionTemplates.end()) {
-        return "the action \"" % actionName + "\" of the specified task is not configured";
+        return "the action \"" % actionTemplateToAllocate + "\" of the specified task is not configured";
     }
     const auto &actionTemplate = actionTemplateIterator->second;
     const auto buildActionType = actionTemplate.type;
     if (!metaInfo.isTypeIdValid(buildActionType)) {
-        return argsToString(
-            "the type \"", static_cast<std::size_t>(buildActionType), "\" of action \"", actionName, "\" of the specified task is invalid");
+        return argsToString("the type \"", static_cast<std::size_t>(buildActionType), "\" of action \"", actionTemplateToAllocate,
+            "\" of the specified task is invalid");
     }
     const auto &typeInfo = metaInfo.typeInfoForId(actionTemplate.type);
-    auto &buildAction = newBuildActions.emplace_back(std::make_shared<BuildAction>()); // a real ID is set later
+    auto &allocatedBuildAction = allocatedActions.emplace_back(std::make_shared<BuildAction>());
+    auto *const buildAction = std::get<std::shared_ptr<BuildAction>>(newActionSequence.actions.emplace_back(allocatedBuildAction)).get();
     buildAction->taskName = taskName;
     buildAction->directory = !typeInfo.directory || directory.empty() ? actionTemplate.directory : directory;
     buildAction->type = buildActionType;
@@ -683,21 +690,80 @@ static std::string allocateNewBuildAction(const BuildActionMetaInfo &metaInfo, c
 
 static std::string allocateNewBuildActionSequence(const BuildActionMetaInfo &metaInfo, const std::string &taskName,
     const std::vector<std::string> &packageNames, const std::string &directory,
-    const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, std::vector<std::shared_ptr<BuildAction>> &newBuildActions,
-    const BuildActionSequence &actionSequence)
+    const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, SequencedBuildActions &newActionSequence,
+    std::vector<std::shared_ptr<BuildAction>> &allocatedActions, const BuildActionSequence &actionSequenceToAllocate)
 {
     auto error = std::string();
-    for (const auto &actionNode : actionSequence.actions) {
-        if (const auto *const actionName = std::get_if<std::string>(&actionNode)) {
-            error = allocateNewBuildAction(metaInfo, taskName, packageNames, directory, actionTemplates, newBuildActions, *actionName);
+    newActionSequence.name = actionSequenceToAllocate.name;
+    newActionSequence.concurrent = actionSequenceToAllocate.concurrent;
+    for (const auto &actionNode : actionSequenceToAllocate.actions) {
+        if (const auto *const actionTemplateName = std::get_if<std::string>(&actionNode)) {
+            error = allocateNewBuildAction(
+                metaInfo, taskName, packageNames, directory, actionTemplates, newActionSequence, allocatedActions, *actionTemplateName);
         } else if (const auto *const actionSequence = std::get_if<BuildActionSequence>(&actionNode)) {
-            error = allocateNewBuildActionSequence(metaInfo, taskName, packageNames, directory, actionTemplates, newBuildActions, *actionSequence);
+            error = allocateNewBuildActionSequence(metaInfo, taskName, packageNames, directory, actionTemplates,
+                std::get<SequencedBuildActions>(newActionSequence.actions.emplace_back(SequencedBuildActions())), allocatedActions, *actionSequence);
         }
         if (!error.empty()) {
             return error;
         }
     }
     return error;
+}
+
+static std::vector<std::shared_ptr<BuildAction>> allocateBuildActionIDs(ServiceSetup &setup,
+    const std::vector<std::shared_ptr<BuildAction>> &startAfterActions, const std::vector<std::shared_ptr<BuildAction>> &parentLevelActions,
+    SequencedBuildActions &newActionSequence)
+{
+    auto previousActions = std::vector<std::shared_ptr<BuildAction>>();
+    for (auto &sequencedAction : newActionSequence.actions) {
+        // make concurrent actions depend on the parent-level actions (or actions specified via start after ID parameters on top-level)
+        // make the first action within a sequence depend on the parent-level actions (or actions specified via start after ID parameters on top-level)
+        // make further actions within a sequence depend on the previous action within the sequence
+        const auto &relevantLastBuildActions = newActionSequence.concurrent || previousActions.empty() ? parentLevelActions : previousActions;
+        if (auto *const action = std::get_if<std::shared_ptr<BuildAction>>(&sequencedAction)) {
+            (*action)->id = setup.building.allocateBuildActionID();
+            (*action)->assignStartAfter(relevantLastBuildActions.empty() ? startAfterActions : relevantLastBuildActions);
+            if (!newActionSequence.concurrent) {
+                previousActions.clear(); // only the last action within the sequence is relevant
+            }
+            previousActions.emplace_back(*action);
+        } else if (auto *const subSequence = std::get_if<SequencedBuildActions>(&sequencedAction)) {
+            auto newSubActions = allocateBuildActionIDs(setup, startAfterActions, relevantLastBuildActions, *subSequence);
+            if (!newSubActions.empty()) {
+                if (!newActionSequence.concurrent) {
+                    previousActions.clear(); // only the last action within the sequence is relevant
+                }
+                if (subSequence->concurrent) {
+                    // consider all new sub-actions from last level relevant when they're concurrent
+                    previousActions.insert(previousActions.end(), newSubActions.begin(), newSubActions.end());
+                } else {
+                    previousActions.emplace_back(newSubActions.back());
+                }
+            }
+        }
+    }
+    return previousActions;
+}
+
+static bool startFirstBuildActions(ServiceSetup &setup, SequencedBuildActions &newActionSequence)
+{
+    for (auto &sequencedAction : newActionSequence.actions) {
+        if (auto *const maybeAction = std::get_if<std::shared_ptr<BuildAction>>(&sequencedAction)) {
+            auto &action = *maybeAction;
+            if (action->isScheduled()) {
+                action->start(setup);
+            }
+            if (!newActionSequence.concurrent) {
+                return true;
+            }
+        } else if (auto *const subSequence = std::get_if<SequencedBuildActions>(&sequencedAction)) {
+            if (startFirstBuildActions(setup, newActionSequence) && !newActionSequence.concurrent) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, const std::string &taskName, const std::string &directory,
@@ -736,13 +802,17 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
     }
 
     // allocate a vector to store build actions (temporarily) in
-    auto newBuildActions = std::vector<std::shared_ptr<BuildAction>>();
-    newBuildActions.reserve(task.actions.size());
+    auto newActionSequence = SequencedBuildActions();
+    auto allocatedActions = std::vector<std::shared_ptr<BuildAction>>();
+    auto parentLevelActions = std::vector<std::shared_ptr<BuildAction>>();
+    newActionSequence.actions.reserve(task.actions.size());
+    allocatedActions.reserve(task.actions.size());
 
     // copy data from templates into new build actions
     auto &metaInfo = params.setup.building.metaInfo;
     auto metaInfoLock = metaInfo.lockToRead();
-    auto error = allocateNewBuildActionSequence(metaInfo, taskName, packageNames, directory, actionTemplates, newBuildActions, task);
+    auto error
+        = allocateNewBuildActionSequence(metaInfo, taskName, packageNames, directory, actionTemplates, newActionSequence, allocatedActions, task);
     metaInfoLock.unlock();
     setupLock.unlock();
     if (!error.empty()) {
@@ -750,46 +820,27 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
         return;
     }
 
-    // allocate build action IDs and populate "start after ID"
-    BuildAction *lastBuildAction = nullptr;
+    // allocate build action IDs and populate "start after ID" and follow-up actions
     auto &building = params.setup.building;
     auto buildLock = building.lockToWrite();
     auto startsAfterBuildActions = building.getBuildActions(startAfterIds);
-    const auto startNow = startImmediately || (!startsAfterBuildActions.empty() && BuildAction::haveSucceeded(startsAfterBuildActions));
-    for (auto &newBuildAction : newBuildActions) {
-        newBuildAction->id = building.allocateBuildActionID();
-        if (lastBuildAction) {
-            newBuildAction->startAfter.emplace_back(lastBuildAction->id);
-        } else {
-            newBuildAction->startAfter = startAfterIds;
-        }
-        lastBuildAction = newBuildAction.get();
-    }
+    allocateBuildActionIDs(params.setup, startsAfterBuildActions, parentLevelActions, newActionSequence);
     buildLock.unlock();
 
     // serialize build actions
-    const auto response = ReflectiveRapidJSON::JsonReflector::toJsonDocument(newBuildActions);
+    auto buildReadLock = building.lockToRead();
+    const auto startNow = startImmediately || (!startsAfterBuildActions.empty() && BuildAction::haveSucceeded(startsAfterBuildActions));
+    const auto response = ReflectiveRapidJSON::JsonReflector::toJsonDocument(allocatedActions);
 
-    // start first build action immediately
+    // start first build action immediately (read-lock sufficient because build action not part of setup-global list yet)
     if (startNow) {
-        newBuildActions.front()->start(params.setup);
+        startFirstBuildActions(params.setup, newActionSequence);
     }
 
-    // add build actions to setup-global list and populate "follow-up actions"
-    buildLock = building.lockToWrite();
-    lastBuildAction = nullptr;
-    for (auto &newBuildAction : newBuildActions) {
-        if (lastBuildAction) {
-            if (lastBuildAction->hasSucceeded()) {
-                newBuildAction->start(params.setup);
-            } else {
-                lastBuildAction->m_followUpActions.emplace_back(newBuildAction->weak_from_this());
-            }
-        } else if (!startsAfterBuildActions.empty()) {
-            newBuildAction->startAfterOtherBuildActions(params.setup, startsAfterBuildActions);
-        }
-        lastBuildAction = newBuildAction.get();
-        building.actions[lastBuildAction->id] = std::move(newBuildAction);
+    // add build actions to setup-global list
+    buildLock = building.lockToWrite(buildReadLock);
+    for (auto &newAction : allocatedActions) {
+        building.actions[newAction->id] = std::move(newAction);
     }
     buildLock.unlock();
 

@@ -219,7 +219,8 @@ bool BuildAction::haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> 
 }
 
 /*!
- * \brief Starts the build action. The caller must acquire the lock to write build actions.
+ * \brief Starts the build action. The caller must acquire the lock to write build actions if
+ *        the build action is setup-globally visible.
  * \returns Returns immediately. The real work is done in a build action thread.
  */
 void BuildAction::start(ServiceSetup &setup)
@@ -298,6 +299,16 @@ void BuildAction::startAfterOtherBuildActions(ServiceSetup &setup, const std::ve
     }
 }
 
+void BuildAction::assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions)
+{
+    for (auto &previousBuildAction : startsAfterBuildActions) {
+        startAfter.emplace_back(previousBuildAction->id);
+        if (!previousBuildAction->hasSucceeded()) {
+            previousBuildAction->m_followUpActions.emplace_back(weak_from_this());
+        }
+    }
+}
+
 void BuildAction::abort()
 {
     m_aborted.store(true);
@@ -341,7 +352,7 @@ void BuildAction::conclude(BuildActionResult result)
         i = m_bufferingForSession.erase(i);
     }
 
-    // start follow-up actions if succeeded
+    // start globally visible follow-up actions if succeeded
     if (result == BuildActionResult::Success && m_setup) {
         for (auto &maybeStillValidFollowUpAction : m_followUpActions) {
             auto followUpAction = maybeStillValidFollowUpAction.lock();
