@@ -37,6 +37,7 @@ set(SRC_FILES
     webapi/server.cpp
     webapi/session.cpp
     webapi/routes.cpp
+    webapi/routes_buildaction.cpp
     webapi/render.cpp
     webapi/params.cpp
     webapi/repository.cpp
