@@ -885,14 +885,12 @@ function initBuildActionDetails(sectionElement, sectionData, newHashParts)
     const hasCurrentlyBuildActions = Array.isArray(currentBuildActionIds) && currentBuildActionIds.length !== 0;
     if (!newHashParts.length) {
         if (hasCurrentlyBuildActions) {
-            window.preventHandlingHashChange = true;
-            window.location.hash = '#build-action-details-section?' + encodeURIComponent(currentBuildActionIds.join(','));
-            window.preventHandlingHashChange = false;
+            updateHashPreventingChangeHandler('#build-action-details-section?' + encodeURIComponent(currentBuildActionIds.join(',')));
         }
         return true;
     }
     const newBuildActionIds = newHashParts[0].split(',');
-    if (!hasCurrentlyBuildActions || newBuildActionIds.some(id => !currentBuildActionIds.find(currentId => id == currentId))) { // possible type conversion wanted
+    if (!hasCurrentlyBuildActions || newBuildActionIds.some(id => currentBuildActionIds.find(currentId => id == currentId) === undefined)) { // possible type conversion wanted
         queryBuildActionDetails(newBuildActionIds);
     }
     return true;
