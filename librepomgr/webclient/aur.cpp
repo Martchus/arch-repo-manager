@@ -40,8 +40,8 @@ constexpr auto aurPort = "443";
 void searchAurPackages(LogContext &log, ServiceSetup &setup, const std::string &searchTerm, boost::asio::io_context &ioContext,
     std::shared_ptr<AurQuerySession> &multiSession)
 {
-    auto session = std::make_shared<WebClient::SslSession>(ioContext, setup.webServer.sslContext,
-        [&log, &setup, multiSession](WebClient::SslSession &session2, const WebClient::HttpClientError &error) mutable {
+    auto session = std::make_shared<WebClient::Session>(ioContext, setup.webServer.sslContext,
+        [&log, &setup, multiSession](WebClient::Session &session2, const WebClient::HttpClientError &error) mutable {
             if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
                 log(Phrases::ErrorMessage, "Failed to search AUR: ", error.what(), '\n');
                 return;
@@ -88,8 +88,8 @@ std::shared_ptr<AurQuerySession> queryAurPackagesInternal(LogContext &log, Servi
     auto multiSession = AurQuerySession::create(ioContext, move(handler));
 
     for (auto i = packages.cbegin(), end = packages.cend(); i != end;) {
-        auto session = make_shared<WebClient::SslSession>(ioContext, setup.webServer.sslContext,
-            [&log, &setup, multiSession](WebClient::SslSession &session2, const WebClient::HttpClientError &error) mutable {
+        auto session = make_shared<WebClient::Session>(ioContext, setup.webServer.sslContext,
+            [&log, &setup, multiSession](WebClient::Session &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
                     log(Phrases::ErrorMessage, "Failed to retrieve AUR packages from RPC: ", error.what(), '\n');
                     return;
@@ -191,8 +191,8 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
 {
     CPP_UTILITIES_UNUSED(log)
     for (const auto &params : queryParams) {
-        auto session = std::make_shared<WebClient::SslSession>(ioContext, setup.webServer.sslContext,
-            [multiSession, params](WebClient::SslSession &session2, const WebClient::HttpClientError &error) mutable {
+        auto session = std::make_shared<WebClient::Session>(ioContext, setup.webServer.sslContext,
+            [multiSession, params](WebClient::Session &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode.message() != "stream truncated") {
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
                         .error = "Unable to retrieve AUR snapshot tarball for package " % *params.packageName % ": " + error.what() });

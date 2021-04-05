@@ -43,66 +43,50 @@ inline LibRepoMgr::WebClient::HttpClientError::operator bool() const
 
 using Response = WebAPI::Response;
 using FileResponse = boost::beast::http::response_parser<boost::beast::http::file_body>;
-using MultiResponse = std::variant<Response, FileResponse>;
+using EmptyResponse = boost::beast::http::response_parser<boost::beast::http::empty_body>;
+using MultiResponse = std::variant<Response, FileResponse, EmptyResponse>;
 using Request = boost::beast::http::request<boost::beast::http::empty_body>;
-struct LIBREPOMGR_EXPORT SessionData {
-    std::shared_ptr<void> session;
-    Request &request;
-    MultiResponse &response;
-    std::string &destinationFilePath;
-};
+struct ChunkProcessing;
 
 class LIBREPOMGR_EXPORT Session : public std::enable_shared_from_this<Session> {
 public:
     using Handler = std::function<void(Session &, const HttpClientError &error)>;
+    using ChunkHandler = std::function<void(const boost::beast::http::chunk_extensions &chunkExtensions, std::string_view chunkData)>;
 
-    template <typename ResponseType = Response> explicit Session(boost::asio::io_context &ioContext, const Handler &handler = Handler());
+    template <typename ResponseType = Response>
+    explicit Session(boost::asio::io_context &ioContext, const Handler &handler = Handler());
+    template <typename ResponseType = Response>
+    explicit Session(boost::asio::io_context &ioContext, Handler &&handler = Handler());
+    template <typename ResponseType = Response>
+    explicit Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, const Handler &handler = Handler());
+    template <typename ResponseType = Response>
+    explicit Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, Handler &&handler);
 
+    void setChunkHandler(ChunkHandler &&handler);
     void run(const char *host, const char *port, boost::beast::http::verb verb, const char *target, unsigned int version = 11);
 
 private:
-    void resolved(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results);
-    void connected(boost::beast::error_code ec);
-    void requested(boost::beast::error_code ec, std::size_t bytesTransferred);
-    void received(boost::beast::error_code ec, std::size_t bytesTransferred);
+    using RawSocket = boost::asio::ip::tcp::socket;
+    using SslStream = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
+    struct ChunkProcessing {
+        boost::beast::http::chunk_extensions chunkExtensions;
+        std::string currentChunk;
+        std::function<void(std::uint64_t chunkSize, boost::beast::string_view extensions, boost::beast::error_code &ec)> onChunkHeader;
+        std::function<std::size_t(std::uint64_t bytesLeftInThisChunk, boost::beast::string_view chunkBodyData, boost::beast::error_code &ec)> onChunkBody;
+        Session::ChunkHandler handler;
+    };
 
-public:
-    Request request;
-    MultiResponse response;
-    std::string destinationFilePath;
+    RawSocket &socket();
 
-private:
-    boost::asio::ip::tcp::resolver m_resolver;
-    boost::asio::ip::tcp::socket m_socket;
-    boost::beast::flat_buffer m_buffer;
-    Handler m_handler;
-};
-
-template <typename ResponseType>
-inline Session::Session(boost::asio::io_context &ioContext, const Handler &handler)
-    : response(ResponseType{})
-    , m_resolver(ioContext)
-    , m_socket(ioContext)
-    , m_handler(handler)
-{
-}
-
-class LIBREPOMGR_EXPORT SslSession : public std::enable_shared_from_this<SslSession> {
-public:
-    using Handler = std::function<void(SslSession &, const HttpClientError &error)>;
-
-    template <typename ResponseType = Response>
-    explicit SslSession(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, const Handler &handler = Handler());
-    template <typename ResponseType = Response>
-    explicit SslSession(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, Handler &&handler);
-
-    void run(const char *host, const char *port, boost::beast::http::verb verb, const char *target, unsigned int version = 11);
-
-private:
     void resolved(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results);
     void connected(boost::beast::error_code ec);
     void handshakeDone(boost::beast::error_code ec);
+    void sendRequest();
     void requested(boost::beast::error_code ec, std::size_t bytesTransferred);
+    void onChunkHeader(std::uint64_t chunkSize, boost::beast::string_view extensions, boost::beast::error_code &ec);
+    std::size_t onChunkBody(std::uint64_t bytesLeftInThisChunk, boost::beast::string_view chunkBodyData, boost::beast::error_code &ec);
+    void chunkReceived(boost::beast::error_code ec, std::size_t bytesTransferred);
+    bool continueReadingChunks();
     void received(boost::beast::error_code ec, std::size_t bytesTransferred);
     void closed(boost::beast::error_code ec);
 
@@ -113,34 +97,53 @@ public:
 
 private:
     boost::asio::ip::tcp::resolver m_resolver;
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> m_stream;
+    std::variant<RawSocket, SslStream> m_stream;
     boost::beast::flat_buffer m_buffer;
+    std::unique_ptr<ChunkProcessing> m_chunkProcessing;
     Handler m_handler;
 };
 
 template <typename ResponseType>
-inline SslSession::SslSession(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, const Handler &handler)
+inline Session::Session(boost::asio::io_context &ioContext, const Handler &handler)
     : response(ResponseType{})
     , m_resolver(ioContext)
-    , m_stream(ioContext, sslContext)
+    , m_stream(RawSocket{ioContext})
     , m_handler(handler)
 {
 }
 
 template <typename ResponseType>
-inline SslSession::SslSession(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, Handler &&handler)
+inline Session::Session(boost::asio::io_context &ioContext, Handler &&handler)
     : response(ResponseType{})
     , m_resolver(ioContext)
-    , m_stream(ioContext, sslContext)
+    , m_stream(RawSocket{ioContext})
+    , m_handler(std::move(handler))
+{
+}
+
+template <typename ResponseType>
+inline Session::Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, const Handler &handler)
+    : response(ResponseType{})
+    , m_resolver(ioContext)
+    , m_stream(SslStream{ioContext, sslContext})
     , m_handler(handler)
 {
 }
 
-LIBREPOMGR_EXPORT std::variant<std::string, std::shared_ptr<Session>, std::shared_ptr<SslSession>> runSessionFromUrl(
+template <typename ResponseType>
+inline Session::Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, Handler &&handler)
+    : response(ResponseType{})
+    , m_resolver(ioContext)
+    , m_stream(SslStream{ioContext, sslContext})
+    , m_handler(std::move(handler))
+{
+}
+
+LIBREPOMGR_EXPORT std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(
     boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, std::string_view url,
-    std::function<void(SessionData data, const HttpClientError &error)> &&handler, std::string &&destinationPath = std::string(),
+    Session::Handler &&handler, std::string &&destinationPath = std::string(),
     std::string_view userName = std::string_view(), std::string_view password = std::string_view(),
-    boost::beast::http::verb verb = boost::beast::http::verb::get);
+    boost::beast::http::verb verb = boost::beast::http::verb::get, Session::ChunkHandler &&chunkHandler = Session::ChunkHandler());
 
 } // namespace WebClient
 } // namespace LibRepoMgr

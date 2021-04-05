@@ -64,18 +64,18 @@ void queryDatabases(
         auto session = runSessionFromUrl(
             setup.building.ioContext, setup.webServer.sslContext, query.url,
             [&log, &setup, dbName = std::move(query.databaseName), dbArch = std::move(query.databaseArch), dbQuerySession](
-                SessionData data, const WebClient::HttpClientError &error) mutable {
+                Session &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
-                    log(Phrases::ErrorMessage, "Error retrieving database file \"", data.destinationFilePath, "\" for ", dbName, ": ", error.what(),
+                    log(Phrases::ErrorMessage, "Error retrieving database file \"", session2.destinationFilePath, "\" for ", dbName, ": ", error.what(),
                         '\n');
                     dbQuerySession->addResponse(std::move(dbName));
                     return;
                 }
 
-                const auto &response = get<FileResponse>(data.response);
+                const auto &response = get<FileResponse>(session2.response);
                 const auto &message = response.get();
                 if (message.result() != boost::beast::http::status::ok) {
-                    log(Phrases::ErrorMessage, "Error retrieving database file \"", data.destinationFilePath, "\" for ", dbName, ": mirror returned ",
+                    log(Phrases::ErrorMessage, "Error retrieving database file \"", session2.destinationFilePath, "\" for ", dbName, ": mirror returned ",
                         message.result_int(), " response\n");
                     dbQuerySession->addResponse(std::move(dbName));
                     return;
@@ -118,7 +118,7 @@ void queryDatabases(
 
                 try {
                     // load packages
-                    auto files = extractFiles(data.destinationFilePath, &Database::isFileRelevant);
+                    auto files = extractFiles(session2.destinationFilePath, &Database::isFileRelevant);
                     auto packages = Package::fromDatabaseFile(move(files));
 
                     // insert packages
@@ -200,14 +200,14 @@ void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&pac
         log(Phrases::InfoMessage, "Downloading \"", cachingData->url, "\" to \"", cachingData->destinationFilePath, "\"\n");
         runSessionFromUrl(
             packageCachingSession->ioContext(), packageCachingSession->m_sslContext, cachingData->url,
-            [&log, packageCachingSession, cachingData](SessionData data, const WebClient::HttpClientError &error) mutable {
+            [&log, packageCachingSession, cachingData](Session &session, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
                     const auto msg = std::make_tuple(
                         "Error downloading \"", cachingData->url, "\" to \"", cachingData->destinationFilePath, "\": ", error.what());
                     cachingData->error = tupleToString(msg);
                     log(Phrases::ErrorMessage, msg, '\n');
                 }
-                const auto &response = get<FileResponse>(data.response);
+                const auto &response = get<FileResponse>(session.response);
                 const auto &message = response.get();
                 if (message.result() != boost::beast::http::status::ok) {
                     const auto msg = std::make_tuple("Error downloading \"", cachingData->url, "\" to \"", cachingData->destinationFilePath,

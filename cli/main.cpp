@@ -302,41 +302,56 @@ static void printRawData(const LibRepoMgr::WebClient::Response::body_type::value
     std::cout << rawData << '\n';
 }
 
-static void handleResponse(const std::string &url, const LibRepoMgr::WebClient::SessionData &data,
+static void handleResponse(const std::string &url, LibRepoMgr::WebClient::Session &session,
     const LibRepoMgr::WebClient::HttpClientError &error, void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData),
     int &returnCode)
 {
-    const auto &response = std::get<LibRepoMgr::WebClient::Response>(data.response);
-    const auto &body = response.body();
+    auto result = boost::beast::http::status::ok;
+    auto body = std::optional<std::string>();
+    if (auto *const emptyResponse = std::get_if<LibRepoMgr::WebClient::EmptyResponse>(&session.response)) {
+        result = emptyResponse->get().result();
+    } else if (auto *const response = std::get_if<LibRepoMgr::WebClient::Response>(&session.response)) {
+        result = response->result();
+        body = std::move(response->body());
+    }
+
     if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
         std::cerr << Phrases::ErrorMessage << "Unable to connect: " << error.what() << Phrases::End;
-        std::cerr << Phrases::InfoMessage << "URL was: " << url << Phrases::End;
-        printRawDataForErrorHandling(body);
-        return;
+        returnCode = 9;
     }
-    if (response.result() != boost::beast::http::status::ok) {
-        std::cerr << Phrases::ErrorMessage << "HTTP request not successful: " << response.result() << " ("
-                  << static_cast<std::underlying_type_t<decltype(response.result())>>(response.result()) << " response)" << Phrases::End;
-        std::cerr << Phrases::InfoMessage << "URL was: " << url << Phrases::End;
-        printRawDataForErrorHandling(body);
-        return;
+    if (result != boost::beast::http::status::ok) {
+        std::cerr << Phrases::ErrorMessage << "HTTP request not successful: " << result << " ("
+                  << static_cast<std::underlying_type_t<decltype(result)>>(result) << " response)" << Phrases::End;
+        returnCode = 10;
     }
-    try {
-        std::invoke(printer, body);
-    } catch (const ReflectiveRapidJSON::JsonDeserializationError &e) {
-        std::cerr << Phrases::ErrorMessage << "Unable to make sense of response: " << ReflectiveRapidJSON::formatJsonDeserializationError(e)
-                  << Phrases::End;
-        returnCode = 13;
-    } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
-        std::cerr << Phrases::ErrorMessage << "Unable to parse responnse: " << tupleToString(LibRepoMgr::serializeParseError(e)) << Phrases::End;
-        returnCode = 11;
-    } catch (const std::runtime_error &e) {
-        std::cerr << Phrases::ErrorMessage << "Unable to display response: " << e.what() << Phrases::End;
-        returnCode = 12;
+    if (body.has_value()) {
+        if (returnCode) {
+            printRawDataForErrorHandling(body.value());
+        } else {
+            try {
+                std::invoke(printer, body.value());
+            } catch (const ReflectiveRapidJSON::JsonDeserializationError &e) {
+                std::cerr << Phrases::ErrorMessage << "Unable to make sense of response: " << ReflectiveRapidJSON::formatJsonDeserializationError(e)
+                          << Phrases::End;
+                returnCode = 13;
+            } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
+                std::cerr << Phrases::ErrorMessage << "Unable to parse responnse: " << tupleToString(LibRepoMgr::serializeParseError(e)) << Phrases::End;
+                returnCode = 11;
+            } catch (const std::runtime_error &e) {
+                std::cerr << Phrases::ErrorMessage << "Unable to display response: " << e.what() << Phrases::End;
+                returnCode = 12;
+            }
+        }
     }
     if (returnCode) {
         std::cerr << Phrases::InfoMessage << "URL was: " << url << std::endl;
     }
+}
+
+static void printChunk(const boost::beast::http::chunk_extensions &chunkExtensions, std::string_view chunkData)
+{
+    CPP_UTILITIES_UNUSED(chunkExtensions)
+    std::cout << chunkData;
 }
 
 // helper for turning CLI args into URL query parameters
@@ -376,6 +391,7 @@ int main(int argc, const char *argv[])
     // define command-specific parameters
     auto verb = boost::beast::http::verb::get;
     auto path = std::string();
+    void (*chunkHandler)(const boost::beast::http::chunk_extensions &chunkExtensions, std::string_view chunkData) = nullptr;
     void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData) = nullptr;
 
     // read CLI args
@@ -427,6 +443,17 @@ int main(int argc, const char *argv[])
         appendAsQueryParam(path, buildActionIdArg, "id");
     });
     showBuildActionArg.setSubArguments({ &buildActionIdArg });
+    auto singleBuildActionIdArg = ConfigValueArgument("id", '\0', "specifies the build action ID", { "ID" });
+    singleBuildActionIdArg.setImplicit(true);
+    singleBuildActionIdArg.setRequired(true);
+    auto streamOutputBuildActionArg = OperationArgument("output", 'o', "stream build action output");
+    streamOutputBuildActionArg.setCallback([&path, &printer, &chunkHandler, &singleBuildActionIdArg](const ArgumentOccurrence &) {
+        path = "/api/v0/build-action/output?";
+        printer = printRawData;
+        chunkHandler = printChunk;
+        appendAsQueryParam(path, singleBuildActionIdArg, "id");
+    });
+    streamOutputBuildActionArg.setSubArguments({ &singleBuildActionIdArg });
     auto createBuildActionArg = OperationArgument("create", '\0', "creates and starts a new build action (or pre-defined task)");
     auto taskArg = ConfigValueArgument("task", '\0', "specifies the pre-defined task to run", { "task" });
     auto typeArg = ConfigValueArgument("type", '\0', "specifies the action type", { "type" });
@@ -488,8 +515,8 @@ int main(int argc, const char *argv[])
         appendAsQueryParam(path, buildActionIdArg, "id");
     });
     stopBuildActionArg.setSubArguments({ &buildActionIdArg });
-    actionArg.setSubArguments({ &listActionsArg, &showBuildActionArg, &createBuildActionArg, &deleteBuildActionArg, &cloneBuildActionArg,
-        &startBuildActionArg, &stopBuildActionArg });
+    actionArg.setSubArguments({ &listActionsArg, &showBuildActionArg, &streamOutputBuildActionArg, &createBuildActionArg, &deleteBuildActionArg,
+        &cloneBuildActionArg, &startBuildActionArg, &stopBuildActionArg });
     auto apiArg = OperationArgument("api", '\0', "Invoke a generic API request:");
     auto pathArg = ConfigValueArgument("path", '\0', "specifies the route's path without prefix", { "path/of/route?foo=bar&bar=foo" });
     pathArg.setImplicit(true);
@@ -545,7 +572,7 @@ int main(int argc, const char *argv[])
     LibRepoMgr::WebClient::runSessionFromUrl(ioContext, sslContext, url,
         std::bind(&handleResponse, std::ref(url), std::placeholders::_1, std::placeholders::_2, rawArg.isPresent() ? printRawData : printer,
             std::ref(returnCode)),
-        std::string(), config.userName, config.password, verb);
+        std::string(), config.userName, config.password, verb, chunkHandler);
     ioContext.run();
     return returnCode;
 }
