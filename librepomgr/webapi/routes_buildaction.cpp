@@ -116,11 +116,13 @@ void getBuildActionOutput(const Params &params, ResponseHandler &&handler)
         handler(makeBadRequest(params.request(), "the offset parameter must be specified at most once"));
         return;
     }
-    try {
-        offset = stringToNumber<std::size_t>(offsetParams.front());
-    } catch (const ConversionException &) {
-        handler(makeBadRequest(params.request(), "the offset must be an unsigned integer"));
-        return;
+    if (!offsetParams.empty()) {
+        try {
+            offset = stringToNumber<std::size_t>(offsetParams.front());
+        } catch (const ConversionException &) {
+            handler(makeBadRequest(params.request(), "the offset must be an unsigned integer"));
+            return;
+        }
     }
     auto buildActionsSearchResult = findBuildActions(params, std::move(handler), false, 1);
     if (!buildActionsSearchResult.ok) {
