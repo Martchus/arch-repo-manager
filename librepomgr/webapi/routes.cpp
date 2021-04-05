@@ -678,6 +678,7 @@ static std::string allocateNewBuildAction(const BuildActionMetaInfo &metaInfo, c
     auto &allocatedBuildAction = allocatedActions.emplace_back(std::make_shared<BuildAction>());
     auto *const buildAction = std::get<std::shared_ptr<BuildAction>>(newActionSequence.actions.emplace_back(allocatedBuildAction)).get();
     buildAction->taskName = taskName;
+    buildAction->templateName = actionTemplateToAllocate;
     buildAction->directory = !typeInfo.directory || directory.empty() ? actionTemplate.directory : directory;
     buildAction->type = buildActionType;
     buildAction->sourceDbs = actionTemplate.sourceDbs;

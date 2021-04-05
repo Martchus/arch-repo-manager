@@ -1,0 +1,74 @@
+{
+    "templates": {
+        "foo": {
+            "directory": "foo",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {
+                "cmd": "echo foo"
+            },
+            "flags": 0,
+            "type": 13
+        },
+        "bar-1": {
+            "directory": "bar",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {
+                "cmd": "echo bar-1"
+            },
+            "flags": 0,
+            "type": 13
+        },
+        "bar-2": {
+            "directory": "bar",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {
+                "cmd": "echo bar-2"
+            },
+            "flags": 0,
+            "type": 13
+        },
+        "baz": {
+            "directory": "baz",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {
+                "cmd": "echo baz"
+            },
+            "flags": 0,
+            "type": 13
+        },
+        "buz": {
+            "directory": "buz",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {
+                "cmd": "echo buz"
+            },
+            "flags": 0,
+            "type": 13
+        }
+    },
+    "tasks": {
+        "foobarbaz": {
+            "name": "Test task",
+            "desc": "Task used by WebAPITests::testPostingBuildActionsFromTask()",
+            "category": "Testing",
+            "actions": [
+                "foo",
+                {
+                    "actions": [["bar-1", "bar-2"], "baz"],
+                    "concurrent": true
+                },
+                "buz"
+            ]
+        }
+    }
+}

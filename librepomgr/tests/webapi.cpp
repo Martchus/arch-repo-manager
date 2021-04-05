@@ -36,6 +36,7 @@ class WebAPITests : public TestFixture {
     CPPUNIT_TEST_SUITE(WebAPITests);
     CPPUNIT_TEST(testBasicNetworking);
     CPPUNIT_TEST(testPostingBuildAction);
+    CPPUNIT_TEST(testPostingBuildActionsFromTask);
     CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -48,6 +49,7 @@ public:
     std::shared_ptr<WebAPI::Response> invokeRouteHandler(
         void (*handler)(const Params &params, ResponseHandler &&handler), std::vector<std::pair<std::string_view, std::string_view>> &&queryParams);
     void testPostingBuildAction();
+    void testPostingBuildActionsFromTask();
 
 private:
     ServiceSetup m_setup;
@@ -188,13 +190,23 @@ static void parseBuildAction(BuildAction &buildAction, std::string_view json)
         CPPUNIT_FAIL("json document is no object");
     }
     auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
+    errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
     ReflectiveRapidJSON::JsonReflector::pull(buildAction, doc.GetObject(), &errors);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("response is valid json", 0_st, errors.size());
+}
+
+/*!
+ * \brief Parses the specified \a json as build actions storing results in \a buildActions.
+ */
+static auto parseBuildActions(std::string_view json)
+{
+    auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
+    errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
+    return ReflectiveRapidJSON::JsonReflector::fromJson<std::list<LibRepoMgr::BuildAction>>(json.data(), json.size(), &errors);
 }
 
 /*!
  * \brief Tests the handler to post a build action.
- * \remarks Only covers a very basic use so far.
+ * \remarks Only covers a very basic use so far; tasks are handled in the next test function.
  */
 void WebAPITests::testPostingBuildAction()
 {
@@ -222,4 +234,51 @@ void WebAPITests::testPostingBuildAction()
         CPPUNIT_ASSERT_EQUAL_MESSAGE("build action has no result yet", BuildActionResult::None, createdBuildAction->result);
         CPPUNIT_ASSERT_EQUAL_MESSAGE("response ok", boost::beast::http::status::ok, response->result());
     }
+}
+
+/*!
+ * \brief Tests the handler to post build actions from a pre-defined task.
+ */
+void WebAPITests::testPostingBuildActionsFromTask()
+{
+    auto &building = m_setup.building;
+    building.presets = decltype(building.presets)::fromJson(readFile(testFilePath("test-config/presets.json")));
+    CPPUNIT_ASSERT_MESSAGE("templates parsed from JSON", !building.presets.templates.empty());
+    CPPUNIT_ASSERT_MESSAGE("task parsed from JSON", building.presets.tasks.contains("foobarbaz"));
+    CPPUNIT_ASSERT_MESSAGE("no build actions present before", building.actions.empty());
+
+    const auto response = invokeRouteHandler(&WebAPI::Routes::postBuildAction,
+        {
+            { "task"sv, "foobarbaz"sv },
+            { "start-condition"sv, "manually"sv },
+        });
+    CPPUNIT_ASSERT_MESSAGE("got response", response);
+
+    const auto buildActions = parseBuildActions(response->body());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("expected number of build actions created", 5_st, buildActions.size());
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions actually present", 5_st, building.actions.size());
+    for (const auto &action : building.actions) {
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action->id, " not started yet"), BuildActionStatus::Created, action->status);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action->id, " has no result yet"), BuildActionResult::None, action->result);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action->id, " has task name assigned"), "foobarbaz"s, action->taskName);
+    }
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("foo is 1st action", "foo"s, building.actions[0]->templateName);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has dir assigned", "foo"s, building.actions[0]->directory);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has correct deps", std::vector<BuildAction::IdType>{}, building.actions[0]->startAfter);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 is 2nd action", "bar-1"s, building.actions[1]->templateName);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 has dir assigned", "bar"s, building.actions[1]->directory);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 has correct deps", std::vector<BuildAction::IdType>{ 0 }, building.actions[1]->startAfter);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 is 3rd action", "bar-2"s, building.actions[2]->templateName);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 has dir assigned", "bar"s, building.actions[2]->directory);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 has correct deps", std::vector<BuildAction::IdType>{ 1 }, building.actions[2]->startAfter);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("baz is 4th action", "baz"s, building.actions[3]->templateName);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("baz has dir assigned", "baz"s, building.actions[3]->directory);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("baz has correct deps", std::vector<BuildAction::IdType>{ 0 }, building.actions[3]->startAfter);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("buz is 5th action", "buz"s, building.actions[4]->templateName);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("buz has dir assigned", "buz"s, building.actions[4]->directory);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "buz has correct deps", std::vector<BuildAction::IdType>{ 2 CPP_UTILITIES_PP_COMMA 3 }, building.actions[4]->startAfter);
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("response ok", boost::beast::http::status::ok, response->result());
 }
