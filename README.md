@@ -26,9 +26,11 @@ So far it consists of:
     * does not need the full file path and supports regex (in contrast to `pacman -F`)
 * cli: Command line tool to interact with srv
     * search for packages and show package details
-    * TODO: show and submit build actions
+    * show and submit build actions
+
+Further ideas (not implemented yet):
 * distri: Tool to distribute applications from the packages in a repository
-    * TODO: bundle an application with its dependencies similar to `linuxdeployqt`
+    * bundle an application with its dependencies similar to `linuxdeployqt`
       and `windeployqt`
 
 ## Setup server
@@ -284,8 +286,7 @@ per package (e.g. via a regex).
   only `pkgrel` changes or when building from VCS sources or when some sources just remain the same).
 
 ## TODOs and further ideas for improvement
-[ ] Add generic locking so build actions don't interfere with each other, e.g. when accessing a database directory
-[ ] CLI client
+[ ] Use persistent database (e.g. lmdb or leveldb)
 [ ] More advanced search options
 [ ] Allow running tasks automatically/periodically
 [ ] Refresh build action details automatically while an action is pending
@@ -293,7 +294,6 @@ per package (e.g. via a regex).
 [ ] Keep the possibility for a "soft stop" where the build action would finish the current item
 [ ] Show statistics like CPU and RAM usage about ongoing build processes
 [ ] Stop a build process which doesn't produce output after a certain time
-[ ] Don't keep always *all* packages in memory for better scalability
 [ ] Find out why the web service sometimes gets stuck
     * Weirdly, restarting the client (browser) helps in these cases
     * Add "stress" test for live-streaming
@@ -307,7 +307,7 @@ For a PKGBUILD checkout my [PKGBUILDs repository](https://github.com/Martchus/PK
 
 ### C++ stuff
 The application depends on [c++utilities](https://github.com/Martchus/cpp-utilities),
-[reflective-rapidjson](https://github.com/Martchus/reflective-rapidjson) and some boost modules.
+[reflective-rapidjson](https://github.com/Martchus/reflective-rapidjson), some Boost modules and OpenSSL.
 
 For basic instructions checkout the README file of [c++utilities](https://github.com/Martchus/cpp-utilities).
 
