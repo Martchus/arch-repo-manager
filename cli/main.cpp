@@ -210,6 +210,16 @@ static std::string formatTimeStamp(const DateTime timeStamp)
         + ')';
 }
 
+static tabulate::Table printListOfStringsAsSubTable(const std::vector<std::string> &strings)
+{
+    auto t = tabulate::Table();
+    t.format().hide_border();
+    for (const auto &string : strings) {
+        t.add_row({ string });
+    }
+    return t;
+}
+
 static void printBuildAction(const LibRepoMgr::BuildAction &a, const LibRepoMgr::BuildActionMetaInfo &meta)
 {
     constexpr auto unknown = std::string_view("?");
@@ -236,9 +246,9 @@ static void printBuildAction(const LibRepoMgr::BuildAction &a, const LibRepoMgr:
     t.add_row({ "Finished", formatTimeStamp(a.finished) });
     t.add_row({ "Start after", joinStrings<decltype(startAfter), std::string>(startAfter, ", ") });
     t.add_row({ "Directory", a.directory });
-    t.add_row({ "Source repo", joinStrings(a.sourceDbs, "\n") });
-    t.add_row({ "Destination repo", joinStrings(a.destinationDbs, "\n") });
-    t.add_row({ "Packages", joinStrings(a.packageNames, "\n") });
+    t.add_row({ "Source repo", printListOfStringsAsSubTable(a.sourceDbs) });
+    t.add_row({ "Destination repo", printListOfStringsAsSubTable(a.destinationDbs) });
+    t.add_row({ "Packages", printListOfStringsAsSubTable(a.packageNames) });
     if (flags) {
         auto presentFlags = std::string();
         presentFlags.reserve(32);
@@ -254,6 +264,8 @@ static void printBuildAction(const LibRepoMgr::BuildAction &a, const LibRepoMgr:
     } else {
         t.add_row({ "Flags", numberToString(a.flags) });
     }
+    t.add_row({ "Log files", printListOfStringsAsSubTable(a.logfiles) });
+    t.add_row({ "Artefacts", printListOfStringsAsSubTable(a.artefacts) });
     t.add_row({ "Output", a.output });
     t.column(0).format().font_align(tabulate::FontAlign::right);
     std::cout << t << '\n';
