@@ -311,17 +311,17 @@ static void printRawDataForErrorHandling(const LibRepoMgr::WebClient::Response::
 
 static void printRawData(const LibRepoMgr::WebClient::Response::body_type::value_type &rawData)
 {
-    std::cout << rawData << '\n';
+    std::cout << rawData;
 }
 
-static void handleResponse(const std::string &url, LibRepoMgr::WebClient::Session &session,
-    const LibRepoMgr::WebClient::HttpClientError &error, void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData),
-    int &returnCode)
+static void handleResponse(const std::string &url, LibRepoMgr::WebClient::Session &session, const LibRepoMgr::WebClient::HttpClientError &error,
+    void (*printer)(const LibRepoMgr::WebClient::Response::body_type::value_type &jsonData), int &returnCode)
 {
     auto result = boost::beast::http::status::ok;
     auto body = std::optional<std::string>();
-    if (auto *const emptyResponse = std::get_if<LibRepoMgr::WebClient::EmptyResponse>(&session.response)) {
-        result = emptyResponse->get().result();
+    if (auto *const responseParser = std::get_if<LibRepoMgr::WebClient::StringResponse>(&session.response)) {
+        result = responseParser->get().result();
+        body = std::move(responseParser->get().body());
     } else if (auto *const response = std::get_if<LibRepoMgr::WebClient::Response>(&session.response)) {
         result = response->result();
         body = std::move(response->body());

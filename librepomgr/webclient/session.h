@@ -43,8 +43,8 @@ inline LibRepoMgr::WebClient::HttpClientError::operator bool() const
 
 using Response = WebAPI::Response;
 using FileResponse = boost::beast::http::response_parser<boost::beast::http::file_body>;
-using EmptyResponse = boost::beast::http::response_parser<boost::beast::http::empty_body>;
-using MultiResponse = std::variant<Response, FileResponse, EmptyResponse>;
+using StringResponse = boost::beast::http::response_parser<boost::beast::http::string_body>;
+using MultiResponse = std::variant<Response, FileResponse, StringResponse>;
 using Request = boost::beast::http::request<boost::beast::http::empty_body>;
 struct ChunkProcessing;
 

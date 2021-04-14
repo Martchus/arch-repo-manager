@@ -72,7 +72,7 @@ void Session::run(const char *host, const char *port, http::verb verb, const cha
             return;
         }
     } else if (m_chunkProcessing) {
-        auto &emptyResponse = response.emplace<EmptyResponse>();
+        auto &emptyResponse = response.emplace<StringResponse>();
         emptyResponse.on_chunk_header(m_chunkProcessing->onChunkHeader);
         emptyResponse.on_chunk_body(m_chunkProcessing->onChunkBody);
     }
@@ -149,7 +149,7 @@ void Session::requested(boost::beast::error_code ec, std::size_t bytesTransferre
     // receive the HTTP response
     std::visit(
         [this](auto &stream, auto &&response) {
-            if constexpr (std::is_same_v<std::decay_t<decltype(response)>, EmptyResponse>) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(response)>, StringResponse>) {
                 http::async_read_header(
                     stream, m_buffer, response, std::bind(&Session::chunkReceived, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             } else {
@@ -208,7 +208,7 @@ void Session::chunkReceived(boost::beast::error_code ec, std::size_t bytesTransf
 
 bool Session::continueReadingChunks()
 {
-    auto &parser = std::get<EmptyResponse>(response);
+    auto &parser = std::get<StringResponse>(response);
     if (parser.is_done()) {
         return false;
     }
