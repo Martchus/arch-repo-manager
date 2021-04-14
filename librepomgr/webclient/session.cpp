@@ -34,8 +34,10 @@ HttpClientError::HttpClientError(const char *context, boost::beast::error_code e
 void Session::setChunkHandler(ChunkHandler &&handler)
 {
     m_chunkProcessing = std::make_unique<ChunkProcessing>();
-    m_chunkProcessing->onChunkHeader = std::bind(&Session::onChunkHeader, shared_from_this(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    m_chunkProcessing->onChunkBody = std::bind(&Session::onChunkBody, shared_from_this(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_chunkProcessing->onChunkHeader
+        = std::bind(&Session::onChunkHeader, shared_from_this(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_chunkProcessing->onChunkBody
+        = std::bind(&Session::onChunkBody, shared_from_this(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_chunkProcessing->handler = std::move(handler);
 }
 
@@ -43,8 +45,9 @@ void Session::run(const char *host, const char *port, http::verb verb, const cha
 {
     // set SNI Hostname (many hosts need this to handshake successfully)
     auto *const sslStream = std::get_if<SslStream>(&m_stream);
-    if (sslStream && !SSL_ctrl(
-            sslStream->native_handle(), SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, reinterpret_cast<void *>(const_cast<char *>(host)))) {
+    if (sslStream
+        && !SSL_ctrl(sslStream->native_handle(), SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name,
+            reinterpret_cast<void *>(const_cast<char *>(host)))) {
         m_handler(*this,
             HttpClientError(
                 "setting SNI hostname", boost::beast::error_code{ static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() }));
@@ -77,7 +80,7 @@ void Session::run(const char *host, const char *port, http::verb verb, const cha
     // look up the domain name
     m_resolver.async_resolve(host, port,
         boost::asio::ip::tcp::resolver::canonical_name | boost::asio::ip::tcp::resolver::passive | boost::asio::ip::tcp::resolver::all_matching,
-                             std::bind(&Session::resolved, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        std::bind(&Session::resolved, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 }
 
 inline Session::RawSocket &Session::socket()
@@ -127,10 +130,12 @@ void Session::handshakeDone(boost::beast::error_code ec)
 void Session::sendRequest()
 {
     // send the HTTP request to the remote host
-    std::visit([this](auto &&stream) {
-        boost::beast::http::async_write(
-                    stream, request, std::bind(&Session::requested, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-    }, m_stream);
+    std::visit(
+        [this](auto &&stream) {
+            boost::beast::http::async_write(
+                stream, request, std::bind(&Session::requested, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        },
+        m_stream);
 }
 
 void Session::requested(boost::beast::error_code ec, std::size_t bytesTransferred)
@@ -145,13 +150,14 @@ void Session::requested(boost::beast::error_code ec, std::size_t bytesTransferre
     std::visit(
         [this](auto &stream, auto &&response) {
             if constexpr (std::is_same_v<std::decay_t<decltype(response)>, EmptyResponse>) {
-                http::async_read_header(stream, m_buffer, response, std::bind(&Session::chunkReceived, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+                http::async_read_header(
+                    stream, m_buffer, response, std::bind(&Session::chunkReceived, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             } else {
                 http::async_read(
                     stream, m_buffer, response, std::bind(&Session::received, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             }
         },
-    m_stream, response);
+        m_stream, response);
 }
 
 void Session::onChunkHeader(std::uint64_t chunkSize, boost::beast::string_view extensions, boost::beast::error_code &ec)
@@ -162,7 +168,7 @@ void Session::onChunkHeader(std::uint64_t chunkSize, boost::beast::string_view e
         return;
     }
 
-    if(chunkSize > std::numeric_limits<std::size_t>::max()) {
+    if (chunkSize > std::numeric_limits<std::size_t>::max()) {
         ec = boost::beast::http::error::body_limit;
         return;
     }
@@ -175,7 +181,7 @@ void Session::onChunkHeader(std::uint64_t chunkSize, boost::beast::string_view e
 std::size_t Session::onChunkBody(std::uint64_t bytesLeftInThisChunk, boost::beast::string_view chunkBodyData, boost::beast::error_code &ec)
 {
     // set the error so that the call to `read` returns if this is the last piece of the chunk body and we can process the chunk
-    if(bytesLeftInThisChunk == chunkBodyData.size()) {
+    if (bytesLeftInThisChunk == chunkBodyData.size()) {
         ec = boost::beast::http::error::end_of_chunk;
     }
 
@@ -189,7 +195,7 @@ std::size_t Session::onChunkBody(std::uint64_t bytesLeftInThisChunk, boost::beas
 
 void Session::chunkReceived(boost::beast::error_code ec, std::size_t bytesTransferred)
 {
-    if(ec == boost::beast::http::error::end_of_chunk) {
+    if (ec == boost::beast::http::error::end_of_chunk) {
         m_chunkProcessing->handler(m_chunkProcessing->chunkExtensions, m_chunkProcessing->currentChunk);
     } else if (ec) {
         m_handler(*this, HttpClientError("receiving chunk response", ec));
@@ -206,9 +212,12 @@ bool Session::continueReadingChunks()
     if (parser.is_done()) {
         return false;
     }
-    std::visit([this, &parser] (auto &stream) {
-        boost::beast::http::async_read(stream, m_buffer, parser, std::bind(&Session::chunkReceived, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-    }, m_stream);
+    std::visit(
+        [this, &parser](auto &stream) {
+            boost::beast::http::async_read(
+                stream, m_buffer, parser, std::bind(&Session::chunkReceived, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        },
+        m_stream);
     return true;
 }
 
@@ -236,10 +245,8 @@ void Session::closed(boost::beast::error_code ec)
     m_handler(*this, ec && ec != boost::asio::error::eof ? HttpClientError("closing connection", ec) : HttpClientError());
 }
 
-std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(
-    boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, std::string_view url,
-    Session::Handler &&handler, std::string &&destinationPath,
-    std::string_view userName, std::string_view password,
+std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext,
+    std::string_view url, Session::Handler &&handler, std::string &&destinationPath, std::string_view userName, std::string_view password,
     boost::beast::http::verb verb, Session::ChunkHandler &&chunkHandler)
 {
     std::string host, port, target;
@@ -276,7 +283,8 @@ std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(
         port = ssl ? "443" : "80";
     }
 
-    auto session = ssl ? std::make_shared<Session>(ioContext, sslContext, std::move(handler)) : std::make_shared<Session>(ioContext, std::move(handler));
+    auto session
+        = ssl ? std::make_shared<Session>(ioContext, sslContext, std::move(handler)) : std::make_shared<Session>(ioContext, std::move(handler));
     if (!userName.empty()) {
         const auto authInfo = userName % ":" + password;
         session->request.set(boost::beast::http::field::authorization,

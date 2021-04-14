@@ -66,8 +66,8 @@ void queryDatabases(
             [&log, &setup, dbName = std::move(query.databaseName), dbArch = std::move(query.databaseArch), dbQuerySession](
                 Session &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
-                    log(Phrases::ErrorMessage, "Error retrieving database file \"", session2.destinationFilePath, "\" for ", dbName, ": ", error.what(),
-                        '\n');
+                    log(Phrases::ErrorMessage, "Error retrieving database file \"", session2.destinationFilePath, "\" for ", dbName, ": ",
+                        error.what(), '\n');
                     dbQuerySession->addResponse(std::move(dbName));
                     return;
                 }
@@ -75,8 +75,8 @@ void queryDatabases(
                 const auto &response = get<FileResponse>(session2.response);
                 const auto &message = response.get();
                 if (message.result() != boost::beast::http::status::ok) {
-                    log(Phrases::ErrorMessage, "Error retrieving database file \"", session2.destinationFilePath, "\" for ", dbName, ": mirror returned ",
-                        message.result_int(), " response\n");
+                    log(Phrases::ErrorMessage, "Error retrieving database file \"", session2.destinationFilePath, "\" for ", dbName,
+                        ": mirror returned ", message.result_int(), " response\n");
                     dbQuerySession->addResponse(std::move(dbName));
                     return;
                 }

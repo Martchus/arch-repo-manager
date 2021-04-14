@@ -53,10 +53,8 @@ public:
     using Handler = std::function<void(Session &, const HttpClientError &error)>;
     using ChunkHandler = std::function<void(const boost::beast::http::chunk_extensions &chunkExtensions, std::string_view chunkData)>;
 
-    template <typename ResponseType = Response>
-    explicit Session(boost::asio::io_context &ioContext, const Handler &handler = Handler());
-    template <typename ResponseType = Response>
-    explicit Session(boost::asio::io_context &ioContext, Handler &&handler = Handler());
+    template <typename ResponseType = Response> explicit Session(boost::asio::io_context &ioContext, const Handler &handler = Handler());
+    template <typename ResponseType = Response> explicit Session(boost::asio::io_context &ioContext, Handler &&handler = Handler());
     template <typename ResponseType = Response>
     explicit Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, const Handler &handler = Handler());
     template <typename ResponseType = Response>
@@ -72,7 +70,8 @@ private:
         boost::beast::http::chunk_extensions chunkExtensions;
         std::string currentChunk;
         std::function<void(std::uint64_t chunkSize, boost::beast::string_view extensions, boost::beast::error_code &ec)> onChunkHeader;
-        std::function<std::size_t(std::uint64_t bytesLeftInThisChunk, boost::beast::string_view chunkBodyData, boost::beast::error_code &ec)> onChunkBody;
+        std::function<std::size_t(std::uint64_t bytesLeftInThisChunk, boost::beast::string_view chunkBodyData, boost::beast::error_code &ec)>
+            onChunkBody;
         Session::ChunkHandler handler;
     };
 
@@ -107,7 +106,7 @@ template <typename ResponseType>
 inline Session::Session(boost::asio::io_context &ioContext, const Handler &handler)
     : response(ResponseType{})
     , m_resolver(ioContext)
-    , m_stream(RawSocket{ioContext})
+    , m_stream(RawSocket{ ioContext })
     , m_handler(handler)
 {
 }
@@ -116,7 +115,7 @@ template <typename ResponseType>
 inline Session::Session(boost::asio::io_context &ioContext, Handler &&handler)
     : response(ResponseType{})
     , m_resolver(ioContext)
-    , m_stream(RawSocket{ioContext})
+    , m_stream(RawSocket{ ioContext })
     , m_handler(std::move(handler))
 {
 }
@@ -125,7 +124,7 @@ template <typename ResponseType>
 inline Session::Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, const Handler &handler)
     : response(ResponseType{})
     , m_resolver(ioContext)
-    , m_stream(SslStream{ioContext, sslContext})
+    , m_stream(SslStream{ ioContext, sslContext })
     , m_handler(handler)
 {
 }
@@ -134,14 +133,13 @@ template <typename ResponseType>
 inline Session::Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, Handler &&handler)
     : response(ResponseType{})
     , m_resolver(ioContext)
-    , m_stream(SslStream{ioContext, sslContext})
+    , m_stream(SslStream{ ioContext, sslContext })
     , m_handler(std::move(handler))
 {
 }
 
-LIBREPOMGR_EXPORT std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(
-    boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, std::string_view url,
-    Session::Handler &&handler, std::string &&destinationPath = std::string(),
+LIBREPOMGR_EXPORT std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asio::io_context &ioContext,
+    boost::asio::ssl::context &sslContext, std::string_view url, Session::Handler &&handler, std::string &&destinationPath = std::string(),
     std::string_view userName = std::string_view(), std::string_view password = std::string_view(),
     boost::beast::http::verb verb = boost::beast::http::verb::get, Session::ChunkHandler &&chunkHandler = Session::ChunkHandler());
 

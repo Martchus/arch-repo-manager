@@ -335,7 +335,8 @@ static void handleResponse(const std::string &url, LibRepoMgr::WebClient::Sessio
                           << Phrases::End;
                 returnCode = 13;
             } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
-                std::cerr << Phrases::ErrorMessage << "Unable to parse responnse: " << tupleToString(LibRepoMgr::serializeParseError(e)) << Phrases::End;
+                std::cerr << Phrases::ErrorMessage << "Unable to parse responnse: " << tupleToString(LibRepoMgr::serializeParseError(e))
+                          << Phrases::End;
                 returnCode = 11;
             } catch (const std::runtime_error &e) {
                 std::cerr << Phrases::ErrorMessage << "Unable to display response: " << e.what() << Phrases::End;
