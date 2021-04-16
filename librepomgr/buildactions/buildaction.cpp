@@ -356,7 +356,8 @@ void BuildAction::conclude(BuildActionResult result)
     if (result == BuildActionResult::Success && m_setup) {
         for (auto &maybeStillValidFollowUpAction : m_followUpActions) {
             auto followUpAction = maybeStillValidFollowUpAction.lock();
-            if (followUpAction && followUpAction->isScheduled()) {
+            if (followUpAction && followUpAction->isScheduled()
+                && BuildAction::haveSucceeded(m_setup->building.getBuildActions(followUpAction->startAfter))) {
                 followUpAction->start(*m_setup);
             }
         }
