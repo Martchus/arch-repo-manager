@@ -405,9 +405,11 @@ static std::vector<std::shared_ptr<BuildAction>> allocateBuildActionIDs(ServiceS
 
 static bool startFirstBuildActions(ServiceSetup &setup, SequencedBuildActions &newActionSequence)
 {
+    auto handledFirstAction = false;
     for (auto &sequencedAction : newActionSequence.actions) {
         if (auto *const maybeAction = std::get_if<std::shared_ptr<BuildAction>>(&sequencedAction)) {
             auto &action = *maybeAction;
+            handledFirstAction = true;
             if (action->isScheduled()) {
                 action->start(setup);
             }
@@ -415,12 +417,12 @@ static bool startFirstBuildActions(ServiceSetup &setup, SequencedBuildActions &n
                 return true;
             }
         } else if (auto *const subSequence = std::get_if<SequencedBuildActions>(&sequencedAction)) {
-            if (startFirstBuildActions(setup, newActionSequence) && !newActionSequence.concurrent) {
+            if (startFirstBuildActions(setup, *subSequence) && !newActionSequence.concurrent) {
                 return true;
             }
         }
     }
-    return false;
+    return handledFirstAction;
 }
 
 void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, const std::string &taskName, const std::string &directory,
