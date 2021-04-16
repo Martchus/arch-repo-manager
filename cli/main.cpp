@@ -470,22 +470,24 @@ int main(int argc, const char *argv[])
     auto streamLogfileBuildActionArg = OperationArgument("logfile", 'f', "stream build action logfile");
     auto buildActionFilePathArg = ConfigValueArgument("path", 'p', "specifies the file path", { "path" });
     buildActionFilePathArg.setRequired(true);
-    streamLogfileBuildActionArg.setCallback([&path, &printer, &chunkHandler, &singleBuildActionIdArg, &buildActionFilePathArg](const ArgumentOccurrence &) {
-        path = "/api/v0/build-action/logfile?";
-        printer = printRawData;
-        chunkHandler = printChunk;
-        appendAsQueryParam(path, singleBuildActionIdArg, "id");
-        appendAsQueryParam(path, buildActionFilePathArg, "name");
-    });
+    streamLogfileBuildActionArg.setCallback(
+        [&path, &printer, &chunkHandler, &singleBuildActionIdArg, &buildActionFilePathArg](const ArgumentOccurrence &) {
+            path = "/api/v0/build-action/logfile?";
+            printer = printRawData;
+            chunkHandler = printChunk;
+            appendAsQueryParam(path, singleBuildActionIdArg, "id");
+            appendAsQueryParam(path, buildActionFilePathArg, "name");
+        });
     streamLogfileBuildActionArg.setSubArguments({ &singleBuildActionIdArg, &buildActionFilePathArg });
     auto streamArtefactBuildActionArg = OperationArgument("artefact", 'a', "stream build action artefact");
-    streamArtefactBuildActionArg.setCallback([&path, &printer, &chunkHandler, &singleBuildActionIdArg, &buildActionFilePathArg](const ArgumentOccurrence &) {
-        path = "/api/v0/build-action/artefact?";
-        printer = printRawData;
-        chunkHandler = printChunk;
-        appendAsQueryParam(path, singleBuildActionIdArg, "id");
-        appendAsQueryParam(path, buildActionFilePathArg, "name");
-    });
+    streamArtefactBuildActionArg.setCallback(
+        [&path, &printer, &chunkHandler, &singleBuildActionIdArg, &buildActionFilePathArg](const ArgumentOccurrence &) {
+            path = "/api/v0/build-action/artefact?";
+            printer = printRawData;
+            chunkHandler = printChunk;
+            appendAsQueryParam(path, singleBuildActionIdArg, "id");
+            appendAsQueryParam(path, buildActionFilePathArg, "name");
+        });
     streamArtefactBuildActionArg.setSubArguments({ &singleBuildActionIdArg, &buildActionFilePathArg });
     auto createBuildActionArg = OperationArgument("create", '\0', "creates and starts a new build action (or pre-defined task)");
     auto taskArg = ConfigValueArgument("task", '\0', "specifies the pre-defined task to run", { "task" });
