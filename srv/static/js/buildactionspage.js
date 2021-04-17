@@ -173,7 +173,7 @@ function renderBuildActionActions(actionValue, buildAction, refresh)
     container.appendChild(renderIconLink(refresh ? 'table-refresh' : 'magnify', buildAction, function() {
         queryBuildActionDetails(id);
         return false;
-    }, refresh ? 'Refresh details table' : 'Show details', undefined, '#build-action-details-section&' + id));
+    }, refresh ? 'Refresh details table' : 'Show details', undefined, '#build-action-details-section?' + id));
     container.appendChild(renderIconLink('restart', buildAction, function() {
         if (window.confirm('Do you really want to clone/restart action ' + id + '?')) {
             cloneBuildAction(id);
