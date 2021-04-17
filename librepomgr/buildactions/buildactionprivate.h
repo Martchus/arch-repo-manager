@@ -539,6 +539,24 @@ struct BinaryPackageInfo {
     bool artefactAlreadyPresent = false;
 };
 
+struct SigningSession : public MultiSession<std::string> {
+    explicit SigningSession(
+        std::vector<BinaryPackageInfo> &&binaryPackages, const std::string *repoPath, boost::asio::io_context &ioContext, HandlerType &&handler);
+    std::vector<BinaryPackageInfo> binaryPackages;
+    std::vector<BinaryPackageInfo>::iterator currentPackage;
+    const std::string *repoPath;
+    std::mutex mutex;
+};
+
+inline SigningSession::SigningSession(std::vector<BinaryPackageInfo> &&binaryPackages, const std::string *repoPath,
+    boost::asio::io_context &ioContext, SigningSession::HandlerType &&handler)
+    : MultiSession<std::string>(ioContext, std::move(handler))
+    , binaryPackages(std::move(binaryPackages))
+    , currentPackage(this->binaryPackages.begin())
+    , repoPath(repoPath)
+{
+}
+
 enum class InvocationResult {
     Ok,
     Skipped,
@@ -579,6 +597,7 @@ private:
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, PackageBuildProgress &packageProgress);
     void invokeGpg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, std::vector<BinaryPackageInfo> &&binaryPackages, BuildResult &&buildResult);
+    void invokeGpg(const std::shared_ptr<SigningSession> &signingSession, const std::string &packageName, PackageBuildProgress &packageProgress);
     void invokeRepoAdd(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, BuildResult &&buildResult);
     void checkDownloadErrorsAndMakePackages(BatchProcessingSession::ContainerType &&failedPackages);

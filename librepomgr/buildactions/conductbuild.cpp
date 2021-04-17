@@ -1138,60 +1138,77 @@ void ConductBuild::addPackageToRepo(
 void ConductBuild::invokeGpg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const string &packageName,
     PackageBuildProgress &packageProgress, std::vector<BinaryPackageInfo> &&binaryPackages, BuildResult &&buildResult)
 {
-    const auto *const repoPath = buildResult.repoPath;
-    auto signingSession = MultiSession<std::string>::create(m_setup.building.ioContext,
+    const auto signingSession = std::make_shared<SigningSession>(std::move(binaryPackages), buildResult.repoPath, m_setup.building.ioContext,
         [this, makepkgchrootSession, &packageName, &packageProgress, buildResult = std::move(buildResult)](
             MultiSession<std::string>::ContainerType &&failedPackages) mutable {
             checkGpgErrorsAndContinueAddingPackagesToRepo(
                 makepkgchrootSession, packageName, packageProgress, std::move(buildResult), std::move(failedPackages));
         });
-    for (const auto &binaryPackage : binaryPackages) {
-        auto processSession
-            = m_buildAction->makeBuildProcess("gpg for " + binaryPackage.name, packageProgress.buildDirectory % "/gpg-" % binaryPackage.name + ".log",
-                [this, signingSession, &packageProgress, repoPath, isAny = binaryPackage.isAny, binaryPackageName = binaryPackage.fileName](
-                    boost::process::child &&child, ProcessResult &&result) mutable {
-                    if (result.errorCode) {
-                        // check for invocation error
-                        m_buildAction->log()(
-                            Phrases::ErrorMessage, "Unable to invoke gpg for ", binaryPackageName, ": ", result.errorCode.message(), '\n');
-                    } else if (child.exit_code() != 0) {
-                        // check for bad exit code
-                        m_buildAction->log()(Phrases::ErrorMessage, "gpg invocation for ", binaryPackageName,
-                            " exited with non-zero exit code: ", child.exit_code(), '\n');
-                    } else {
-                        // move signature to repository
-                        try {
-                            const auto buildDirSignaturePath
-                                = std::filesystem::path(argsToString(packageProgress.buildDirectory, '/', binaryPackageName, ".sig"));
-                            if (!std::filesystem::exists(buildDirSignaturePath)) {
-                                m_buildAction->log()(Phrases::ErrorMessage, "Signature of \"", binaryPackageName,
-                                    "\" could not be created: ", buildDirSignaturePath, " does not exist after invoking gpg\n");
-                            } else if (!isAny) {
-                                std::filesystem::copy(buildDirSignaturePath, *repoPath % '/' % binaryPackageName + ".sig",
-                                    std::filesystem::copy_options::update_existing);
-                                return;
-                            } else {
-                                std::filesystem::copy(buildDirSignaturePath, argsToString(repoPath, "/../any/", binaryPackageName, ".sig"),
-                                    std::filesystem::copy_options::update_existing);
-                                const auto symlink = std::filesystem::path(argsToString(repoPath, '/', binaryPackageName, ".sig"));
-                                if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
-                                    std::filesystem::remove(symlink);
-                                }
-                                std::filesystem::create_symlink("../any/" % binaryPackageName + ".sig", symlink);
-                                return;
-                            }
-                        } catch (const std::filesystem::filesystem_error &e) {
-                            m_buildAction->log()(
-                                Phrases::ErrorMessage, "Unable to copy signature of \"", binaryPackageName, "\" to repository: ", e.what(), '\n');
-                        }
-                    }
-                    // consider the package failed
-                    signingSession->addResponse(std::move(binaryPackageName));
-                });
-        processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, "--detach-sign", "--yes", "--use-agent",
-            "--no-armor", "-u", m_gpgKey, binaryPackage.fileName);
-        m_buildAction->log()(Phrases::InfoMessage, "Signing ", binaryPackage.fileName, '\n');
+    constexpr auto gpgParallelLimit = 4;
+    const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
+    for (auto i = 0; i != gpgParallelLimit && signingSession->currentPackage != signingSession->binaryPackages.end();
+         ++i, ++signingSession->currentPackage) {
+        invokeGpg(signingSession, packageName, packageProgress);
     }
+}
+
+void ConductBuild::invokeGpg(
+    const std::shared_ptr<SigningSession> &signingSession, const std::string &packageName, PackageBuildProgress &packageProgress)
+{
+    const auto &binaryPackage = *signingSession->currentPackage;
+    auto processSession = m_buildAction->makeBuildProcess("gpg for " + binaryPackage.name,
+        packageProgress.buildDirectory % "/gpg-" % binaryPackage.name + ".log",
+        [this, signingSession, &packageName, &packageProgress, isAny = binaryPackage.isAny, binaryPackageName = binaryPackage.fileName](
+            boost::process::child &&child, ProcessResult &&result) mutable {
+            // make the next gpg invocation
+            if (const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
+                signingSession->currentPackage != signingSession->binaryPackages.end()
+                && ++signingSession->currentPackage != signingSession->binaryPackages.end()) {
+                invokeGpg(signingSession, packageName, packageProgress);
+            }
+
+            // handle results of gpg invocation
+            if (result.errorCode) {
+                // check for invocation error
+                m_buildAction->log()(Phrases::ErrorMessage, "Unable to invoke gpg for ", binaryPackageName, ": ", result.errorCode.message(), '\n');
+            } else if (child.exit_code() != 0) {
+                // check for bad exit code
+                m_buildAction->log()(
+                    Phrases::ErrorMessage, "gpg invocation for ", binaryPackageName, " exited with non-zero exit code: ", child.exit_code(), '\n');
+            } else {
+                // move signature to repository
+                try {
+                    const auto buildDirSignaturePath
+                        = std::filesystem::path(argsToString(packageProgress.buildDirectory, '/', binaryPackageName, ".sig"));
+                    if (!std::filesystem::exists(buildDirSignaturePath)) {
+                        m_buildAction->log()(Phrases::ErrorMessage, "Signature of \"", binaryPackageName,
+                            "\" could not be created: ", buildDirSignaturePath, " does not exist after invoking gpg\n");
+                    } else if (!isAny) {
+                        std::filesystem::copy(buildDirSignaturePath, *signingSession->repoPath % '/' % binaryPackageName + ".sig",
+                            std::filesystem::copy_options::update_existing);
+                        return;
+                    } else {
+                        std::filesystem::copy(buildDirSignaturePath, argsToString(signingSession->repoPath, "/../any/", binaryPackageName, ".sig"),
+                            std::filesystem::copy_options::update_existing);
+                        const auto symlink = std::filesystem::path(argsToString(signingSession->repoPath, '/', binaryPackageName, ".sig"));
+                        if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
+                            std::filesystem::remove(symlink);
+                        }
+                        std::filesystem::create_symlink("../any/" % binaryPackageName + ".sig", symlink);
+                        return;
+                    }
+                } catch (const std::filesystem::filesystem_error &e) {
+                    m_buildAction->log()(
+                        Phrases::ErrorMessage, "Unable to copy signature of \"", binaryPackageName, "\" to repository: ", e.what(), '\n');
+                }
+            }
+
+            // consider the package failed
+            signingSession->addResponse(std::move(binaryPackageName));
+        });
+    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, "--detach-sign", "--yes", "--use-agent",
+        "--no-armor", "-u", m_gpgKey, binaryPackage.fileName);
+    m_buildAction->log()(Phrases::InfoMessage, "Signing ", binaryPackage.fileName, '\n');
 }
 
 void ConductBuild::invokeRepoAdd(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const string &packageName,
