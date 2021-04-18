@@ -1,3 +1,6 @@
 [submodule "3rdparty/tabulate"]
 	path = 3rdparty/tabulate
 	url = git@github.com:p-ranav/tabulate.git
+[submodule "3rdparty/lmdb-safe"]
+	path = 3rdparty/lmdb-safe
+	url = git@github.com:ahupowerdns/lmdb-safe.git
