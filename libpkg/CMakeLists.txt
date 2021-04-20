@@ -12,7 +12,9 @@ set(HEADER_FILES
     parser/database.h
     parser/config.h
     parser/utils.h
-    parser/binary.h)
+    parser/binary.h
+    lmdb-safe/lmdb-safe.hh
+    lmdb-safe/lmdb-typed.hh)
 set(SRC_FILES
     data/package.cpp
     data/database.cpp
@@ -27,7 +29,9 @@ set(SRC_FILES
     parser/config.cpp
     parser/utils.cpp
     parser/binary.cpp
-    parser/siglevel.cpp)
+    parser/siglevel.cpp
+    lmdb-safe/lmdb-safe.cc
+    lmdb-safe/lmdb-typed.cc)
 set(TEST_HEADER_FILES tests/parser_helper.h)
 set(TEST_SRC_FILES tests/cppunit.cpp tests/parser.cpp tests/parser_binary.cpp tests/parser_helper.cpp tests/data.cpp
                    tests/utils.cpp)
@@ -56,6 +60,12 @@ use_standard_filesystem(VISIBILITY PUBLIC)
 # find reflective-rapidjson
 find_package(reflective_rapidjson${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
 use_reflective_rapidjson(VISIBILITY PUBLIC)
+
+# find lmdb
+use_pkg_config_module(PKG_CONFIG_MODULES "lmdb" VISIBILITY PUBLIC)
+
+# configure lmdb-safe
+set_source_files_properties(lmdb-safe/lmdb-safe.cc lmdb-safe/lmdb-typed.cc PROPERTIES COMPILE_FLAGS "-Wno-error")
 
 # find 3rd party libraries zlib
 use_zlib()
