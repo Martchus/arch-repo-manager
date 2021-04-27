@@ -710,7 +710,8 @@ void CleanRepository::run()
 
                 // delete orphaned signatures, otherwise skip signatures as they are handled alongside the related package
                 if (fileName.ends_with(".sig")) {
-                    if (!std::filesystem::exists(dirInfo.canonicalPath / std::string_view(fileName.data(), fileName.data() + fileName.size() - 4))) {
+                    if (!std::filesystem::exists(std::filesystem::symlink_status(
+                            dirInfo.canonicalPath / std::string_view(fileName.data(), fileName.data() + fileName.size() - 4)))) {
                         dirInfo.toDelete.emplace_back(fileName);
                     }
                     continue;
@@ -733,7 +734,7 @@ void CleanRepository::run()
 
                 // check whether the file is still referenced by and relevant database and move it to archive if not
                 auto fileStillReferenced = false;
-                std::vector<std::string_view> actuallyReferencedFileNames;
+                auto actuallyReferencedFileNames = std::vector<std::string_view>();
                 for (const auto *const db : dirInfo.relevantDbs) {
                     const auto i = db->packages.find(packageName);
                     if (i == db->packages.end()) {
