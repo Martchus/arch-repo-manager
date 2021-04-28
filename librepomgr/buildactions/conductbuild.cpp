@@ -1552,6 +1552,7 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
                     }
                     needsStaging = true;
                     (*rebuildInfoForDb)[affectedPackage->name].libprovides.emplace_back(removedLibProvide);
+                    listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage->name);
                 }
             }
         }
