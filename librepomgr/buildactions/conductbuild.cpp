@@ -179,7 +179,8 @@ void BatchProcessingSession::enableStagingInNextBatch()
     m_enableStagingInNextBatch = true;
     if (!m_stagingEnabled) {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_stagingEnabled = m_batchIterator != m_batchEnd && m_batchIterator != m_batchBegin && m_packageIterator == m_batchIterator->begin();
+        m_stagingEnabled
+            = m_stagingEnabled || (m_batchIterator != m_batchEnd && m_batchIterator != m_batchBegin && m_packageIterator == m_batchIterator->begin());
     }
 }
 
