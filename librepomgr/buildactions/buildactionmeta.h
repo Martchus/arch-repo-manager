@@ -109,6 +109,7 @@ struct LIBREPOMGR_EXPORT BuildActionTypeMetaInfo : public ReflectiveRapidJSON::J
     const bool sourceDb = true;
     const bool destinationDb = true;
     const bool packageNames = true;
+    const bool implyPackagesFromPrevAction = false;
 };
 struct LIBREPOMGR_EXPORT BuildActionStatusMetaInfo : public ReflectiveRapidJSON::JsonSerializable<BuildActionStatusMetaInfo> {
     const BuildActionStatus id = BuildActionStatus::Created;

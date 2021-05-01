@@ -318,7 +318,7 @@ struct SequencedBuildActions {
 static std::string allocateNewBuildAction(const BuildActionMetaInfo &metaInfo, const std::string &taskName,
     const std::vector<std::string> &packageNames, const std::string &directory,
     const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, SequencedBuildActions &newActionSequence,
-    std::vector<std::shared_ptr<BuildAction>> &allocatedActions, const std::string &actionTemplateToAllocate)
+    std::vector<std::shared_ptr<BuildAction>> &allocatedActions, const std::string &actionTemplateToAllocate, bool asFirstActions)
 {
     const auto actionTemplateIterator = actionTemplates.find(actionTemplateToAllocate);
     if (actionTemplateIterator == actionTemplates.end()) {
@@ -339,7 +339,9 @@ static std::string allocateNewBuildAction(const BuildActionMetaInfo &metaInfo, c
     buildAction->type = buildActionType;
     buildAction->sourceDbs = actionTemplate.sourceDbs;
     buildAction->destinationDbs = actionTemplate.destinationDbs;
-    buildAction->packageNames = !typeInfo.packageNames || packageNames.empty() ? actionTemplate.packageNames : packageNames;
+    if (asFirstActions || !typeInfo.implyPackagesFromPrevAction) {
+        buildAction->packageNames = !typeInfo.packageNames || packageNames.empty() ? actionTemplate.packageNames : packageNames;
+    }
     buildAction->flags = actionTemplate.flags;
     buildAction->settings = actionTemplate.settings;
     return std::string();
@@ -348,18 +350,19 @@ static std::string allocateNewBuildAction(const BuildActionMetaInfo &metaInfo, c
 static std::string allocateNewBuildActionSequence(const BuildActionMetaInfo &metaInfo, const std::string &taskName,
     const std::vector<std::string> &packageNames, const std::string &directory,
     const std::unordered_map<std::string, BuildActionTemplate> &actionTemplates, SequencedBuildActions &newActionSequence,
-    std::vector<std::shared_ptr<BuildAction>> &allocatedActions, const BuildActionSequence &actionSequenceToAllocate)
+    std::vector<std::shared_ptr<BuildAction>> &allocatedActions, const BuildActionSequence &actionSequenceToAllocate, bool asFirstActions = true)
 {
     auto error = std::string();
     newActionSequence.name = actionSequenceToAllocate.name;
     newActionSequence.concurrent = actionSequenceToAllocate.concurrent;
     for (const auto &actionNode : actionSequenceToAllocate.actions) {
         if (const auto *const actionTemplateName = std::get_if<std::string>(&actionNode)) {
-            error = allocateNewBuildAction(
-                metaInfo, taskName, packageNames, directory, actionTemplates, newActionSequence, allocatedActions, *actionTemplateName);
+            error = allocateNewBuildAction(metaInfo, taskName, packageNames, directory, actionTemplates, newActionSequence, allocatedActions,
+                *actionTemplateName, newActionSequence.concurrent ? asFirstActions : newActionSequence.actions.empty());
         } else if (const auto *const actionSequence = std::get_if<BuildActionSequence>(&actionNode)) {
             error = allocateNewBuildActionSequence(metaInfo, taskName, packageNames, directory, actionTemplates,
-                std::get<SequencedBuildActions>(newActionSequence.actions.emplace_back(SequencedBuildActions())), allocatedActions, *actionSequence);
+                std::get<SequencedBuildActions>(newActionSequence.actions.emplace_back(SequencedBuildActions())), allocatedActions, *actionSequence,
+                newActionSequence.concurrent ? asFirstActions : false);
         }
         if (!error.empty()) {
             return error;

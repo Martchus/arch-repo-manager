@@ -220,6 +220,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .sourceDb = false,
             .destinationDb = false,
             .packageNames = true,
+            .implyPackagesFromPrevAction = true,
         },
         BuildActionTypeMetaInfo{
             .id = BuildActionType::MakeLicenseInfo,
