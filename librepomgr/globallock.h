@@ -1,6 +1,7 @@
 #ifndef LIBREPOMGR_GLOBAL_LOCK_H
 #define LIBREPOMGR_GLOBAL_LOCK_H
 
+#include <condition_variable>
 #include <cstdint>
 #include <mutex>
 #include <shared_mutex>
