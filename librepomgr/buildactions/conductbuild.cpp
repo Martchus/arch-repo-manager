@@ -1324,7 +1324,6 @@ void ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo(const BatchProce
         dumpBuildProgress();
         lock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "Unable to invoke makechrootpkg for ", packageName, ": ", errorMessage, '\n');
-        return;
     }
     if (child.exit_code() != 0) {
         packageProgress.error = argsToString("unable to build: makechrootpkg returned with exit code ", child.exit_code());
