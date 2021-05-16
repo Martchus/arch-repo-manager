@@ -261,10 +261,12 @@ void BuildActionsTests::testBuildActionProcess()
     session.reset();
     ioc.run();
 
-    auto logLines = splitString(readFile(logFilePath), "\r\n");
-    CPPUNIT_ASSERT_EQUAL(5001_st, logLines.size());
-    CPPUNIT_ASSERT_EQUAL("printing some numbers"s, logLines.front());
-    CPPUNIT_ASSERT_EQUAL("line 5000"s, logLines.back());
+    const auto logFile = readFile(logFilePath);
+    const auto logLines = splitStringSimple<std::vector<std::string_view>>(logFile, "\r\n");
+    CPPUNIT_ASSERT_EQUAL(5002_st, logLines.size());
+    CPPUNIT_ASSERT_EQUAL("printing some numbers"sv, logLines.front());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("trailing line break", ""sv, logLines.back());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("last line", "line 5000"sv, logLines[logLines.size() - 2u]);
     TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*Launched \"test\", PID\\: [0-9]+.*\n.*"s, std::regex::extended, m_buildAction->output);
 }
 
