@@ -34,6 +34,27 @@ using namespace CppUtilities::EscapeCodes;
 
 namespace LibRepoMgr {
 
+bool PackageBuildProgress::hasBeenAnyProgressMade() const
+{
+    return checksumsUpdated || hasSources || !finished.isNull() || addedToRepo || stagingNeeded != PackageStagingNeeded::Undetermined;
+}
+
+void PackageBuildProgress::resetProgress()
+{
+    checksumsUpdated = false;
+    hasSources = false;
+    finished = DateTime();
+    addedToRepo = false;
+    stagingNeeded = PackageStagingNeeded::Undetermined;
+}
+
+void PackageBuildProgress::resetChrootSettings()
+{
+    chrootDirectory.clear();
+    chrootUser.clear();
+    skipChrootUpgrade = skipChrootCleanup = keepPreviousSourceTree = false;
+}
+
 PrepareBuild::PrepareBuild(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction)
     : InternalBuildAction(setup, buildAction)
 {
@@ -53,6 +74,7 @@ void PrepareBuild::run()
     m_cleanSourceDirectory = flags & PrepareBuildFlags::CleanSrcDir;
     m_keepOrder = flags & PrepareBuildFlags::KeepOrder;
     m_keepPkgRelAndEpoch = flags & PrepareBuildFlags::KeepPkgRelAndEpoch;
+    m_resetChrootSettings = flags & PrepareBuildFlags::ResetChrootSettings;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -1039,7 +1061,10 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                             continue;
                         }
                         if (buildProgress.buildDirectory.empty()) {
-                            buildProgress.reset();
+                            buildProgress.resetProgress();
+                            if (m_resetChrootSettings) {
+                                buildProgress.resetChrootSettings();
+                            }
                             continue;
                         }
                         const std::filesystem::path srcDirPkgbuild = buildData.sourceDirectory + "/PKGBUILD";
@@ -1047,7 +1072,10 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                         try {
                             if (!std::filesystem::exists(buildDirPkgbuild)
                                 || std::filesystem::last_write_time(srcDirPkgbuild) > std::filesystem::last_write_time(buildDirPkgbuild)) {
-                                buildProgress.reset();
+                                buildProgress.resetProgress();
+                                if (m_resetChrootSettings) {
+                                    buildProgress.resetChrootSettings();
+                                }
                             }
                         } catch (const std::filesystem::filesystem_error &e) {
                             m_buildAction->appendOutput(

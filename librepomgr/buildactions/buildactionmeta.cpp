@@ -140,6 +140,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Never bumps pkgrel and epoch",
                     .param = "keep-pkgrel-and-epoch",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::ResetChrootSettings),
+                    .name = "Reset chroot settings",
+                    .desc = "Resets chroot dir, chroot user and related flags",
+                    .param = "keep-pkgrel-and-epoch",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

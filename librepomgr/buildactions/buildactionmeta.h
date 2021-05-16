@@ -66,6 +66,7 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     CleanSrcDir = (1 << 1),
     KeepOrder = (1 << 2),
     KeepPkgRelAndEpoch = (1 << 3),
+    ResetChrootSettings = (1 << 4),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,

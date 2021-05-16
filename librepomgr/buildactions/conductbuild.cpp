@@ -39,20 +39,6 @@ using namespace CppUtilities::EscapeCodes;
 
 namespace LibRepoMgr {
 
-bool PackageBuildProgress::hasBeenAnyProgressMade() const
-{
-    return checksumsUpdated || hasSources || !finished.isNull() || addedToRepo || stagingNeeded != PackageStagingNeeded::Undetermined;
-}
-
-void PackageBuildProgress::reset()
-{
-    checksumsUpdated = false;
-    hasSources = false;
-    finished = DateTime();
-    addedToRepo = false;
-    stagingNeeded = PackageStagingNeeded::Undetermined;
-}
-
 void RebuildInfo::add(const LibPkg::DependencySet &deps, const std::unordered_set<std::string> &libs)
 {
     for (const auto &dep : deps) {

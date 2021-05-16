@@ -505,6 +505,7 @@ private:
     bool m_cleanSourceDirectory = false;
     bool m_keepOrder = false;
     bool m_keepPkgRelAndEpoch = false;
+    bool m_resetChrootSettings = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {
