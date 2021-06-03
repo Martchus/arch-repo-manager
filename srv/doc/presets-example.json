@@ -1,0 +1,193 @@
+{
+    "templates": {
+        "reload-dbs": {
+            "directory": "",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [
+                "core",
+                "extra",
+                "community",
+                "multilib",
+                "staging",
+                "testing",
+                "community-staging",
+                "community-testing",
+                "multilib-staging",
+                "multilib-testing",
+                "kde-unstable",
+                "gnome-unstable",
+                "ownstuff",
+                "ownstuff-testing",
+                "ownstuff-staging",
+                "aur"
+            ],
+            "settings": {},
+            "flags": 0,
+            "type": 4
+        },
+        "reload-libs": {
+            "directory": "",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [
+                "ownstuff",
+                "ownstuff-testing",
+                "ownstuff-staging",
+            ],
+            "settings": {},
+            "flags": 0,
+            "type": 5
+        },
+        "update-chroot": {
+            "directory": "chroot-update",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {
+                "cmd": "…",
+                "shared-locks": "…"
+            },
+            "flags": 0,
+            "type": 13
+        },
+        "update-ownstuff": {
+            "directory": "",
+            "packageNames": [],
+            "sourceDbs": ["aur"],
+            "destinationDbs": ["ownstuff"],
+            "settings": {},
+            "flags": 0,
+            "type": 3
+        },
+        "prepare-ownstuff": {
+            "directory": "misc",
+            "packageNames": [],
+            "sourceDbs": ["ownstuff", "core", "extra", "community", "multilib"],
+            "destinationDbs": ["ownstuff"],
+            "settings": {},
+            "flags": 2,
+            "type": 6
+        },
+        "prepare-ownstuff-testing": {
+            "directory": "misc",
+            "packageNames": [],
+            "sourceDbs": ["ownstuff-testing", "ownstuff", "core", "extra", "community", "multilib", "testing", "community-testing", "multilib-testing"],
+            "destinationDbs": ["ownstuff-testing"],
+            "settings": {},
+            "flags": 2,
+            "type": 6
+        },
+        "prepare-ownstuff-staging": {
+            "directory": "misc",
+            "packageNames": [],
+            "sourceDbs": ["ownstuff-staging", "ownstuff-testing", "ownstuff", "core", "extra", "community", "multilib", "staging", "community-staging", "multilib-staging", "testing", "community-testing", "multilib-testing"],
+            "destinationDbs": ["ownstuff-staging"],
+            "settings": {},
+            "flags": 2,
+            "type": 6
+        },
+        "conduct-build": {
+            "directory": "misc",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {},
+            "flags": 9,
+            "type": 7
+        },
+        "conduct-build-save-chroots-of-failures": {
+            "directory": "misc",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {},
+            "flags": 11,
+            "type": 7
+        },
+        "sync-ownstuff": {
+            "directory": "sync-ownstuff",
+            "packageNames": [],
+            "sourceDbs": [],
+            "destinationDbs": [],
+            "settings": {
+                "cmd": "rsync …"
+            },
+            "flags": 0,
+            "type": 13
+        }
+    },
+    "tasks": {
+        "conduct-build": {
+            "name": "Conduct build",
+            "desc": "Perform build with default settings",
+            "category": "Building",
+            "actions": ["update-chroot", "conduct-build", "sync-ownstuff"]
+        },
+        "conduct-build-save-chroots-of-failures": {
+            "name": "Conduct build saving chroots of failures",
+            "desc": "Perform build with default settings saving chroots of failures",
+            "category": "Building",
+            "actions": ["update-chroot", "conduct-build-save-chroots-of-failures", "sync-ownstuff"]
+        },
+        "prepare-ownstuff": {
+            "name": "Prepare building for ownstuff",
+            "desc": "Prepare building packages for ownstuff (x86_64)",
+            "category": "Building",
+            "actions": ["reload-dbs", "prepare-ownstuff"]
+        },
+        "prepare-ownstuff-testing": {
+            "name": "Prepare building for ownstuff-testing",
+            "desc": "Prepare building packages for ownstuff-testing (x86_64)",
+            "category": "Building",
+            "actions": ["reload-dbs", "prepare-ownstuff-testing"]
+        },
+        "prepare-ownstuff-staging": {
+            "name": "Prepare building for ownstuff-staging",
+            "desc": "Prepare building packages for ownstuff-staging (x86_64)",
+            "category": "Building",
+            "actions": ["reload-dbs", "prepare-ownstuff-staging"]
+        },
+        "build-ownstuff": {
+            "name": "Build for ownstuff",
+            "desc": "Prepare and build packages for ownstuff saving chroots of failures (x86_64)",
+            "category": "Building",
+            "actions": [
+                {
+                    "actions": ["reload-dbs", "update-chroot"],
+                    "concurrent": true
+                },
+                "prepare-ownstuff",
+                "conduct-build-save-chroots-of-failures",
+                "sync-ownstuff"
+            ]
+        },
+        "update-ownstuff": {
+            "name": "Check ownstuff for updates",
+            "desc": "Check ownstuff for updates (x86_64)",
+            "category": "Repo management",
+            "actions": [
+                "reload-dbs",
+                {
+                    "actions": [
+                        "update-ownstuff"
+                    ],
+                    "concurrent": true
+                }
+            ]
+        },
+        "sync-ownstuff": {
+            "name": "Sync ownstuff",
+            "desc": "Syncs f3l mirror of ownstuff{,-testing,-staging}",
+            "category": "Repo management",
+            "actions": ["sync-ownstuff"]
+        },
+        "update-chroot": {
+            "name": "Update chroots",
+            "desc": "Updates the chroots (so far covers only x86_64)",
+            "category": "Repo management",
+            "actions": ["update-chroot"]
+        }
+    }
+}
+

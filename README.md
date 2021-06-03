@@ -4,7 +4,17 @@ This **experimental** project contains **inofficial** tools to manage custom Arc
 repositories. It is built on top of the official tools provided by the `pacman` and
 `devtools` packages.
 
-So far it consists of:
+At this point the project is rather raw and there are many things left to implement and
+to improve (checkout the TODOs section below). Currently builds are exclusively triggered
+manually (although the API brings the possibility for automation), scalability is limited
+through the use of an in-memory database. Builds are only conducted on one host.
+
+On the upside, this project can easily be used to together with other build scripts. It
+doesn't care if your repository's DB file is updated by another application; just be sure
+to reload the DB file (see Workflow section below). This should make an easy migration
+path to use this for maintaining an existing repository.
+
+So far this project consists of:
 
 * libpkg: C++ library to parse Arch Linux packages and databases
     * parse pacman config
@@ -35,7 +45,19 @@ Further ideas (not implemented yet):
 
 ## Setup server
 An example config files can be found in this repository, see the `srv/doc`
-directory.
+directory. The example config is also installed so one can easily get started.
+
+This is an example for using the package
+[`arch-repo-manager-git`](https://github.com/Martchus/PKGBUILDs/blob/master/arch-repo-manager/git/PKGBUILD):
+
+```
+mkdir -p /etc/buildservice-git
+cp /usr/share/buildservice-git/skel/server-config-example.conf /etc/buildservice-git/server.conf
+cp /usr/share/buildservice-git/skel/presets-example.json /etc/buildservice-git/presets.json
+systemctl enable --now buildservice-git.service
+```
+
+Note that the `-git` package is used at this point because there are no releases yet.
 
 ### Setting up a working directory
 The server needs a place to temporarily store PKGBUILDs, cache files and other stuff.
@@ -181,7 +203,6 @@ keyserver hkp://keys.gnupg.net
 ```
 
 #### Notes
-
 * Adding the pacman keyring is actually not very useful because we need to check signatures
   of any upstream project and not just arch devs.
 * If "auto-key-retrieve" does not work, use `gpg --recv-key <KEYID>` as a workaround
@@ -199,10 +220,20 @@ with only slight changes are expected. Currently it is *not* possible to enable/
 per package (e.g. via a regex).
 
 ## Workflow
+So called "build actions" are used to conduct certain tasks, e.g. checking for updates or problems,
+moving packages from one repository to another, preparing the build and conducting the build. The web
+UI contains a form to create a new build action and shows the possible options.
+
+It would be tedious to create the same set of build actions over and over again. Hence it is also
+possible to create "pre defined tasks". Such a task contains a list of build actions with pre-filled
+flags and settings. By default, the build actions within a task run one after another but it is also
+possible to specify that certain build actions can run in parallel. The presets are configured by
+editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the example config).
 
 ### General
-* Use the "Reload database" build action to reload one or more databases after databases have been
-  changes by build actions or manually. So far databases are *not* automatically reloaded.
+* So far databases are *not* automatically reloaded. Use the "Reload database" build action to reload
+  one or more databases after databases have been changes by build actions or manually. This build
+  action is similar to `pacman -Sy`.
 * Use the "Reload configuration" build action to apply configuration changes without restarting the
   service.
 
@@ -286,21 +317,23 @@ per package (e.g. via a regex).
   only `pkgrel` changes or when building from VCS sources or when some sources just remain the same).
 
 ## TODOs and further ideas for improvement
-[ ] Use persistent database (e.g. lmdb or leveldb)
-[ ] More advanced search options
-[ ] Allow running tasks automatically/periodically
-[ ] Refresh build action details automatically while an action is pending
-[ ] Fix permission error when stopping a process
-[ ] Keep the possibility for a "soft stop" where the build action would finish the current item
-[ ] Show statistics like CPU and RAM usage about ongoing build processes
-[ ] Stop a build process which doesn't produce output after a certain time
-[ ] Find out why the web service sometimes gets stuck
+* [ ] Use persistent, non-in-memory database (e.g. lmdb or leveldb) to improve scalability
+* [ ] Allow triggering tasks automatically/periodically
+* [ ] Allow to run `makechrootpkg` on a remote host (e.g. via SSH) to work can be spread across multiple hosts
+* [ ] More advanced search options
+* [ ] Refresh build action details on the web UI automatically while an action is pending
+* [ ] Fix permission error when stopping a process
+* [ ] Keep the possibility for a "soft stop" where the build action would finish the current item
+* [ ] Show statistics like CPU and RAM usage about ongoing build processes
+* [ ] Stop a build process which doesn't produce output after a certain time
+* [ ] Find out why the web service sometimes gets stuck
     * Weirdly, restarting the client (browser) helps in these cases
     * Add "stress" test for live-streaming
         * Start process producing lots of output very fast
         * Let different clients connect and disconnect fast
-[ ] Improve test coverage
-[ ] Include `xterm.js` properly
+* [ ] Improve test coverage
+* [ ] Add fancy graphs for dependencies on the web UI
+* [ ] Include `xterm.js` properly
 
 ## Build instructions and dependencies
 For a PKGBUILD checkout my [PKGBUILDs repository](https://github.com/Martchus/PKGBUILDs).

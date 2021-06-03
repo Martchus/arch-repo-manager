@@ -98,7 +98,7 @@ endif ()
 
 # add installs for config file template
 install(
-    FILES doc/server-config-example.conf doc/nginx-config-example.conf
+    FILES doc/server-config-example.conf doc/presets-example.json doc/nginx-config-example.conf
     DESTINATION "${CMAKE_INSTALL_PREFIX}/${META_DATA_DIR}/skel"
     COMPONENT config)
 
