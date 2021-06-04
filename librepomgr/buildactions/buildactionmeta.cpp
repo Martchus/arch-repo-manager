@@ -144,7 +144,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::ResetChrootSettings),
                     .name = "Reset chroot settings",
                     .desc = "Resets chroot dir, chroot user and related flags",
-                    .param = "keep-pkgrel-and-epoch",
+                    .param = "reset-chroot-cfg",
                 },
             },
             .settings = {
