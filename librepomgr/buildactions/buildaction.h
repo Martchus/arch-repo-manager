@@ -112,6 +112,7 @@ struct LIBREPOMGR_EXPORT RebuildInfo : public ReflectiveRapidJSON::JsonSerializa
     std::vector<LibPkg::Dependency> provides;
     std::vector<std::string> libprovides;
 
+    void replace(const LibPkg::DependencySet &deps, const std::unordered_set<std::string> &libs);
     void add(const LibPkg::DependencySet &deps, const std::unordered_set<std::string> &libs);
 };
 

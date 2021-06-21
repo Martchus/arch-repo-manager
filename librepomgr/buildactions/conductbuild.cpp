@@ -38,6 +38,13 @@ using namespace CppUtilities::EscapeCodes;
 
 namespace LibRepoMgr {
 
+void RebuildInfo::replace(const LibPkg::DependencySet &deps, const std::unordered_set<std::string> &libs)
+{
+    provides.clear();
+    libprovides.clear();
+    add(deps, libs);
+}
+
 void RebuildInfo::add(const LibPkg::DependencySet &deps, const std::unordered_set<std::string> &libs)
 {
     for (const auto &dep : deps) {
@@ -1477,8 +1484,8 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
 
     // populate m_buildProgress.producedProvides and m_buildProgress.removedProvides (which only serve informal purposes)
     std::lock_guard rebuildListLock(m_rebuildListMutex);
-    m_buildProgress.producedProvides[packageName].add(addedProvides, addedLibProvides);
-    m_buildProgress.removedProvides[packageName].add(removedProvides, removedLibProvides);
+    m_buildProgress.producedProvides[packageName].replace(addedProvides, addedLibProvides);
+    m_buildProgress.removedProvides[packageName].replace(removedProvides, removedLibProvides);
 
     // skip any further checks if nothing will be removed anyways
     if (removedProvides.empty() && removedLibProvides.empty()) {
