@@ -238,8 +238,15 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
             boost::process::extend::on_success =
                 [session = shared_from_this()](auto &executor) {
                     if (const auto buildAction = session->m_buildAction.lock()) {
-                        buildAction->appendOutput(
-                            CppUtilities::EscapeCodes::Phrases::InfoMessage, "Launched \"", session->m_displayName, "\", PID: ", executor.pid, '\n');
+                        buildAction->appendOutput(CppUtilities::EscapeCodes::Phrases::InfoMessage, "Launched \"", session->m_displayName, "\", PID: ",
+                            executor
+#ifdef PLATFORM_WINDOWS
+                                .proc_info.dwProcessId
+#else
+                                .pid
+#endif
+                            ,
+                            '\n');
                     }
                 },
             boost::process::on_exit =
