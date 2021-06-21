@@ -15,7 +15,6 @@
 
 #include <boost/asio/read.hpp>
 
-#include <boost/process/search_path.hpp>
 #include <boost/process/start_dir.hpp>
 
 #include <rapidjson/error/en.h>
