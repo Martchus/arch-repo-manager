@@ -18,7 +18,10 @@ project(${META_PROJECT_NAME})
 enable_testing()
 
 # add subdirectories
-add_subdirectory(3rdparty/tabulate)
+option(INCLUDE_TABULATE_PROJECT "includes the CMake project of tabulate" OFF)
+if (INCLUDE_TABULATE_PROJECT)
+    add_subdirectory(3rdparty/tabulate)
+endif ()
 add_subdirectory(libpkg)
 link_directories(${LIBPKG_BINARY_DIR})
 add_subdirectory(librepomgr)
