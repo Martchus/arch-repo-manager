@@ -499,23 +499,26 @@ LIBPKG_EXPORT void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult
 namespace BinaryReflector {
 
 template <>
-LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSearchResult>(BinarySerializer &serializer, const LibPkg::PackageSearchResult &packageSearchResult)
+LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSearchResult>(
+    BinarySerializer &serializer, const LibPkg::PackageSearchResult &packageSearchResult, BinaryVersion version)
 {
     if (const auto *const dbInfo = std::get_if<LibPkg::DatabaseInfo>(&packageSearchResult.db)) {
-        serializer.write(dbInfo->name);
+        serializer.write(dbInfo->name, version);
     } else if (const auto *const db = std::get<LibPkg::Database *>(packageSearchResult.db)) {
-        serializer.write(db->name);
+        serializer.write(db->name, version);
     } else {
-        serializer.write(std::string());
+        serializer.write(std::string(), version);
     }
-    serializer.write(packageSearchResult.pkg);
+    serializer.write(packageSearchResult.pkg, version);
 }
 
 template <>
-LIBPKG_EXPORT void readCustomType<LibPkg::PackageSearchResult>(BinaryDeserializer &deserializer, LibPkg::PackageSearchResult &packageSearchResult)
+LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::PackageSearchResult>(
+    BinaryDeserializer &deserializer, LibPkg::PackageSearchResult &packageSearchResult, BinaryVersion version)
 {
-    deserializer.read(packageSearchResult.db.emplace<LibPkg::DatabaseInfo>().name);
-    deserializer.read(packageSearchResult.pkg);
+    deserializer.read(packageSearchResult.db.emplace<LibPkg::DatabaseInfo>().name, version);
+    deserializer.read(packageSearchResult.pkg, version);
+    return 0;
 }
 
 } // namespace BinaryReflector

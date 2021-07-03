@@ -214,9 +214,11 @@ LIBPKG_EXPORT void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult
 namespace BinaryReflector {
 
 template <>
-LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSearchResult>(BinarySerializer &serializer, const LibPkg::PackageSearchResult &packageSearchResult);
+LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSearchResult>(
+    BinarySerializer &serializer, const LibPkg::PackageSearchResult &packageSearchResult, BinaryVersion version);
 template <>
-LIBPKG_EXPORT void readCustomType<LibPkg::PackageSearchResult>(BinaryDeserializer &deserializer, LibPkg::PackageSearchResult &packageSearchResult);
+LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::PackageSearchResult>(
+    BinaryDeserializer &deserializer, LibPkg::PackageSearchResult &packageSearchResult, BinaryVersion version);
 
 } // namespace BinaryReflector
 
