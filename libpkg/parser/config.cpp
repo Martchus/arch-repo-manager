@@ -112,7 +112,7 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
                         includedFile.open(path, ios_base::in);
                         includedIni.parse(includedFile);
                     } catch (const ios_base::failure &) {
-                        cerr << Phrases::WarningMessage << "An IO error occured when parsing the included file \"" << path << "\"."
+                        cerr << Phrases::WarningMessage << "An IO error occurred when parsing the included file \"" << path << "\"."
                              << Phrases::EndFlush;
                     }
                 }

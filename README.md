@@ -1,6 +1,6 @@
 # Repository manager and build tool for Arch Linux
 
-This **experimental** project contains **inofficial** tools to manage custom Arch Linux
+This **experimental** project contains **unofficial** tools to manage custom Arch Linux
 repositories. It is built on top of the official tools provided by the `pacman` and
 `devtools` packages.
 
@@ -245,7 +245,7 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
           packages are considered as newer by pacman. A warning is logged when bumping is done.
         * Missing dependencies are pulled into the build automatically. Whether dependencies are
           considered "missing" or "given" depends on the specified databases (see next points).
-        * Packages will be splitted into batches. The first batch contains all packages which can be
+        * Packages will be split into batches. The first batch contains all packages which can be
           built immediately. The second batch contains all packages which only depend on packages in
           the first batch. The third batch contains all packages which only depend on packages in the
           second batch and so on. That means packages do not need to be specified in the correct order.
@@ -254,9 +254,9 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
         * Cyclic dependencies can not be added to a batch. A list of cyclic "leftovers" is emitted
           if those exist and that is considered a failure. If this is the case you need to add a
           bootstrap package to break the cycle. The build system is not clever enough to pull a bootstrap
-          package automatically into the build so it must be specified explicitely. E.g. to build
+          package automatically into the build so it must be specified explicitly. E.g. to build
           `mingw-w64-freetype2` and `mingw-w64-harfbuzz` one needs to add `mingw-w64-freetype2-bootstrap`
-          explicitely to the list of packages to be built.
+          explicitly to the list of packages to be built.
     * Specify exactly one destination database. The built packages are added to this database.
     * Specify source databases.
         * All packages contained by the source databases are considered as "given" and not pulled
@@ -303,7 +303,7 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
         1. Clean the `src` directory within "directory" for the package(s) or use "Clean source directory" if
            all packages need fixing.
         2. Restart step 1. Existing sources are reused (except for the removed `src` directories) so it shouldn't
-           take long. The build progress (`hasSources` in particular) of the affected package(s) should be resetted.
+           take long. The build progress (`hasSources` in particular) of the affected package(s) should be reset.
         3. Restart step 2.
     * or: Amend the PKGBUILD within the `src` directory.
         1. Set `hasSources` back to `false` as mentioned under 2. to retrigger building the source directory.

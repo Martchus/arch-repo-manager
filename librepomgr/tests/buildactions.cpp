@@ -96,7 +96,7 @@ void BuildActionsTests::tearDown()
 
 /*!
  * \brief Assigns certain build variables to use fake scripts (instead of invoking e.g. the real makepkg).
- * \remarks The fake scripts are esentially no-ops which merely print the script name and the passed arguments.
+ * \remarks The fake scripts are essentially no-ops which merely print the script name and the passed arguments.
  */
 void BuildActionsTests::loadBasicTestSetup()
 {

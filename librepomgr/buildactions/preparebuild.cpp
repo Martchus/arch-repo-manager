@@ -196,7 +196,7 @@ void PrepareBuild::run()
     // -> The existing version is useful to know when we need to bump pkgrel or even epoch.
     size_t currentIndex = 0;
     for (const auto &packageName : m_buildAction->packageNames) {
-        // pick some package matching the specified packageName which has a source info; prefering packages
+        // pick some package matching the specified packageName which has a source info; preferring packages
         // from the destination db
         auto existingPackages = m_setup.config.findPackages(packageName);
         auto foundSourcePackage = false;
@@ -229,7 +229,7 @@ void PrepareBuild::run()
                 break;
             }
         }
-        // add an empty BuildPackage neverthless assuming packageName specifies the base package as-is
+        // add an empty BuildPackage nevertheless assuming packageName specifies the base package as-is
         if (!foundSourcePackage) {
             packageBuildData.specifiedIndex = currentIndex++;
             m_buildDataByPackage[packageName] = std::move(packageBuildData);
@@ -297,7 +297,7 @@ bool PrepareBuild::isExistingPackageRelevant(
         }
         packageBuildData.existingPackages.emplace_back(package.pkg);
     }
-    // skip if packge is not from any database available within that build
+    // skip if package is not from any database available within that build
     return (m_baseDbs.empty() && dependencyPresentInRequiredDbs) || (m_baseDbs.find(db->name) != m_baseDbs.end());
 }
 
@@ -489,7 +489,7 @@ void PrepareBuild::fetchMissingBuildData()
 
 bool PrepareBuild::pullFurtherDependencies(const std::vector<LibPkg::Dependency> &dependencies)
 {
-    // pull further depencencies; similar to initial dependency lookup in run()
+    // pull further dependencies; similar to initial dependency lookup in run()
     auto dependencyAdded = false;
     const auto *const destinationDb = *m_destinationDbs.begin();
     for (const auto &dependency : dependencies) {
@@ -613,7 +613,7 @@ void BatchItem::determineNeededItems(LibPkg::Config &config, const std::unordere
         auto foundPackage = false;
         const auto existingPackages = config.findPackages(dependency);
         for (const auto &package : existingPackages) {
-            // skip if packge is not from any database available within that build
+            // skip if package is not from any database available within that build
             const auto *const db = std::get<LibPkg::Database *>(package.db);
             if (requiredDbs.find(db->name) == requiredDbs.end()) {
                 continue;
@@ -693,7 +693,7 @@ void BatchItem::addNeededBatchItemsForPackage(LibPkg::Config &config, const std:
         auto foundPackage = false;
         const auto existingPackages = config.findPackages(dep);
         for (const auto &existingPackage : existingPackages) {
-            // skip if packge is not from any database available within that build
+            // skip if package is not from any database available within that build
             const auto *const db = std::get<LibPkg::Database *>(existingPackage.db);
             if (requiredDbs.find(db->name) == requiredDbs.end()) {
                 continue;
@@ -753,7 +753,7 @@ void PrepareBuild::bumpVersions()
                 if (package->decomposeName().isVcsPackage()) {
                     // skip bumping epoch of VCS packages; the pkgver is supposed to be adjusted in pkgver()
                     // note: Not skipping this in the pkgrel handling in the case above because when pkgver() returns a new version, pkgrel is
-                    //       resetted automatically so there's no harm in bumping it and it might actually be needed if there's no no version.
+                    //       reset automatically so there's no harm in bumping it and it might actually be needed if there's no no version.
                     m_warnings.emplace_back("Version of package " % package->name % " is" % package->version
                             % " which is older than existing version " % existingVersionStr
                         + "; NOT bumping the epoch because it is a VCS package; be sure pkgver() actually yields a new version");
@@ -977,7 +977,7 @@ void PrepareBuild::computeBatches()
             }
         }
         if (!cyclicLeftovers.empty()) {
-            m_warnings.emplace_back("Dependency cycles have been detected. Add a boostrap package to the package list to resolve this.");
+            m_warnings.emplace_back("Dependency cycles have been detected. Add a bootstrap package to the package list to resolve this.");
         }
     }
 

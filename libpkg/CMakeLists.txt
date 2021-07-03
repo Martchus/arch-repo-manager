@@ -36,7 +36,7 @@ set(TEST_SRC_FILES tests/cppunit.cpp tests/parser.cpp tests/parser_binary.cpp te
 set(META_PROJECT_NAME libpkg)
 set(META_PROJECT_TYPE library)
 set(META_PROJECT_VARNAME LIBPKG)
-set(META_APP_NAME "Inofficial Arch Linux package library")
+set(META_APP_NAME "Unofficial Arch Linux package library")
 set(META_APP_DESCRIPTION "C++ library to parse Arch Linux packages and databases")
 set(META_VERSION_MAJOR 0)
 set(META_VERSION_MINOR 0)

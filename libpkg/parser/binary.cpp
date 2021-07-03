@@ -694,7 +694,7 @@ std::uint64_t Binary::readElfAddress(BinaryReader &reader)
     case BinaryClass::Class32Bit:
         return isBigEndian ? reader.readUInt32BE() : reader.readUInt32LE();
     default:
-        throw runtime_error("Inavlid binary class");
+        throw runtime_error("Invalid binary class");
     }
 }
 

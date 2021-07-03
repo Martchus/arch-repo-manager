@@ -268,7 +268,7 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
             }
         }
     } catch (const ios_base::failure &) {
-        cerr << Phrases::WarningMessage << "An IO error occured when parsing \"" << configFilePath << "\", using defaults" << Phrases::EndFlush;
+        cerr << Phrases::WarningMessage << "An IO error occurred when parsing \"" << configFilePath << "\", using defaults" << Phrases::EndFlush;
     }
 
     // restore state/cache and discard databases if not done yet
@@ -281,9 +281,9 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
     try {
         config.loadPacmanConfig(pacmanConfigFilePath.data());
     } catch (const ios_base::failure &e) {
-        cerr << Phrases::ErrorMessage << "An IO error occured when loading pacman config: " << e.what() << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "An IO error occurred when loading pacman config: " << e.what() << Phrases::EndFlush;
     } catch (const runtime_error &e) {
-        cerr << Phrases::ErrorMessage << "An error occured when loading pacman config: " << e.what() << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "An error occurred when loading pacman config: " << e.what() << Phrases::EndFlush;
     }
 
     // add databases declared in config
@@ -485,9 +485,9 @@ std::size_t ServiceSetup::restoreState()
             cerr << Phrases::SubMessage << "Restored build actions from cache file 😌" << Phrases::EndFlush;
         }
     } catch (const ConversionException &) {
-        cerr << Phrases::WarningMessage << "A conversion error occured when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
+        cerr << Phrases::WarningMessage << "A conversion error occurred when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
     } catch (const ios_base::failure &) {
-        cerr << Phrases::WarningMessage << "An IO error occured when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
+        cerr << Phrases::WarningMessage << "An IO error occurred when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
     }
 
     // restore build actions from JSON file
@@ -573,7 +573,7 @@ std::size_t ServiceSetup::saveState()
         cacheFile.close();
         cerr << Phrases::SuccessMessage << "Wrote cache file \"" << cacheFilePath << "\", " << dataSizeToString(size) << Phrases::EndFlush;
     } catch (const ios_base::failure &) {
-        cerr << Phrases::WarningMessage << "An IO error occured when dumping the cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
+        cerr << Phrases::WarningMessage << "An IO error occurred when dumping the cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
     }
 
     // write build actions to a JSON file to be able to restore build actions even if the cache file can not be used due to version mismatch
@@ -661,7 +661,7 @@ void ServiceSetup::Locks::clear()
     for (auto i = m_locksByName.begin(), end = m_locksByName.end(); i != end;) {
         if (auto lock2 = i->second.tryLockToWrite(log, std::string(i->first)); lock2.lock()) { // check whether nobody holds the lock anymore
             lock2.lock().unlock(); // ~shared_mutex(): The behavior is undefined if the mutex is owned by any thread [...].
-            m_locksByName.erase(i++); // we can be sure no other thead aquires i->second in the meantime because we're holding m_mutex
+            m_locksByName.erase(i++); // we can be sure no other thead acquires i->second in the meantime because we're holding m_mutex
         } else {
             ++i;
         }

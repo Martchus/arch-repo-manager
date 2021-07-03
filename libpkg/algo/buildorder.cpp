@@ -82,7 +82,7 @@ bool Config::addDepsRecursivelyInTopoOrder(vector<unique_ptr<TopoSortItem>> &all
         return false;
     }
 
-    // add package to the "current chain" (used to comprehend the path in case a cycle occured)
+    // add package to the "current chain" (used to comprehend the path in case a cycle occurred)
     cycleTracking.emplace_back(packageSearchResult);
 
     // add topo sort item for dependency

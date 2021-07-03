@@ -23,7 +23,7 @@
 namespace LibPkg {
 
 /*!
- * \brief The InstallStatus enum specifies whether a package has been installed explicitely or as dependency.
+ * \brief The InstallStatus enum specifies whether a package has been installed explicitly or as dependency.
  */
 enum class InstallStatus { Explicit = 0, AsDependency = 1, Unknown = 20 };
 
@@ -212,7 +212,7 @@ enum class PackageVersionComparison {
 LIBPKG_EXPORT std::ostream &operator<<(std::ostream &o, const PackageVersionComparison &res);
 
 /*!
- * \brief The ComparsionResult enum defines possible results of the package version part comparsion
+ * \brief The ComparsionResult enum defines possible results of the package version part comparison
  *        provided by PackageVersion::compareParts().
  */
 enum class PackageVersionPartComparison {
@@ -230,7 +230,7 @@ struct LIBPKG_EXPORT PackageVersion : public ReflectiveRapidJSON::JsonSerializab
     static std::string trimPackageVersion(const std::string &versionString);
     PackageVersionComparison compare(const PackageVersion &other) const;
     static PackageVersionComparison compare(const std::string &versionString1, const std::string &versionString2);
-    static bool isNewer(PackageVersionComparison comparision);
+    static bool isNewer(PackageVersionComparison comparison);
     std::string toString() const;
 
     std::string epoch;
@@ -248,9 +248,9 @@ inline PackageVersionComparison PackageVersion::compare(const std::string &versi
     return fromString(versionString1).compare(fromString(versionString2));
 }
 
-inline bool PackageVersion::isNewer(PackageVersionComparison comparision)
+inline bool PackageVersion::isNewer(PackageVersionComparison comparison)
 {
-    return comparision == PackageVersionComparison::SoftwareUpgrade || comparision == PackageVersionComparison::PackageUpgradeOnly;
+    return comparison == PackageVersionComparison::SoftwareUpgrade || comparison == PackageVersionComparison::PackageUpgradeOnly;
 }
 
 /*!

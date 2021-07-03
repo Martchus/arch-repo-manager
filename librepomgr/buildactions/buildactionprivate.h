@@ -124,7 +124,7 @@ struct LIBREPOMGR_EXPORT OutputBufferingForSession {
     std::atomic_bool existingOutputSent = false;
 };
 
-/// \brief The BuildProcessSession class spawns a process assoicated with a build action.
+/// \brief The BuildProcessSession class spawns a process associated with a build action.
 /// The process output is make available as a logfile of the build action allowing live-steaming.
 class LIBREPOMGR_EXPORT BuildProcessSession : public std::enable_shared_from_this<BuildProcessSession>, public BaseProcessSession {
 public:

@@ -303,7 +303,7 @@ void ParserTests::testParsingSignatureLevel()
 void ParserTests::testSerializingDatabaseSignatureLevel()
 {
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "defaut signature level", SignatureLevelConfig(SignatureLevel::Default), SignatureLevelConfig::fromString(std::string_view()));
+        "default signature level", SignatureLevelConfig(SignatureLevel::Default), SignatureLevelConfig::fromString(std::string_view()));
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "invalid signature level", SignatureLevelConfig(SignatureLevel::Invalid), SignatureLevelConfig::fromString("foo bar"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE(

@@ -60,7 +60,7 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
         // get permissions
         const mode_t perm = archive_entry_perm(entry);
 
-        // add directories explicitely to get the entire tree though skipping irrelevant files
+        // add directories explicitly to get the entire tree though skipping irrelevant files
         if (entryType == AE_IFDIR) {
             // remove trailing slashes
             const char *dirEnd = filePath;
@@ -160,7 +160,7 @@ void walkThroughArchive(
 {
     // open archive file using libarchive
     if (archivePath.empty()) {
-        throw std::runtime_error("Unable to open archive: no path specificed");
+        throw std::runtime_error("Unable to open archive: no path specified");
     }
     struct archive *ar = archive_read_new();
     archive_read_support_filter_all(ar);

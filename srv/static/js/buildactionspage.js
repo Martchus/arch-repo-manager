@@ -542,7 +542,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                             },
                         },
                     });
-                case 7: { // reporitory problems
+                case 7: { // repository problems
                     const container = document.createElement('div');
                     container.className = 'repo-problems';
                     for (const [database, problems] of Object.entries(value.data)) {
@@ -551,7 +551,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                             columnHeaders: ['Related package', 'Problem description'],
                             columnAccessors: ['pkg', 'desc'],
                             customRenderer: {
-                                note: problems.length + ' problems in reporitory ' + database,
+                                note: problems.length + ' problems in repository ' + database,
                                 desc: function(value) {
                                     switch(value.index) {
                                     case 1:

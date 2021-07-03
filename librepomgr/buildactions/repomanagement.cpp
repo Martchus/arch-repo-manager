@@ -651,7 +651,7 @@ void CleanRepository::run()
                       }();
 #endif
                 throw std::runtime_error(
-                    "multiple/ambigous *.db files present: " + joinStrings<decltype(dbFileNames), std::string>(dbFileNames, ", "));
+                    "multiple/ambiguous *.db files present: " + joinStrings<decltype(dbFileNames), std::string>(dbFileNames, ", "));
             }
             // initialize temporary database object for the repository
             auto &db = otherDbs.emplace_back(std::make_unique<LibPkg::Database>(dbFilePaths.front().stem(), dbFilePaths.front()));

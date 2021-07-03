@@ -333,7 +333,7 @@ void ConductBuild::run()
     }
     setupReadLock.unlock();
 
-    // fill ommitted build progress configuration with defaults from global config
+    // fill omitted build progress configuration with defaults from global config
     if (m_autoStaging && m_buildPreparation.stagingDb.empty()) {
         reportError("Auto-staging is enabled but no staging database has been specified in build-preparation.json.");
         return;

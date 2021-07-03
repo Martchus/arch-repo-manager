@@ -435,11 +435,11 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
 
     // show error when parameters are specified which are only supposed to be specified when starting a single build action
     if (!params.target.value("source-repo").empty()) {
-        handler(makeBadRequest(params.request(), "the source repo can not be explicitely specified when a task is specified"));
+        handler(makeBadRequest(params.request(), "the source repo can not be explicitly specified when a task is specified"));
         return;
     }
     if (!params.target.value("destination-repo").empty()) {
-        handler(makeBadRequest(params.request(), "the destination repo can not be explicitely specified when a task is specified"));
+        handler(makeBadRequest(params.request(), "the destination repo can not be explicitly specified when a task is specified"));
         return;
     }
 

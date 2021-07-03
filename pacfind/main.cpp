@@ -29,7 +29,7 @@ int main(int argc, const char *argv[])
     loadPacmanConfigArg.setCombinable(true);
     ConfigValueArgument pacmanConfigPathArg("pacman-config-path", '\0', "specifies the path of the pacman config file", { "path" });
     loadPacmanConfigArg.setSubArguments({ &pacmanConfigPathArg });
-    ConfigValueArgument fileNameArg("file-name", 'f', "specifies the file name to seach for", { "name" });
+    ConfigValueArgument fileNameArg("file-name", 'f', "specifies the file name to search for", { "name" });
     fileNameArg.setImplicit(true);
     fileNameArg.setRequired(true);
     Argument regexArg("regex", 'r', "use regex to match the file name (--file-name is considered a regex)");

@@ -156,7 +156,7 @@ void ReloadLibraryDependencies::run()
                 PackageToConsider{ .path = std::move(path), .url = std::move(url), .lastModified = lastModified });
             // create a temporary package object to hold the info parsed from the .PKGINFO file
             relevantPkg.info.name = package->name;
-            // -> assing certain fields which are used by addDepsAndProvidesFromOtherPackage() to check whether the packages are matching
+            // -> assign certain fields which are used by addDepsAndProvidesFromOtherPackage() to check whether the packages are matching
             relevantPkg.info.version = package->version;
             relevantPkg.info.packageInfo = std::make_unique<LibPkg::PackageInfo>();
             relevantPkg.info.packageInfo->buildDate = package->packageInfo->buildDate;

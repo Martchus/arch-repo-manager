@@ -149,9 +149,9 @@ void DataTests::testDependencyMatching()
     dep.mode = DependencyMode::Equal;
     CPPUNIT_ASSERT_MESSAGE("equal constraint, direct match", pkg.providesDependency(dep));
     dep.mode = DependencyMode::GreatherEqual;
-    CPPUNIT_ASSERT_MESSAGE("greather equal constraint, no match", pkg.providesDependency(dep));
+    CPPUNIT_ASSERT_MESSAGE("greater equal constraint, no match", pkg.providesDependency(dep));
     dep.mode = DependencyMode::GreatherThan;
-    CPPUNIT_ASSERT_MESSAGE("greather constraint, no match", !pkg.providesDependency(dep));
+    CPPUNIT_ASSERT_MESSAGE("greater constraint, no match", !pkg.providesDependency(dep));
     dep.mode = DependencyMode::LessEqual;
     CPPUNIT_ASSERT_MESSAGE("less equal constraint, match", pkg.providesDependency(dep));
     dep.mode = DependencyMode::LessThan;
@@ -160,33 +160,33 @@ void DataTests::testDependencyMatching()
     pkg.version += '0';
     CPPUNIT_ASSERT_MESSAGE("equal constraint, no match", !pkg.providesDependency(dep));
     dep.mode = DependencyMode::GreatherEqual;
-    CPPUNIT_ASSERT_MESSAGE("greather equal constraint, direct match", pkg.providesDependency(dep));
+    CPPUNIT_ASSERT_MESSAGE("greater equal constraint, direct match", pkg.providesDependency(dep));
     pkg.version = "123.4";
-    CPPUNIT_ASSERT_MESSAGE("greather equal constraint, direct match", pkg.providesDependency(dep));
+    CPPUNIT_ASSERT_MESSAGE("greater equal constraint, direct match", pkg.providesDependency(dep));
     dep.name = "foo";
-    CPPUNIT_ASSERT_MESSAGE("greather equal constraint, indirect match", pkg.providesDependency(dep));
+    CPPUNIT_ASSERT_MESSAGE("greater equal constraint, indirect match", pkg.providesDependency(dep));
 
     Package pkg2;
     pkg2.name = "crypto++";
     pkg2.version = "5.6.5-1";
     const char *depStr = "crypto++=5.6.5-1";
     CPPUNIT_ASSERT_MESSAGE("name with plus signs", pkg2.providesDependency(Dependency::fromString(depStr, 8)));
-    CPPUNIT_ASSERT_MESSAGE("equal constraint with explicitely specified pkgrel", pkg2.providesDependency(Dependency::fromString(depStr, 16)));
+    CPPUNIT_ASSERT_MESSAGE("equal constraint with explicitly specified pkgrel", pkg2.providesDependency(Dependency::fromString(depStr, 16)));
     CPPUNIT_ASSERT_MESSAGE("equal constraint, default pkgrel should match", pkg2.providesDependency(Dependency::fromString(depStr, 14)));
     Package pkg3;
     pkg3.name = "crypto++";
     pkg3.version = "5.6.5-2";
     CPPUNIT_ASSERT_MESSAGE("equal constraint, any pkgrel should match", pkg3.providesDependency(Dependency::fromString(depStr, 14)));
     CPPUNIT_ASSERT_MESSAGE(
-        "equal constraint with explicitely specified pkgrel must not match", !pkg3.providesDependency(Dependency::fromString(depStr, 16)));
+        "equal constraint with explicitly specified pkgrel must not match", !pkg3.providesDependency(Dependency::fromString(depStr, 16)));
 
     depStr = "crypto++>=5.6.5-1";
     CPPUNIT_ASSERT_MESSAGE(
-        "greather equal constraint with explicitely specified pkgrel", pkg2.providesDependency(Dependency::fromString(depStr, 17)));
-    CPPUNIT_ASSERT_MESSAGE("greather equal constraint, default pkgrel should match", pkg2.providesDependency(Dependency::fromString(depStr, 15)));
-    CPPUNIT_ASSERT_MESSAGE("greather equal constrainer, any pkgrel should match", pkg3.providesDependency(Dependency::fromString(depStr, 15)));
+        "greater equal constraint with explicitly specified pkgrel", pkg2.providesDependency(Dependency::fromString(depStr, 17)));
+    CPPUNIT_ASSERT_MESSAGE("greater equal constraint, default pkgrel should match", pkg2.providesDependency(Dependency::fromString(depStr, 15)));
+    CPPUNIT_ASSERT_MESSAGE("greater equal constrainer, any pkgrel should match", pkg3.providesDependency(Dependency::fromString(depStr, 15)));
     CPPUNIT_ASSERT_MESSAGE(
-        "greather equal constraint with explicitely specified pkgrel must match", pkg3.providesDependency(Dependency::fromString(depStr, 17)));
+        "greater equal constraint with explicitly specified pkgrel must match", pkg3.providesDependency(Dependency::fromString(depStr, 17)));
 
     pkg3.name = "sphinxbase";
     pkg3.version = "5prealpha-11.1aBc";
@@ -249,7 +249,7 @@ void DataTests::testComputingFileName()
     pkg.packageInfo->arch = "x86_64";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("file name computed from name, version and arch", "test-1.2-3-x86_64.pkg.tar.zst"s, pkg.computeFileName());
     pkg.packageInfo->fileName = "explicitely-specified-filename";
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("explicitely specified filename returned", "explicitely-specified-filename"s, pkg.computeFileName());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("explicitly specified filename returned", "explicitly-specified-filename"s, pkg.computeFileName());
 }
 
 void DataTests::testDetectingUnresolved()

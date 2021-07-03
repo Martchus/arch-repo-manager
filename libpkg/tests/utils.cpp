@@ -77,7 +77,7 @@ void UtilsTests::testAmendingPkgbuild()
 
     amendPkgbuild(pkgbuildPath, PackageVersion{ .upstream = "5.0.2", .package = "3" },
         PackageAmendment{ .bumpDownstreamVersion = PackageAmendment::VersionBump::Epoch });
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("epoch bumped, pkgrel resetted", readFile(testFilePath("c++utilities/PKGBUILD.newepoch")), readFile(pkgbuildPath));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("epoch bumped, pkgrel reset", readFile(testFilePath("c++utilities/PKGBUILD.newepoch")), readFile(pkgbuildPath));
 
     amendPkgbuild(pkgbuildPath, PackageVersion{ .upstream = "5.0.2", .package = "3" }, PackageAmendment{ .setUpstreamVersion = true });
     CPPUNIT_ASSERT_EQUAL_MESSAGE("upstream version set", readFile(testFilePath("c++utilities/PKGBUILD.newpkgver")), readFile(pkgbuildPath));
