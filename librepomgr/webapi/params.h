@@ -26,10 +26,16 @@ struct ServiceSetup;
 namespace WebAPI {
 
 struct LIBREPOMGR_EXPORT BadRequest : std::runtime_error {
-    BadRequest(const char *message);
+    explicit BadRequest(const char *message);
+    explicit BadRequest(const std::string &message);
 };
 
 inline BadRequest::BadRequest(const char *message)
+    : std::runtime_error(message)
+{
+}
+
+inline BadRequest::BadRequest(const std::string &message)
     : std::runtime_error(message)
 {
 }
