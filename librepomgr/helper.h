@@ -53,7 +53,7 @@ inline void convertValue(const std::multimap<std::string, std::string> &multimap
         if (error) {
             cerr << Phrases::ErrorMessage << "Specified IP address \"" << value << "\" for key \"" << key << "\" is invalid" << Phrases::End
                  << Phrases::SubError << error.message() << Phrases::End;
-            exit(-1);
+            return;
         }
         result = ip;
     }
@@ -70,7 +70,7 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
             result = stringToNumber<unsigned short>(value);
         } catch (const ConversionException &) {
             cerr << Phrases::ErrorMessage << "Specified number \"" << value << "\" for key \"" << key << "\" is invalid." << Phrases::End;
-            exit(-1);
+            return;
         }
     }
 }
@@ -93,7 +93,7 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
         } catch (const regex_error &e) {
             cerr << Phrases::ErrorMessage << "Specified regex \"" << value << "\" for key \"" << key << "\" is invalid: " << Phrases::End;
             cerr << e.what() << '\n';
-            exit(-1);
+            return;
         }
     }
 }
