@@ -273,7 +273,11 @@ void getPackages(const Params &params, ResponseHandler &&handler)
             break;
         case Mode::Regex:
             // assume names are regexes
-            pushPackages(params.setup.config.findPackages(std::regex(name.data(), name.size())));
+            try {
+                pushPackages(params.setup.config.findPackages(std::regex(name.data(), name.size())));
+            } catch (const std::regex_error &e) {
+                throw BadRequest(argsToString("regex is invalid: ", e.what()));
+            }
             break;
         case Mode::Provides:
         case Mode::Depends:

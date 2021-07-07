@@ -112,7 +112,12 @@ int main(int argc, const char *argv[])
     const auto negate = negateArg.isPresent();
     auto regex = std::optional<std::regex>();
     if (regexArg.isPresent()) {
-        regex = std::regex(searchTerm, std::regex::egrep);
+        try {
+            regex = std::regex(searchTerm, std::regex::egrep);
+        } catch (const std::regex_error &e) {
+            cerr << "Specified regex is invalid: " << e.what() << endl;
+            exit(3);
+        }
     }
     for (const Database &db : cfg.databases) {
         for (const auto &pkg : db.packages) {
