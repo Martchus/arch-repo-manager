@@ -248,7 +248,7 @@ void DataTests::testComputingFileName()
     pkg.packageInfo = make_unique<PackageInfo>();
     pkg.packageInfo->arch = "x86_64";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("file name computed from name, version and arch", "test-1.2-3-x86_64.pkg.tar.zst"s, pkg.computeFileName());
-    pkg.packageInfo->fileName = "explicitely-specified-filename";
+    pkg.packageInfo->fileName = "explicitly-specified-filename";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("explicitly specified filename returned", "explicitly-specified-filename"s, pkg.computeFileName());
 }
 
