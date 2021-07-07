@@ -9,6 +9,7 @@
 
 #include <c++utilities/io/ansiescapecodes.h>
 
+#include <regex>
 #include <unordered_set>
 
 using namespace std;
@@ -24,10 +25,27 @@ ReloadLibraryDependencies::ReloadLibraryDependencies(ServiceSetup &setup, const 
 
 void ReloadLibraryDependencies::run()
 {
-    // initialize
+    // read configuration
     const auto flags = static_cast<ReloadLibraryDependenciesFlags>(m_buildAction->flags);
     const auto force = flags & ReloadLibraryDependenciesFlags::ForceReload;
     const auto skipDependencies = flags & ReloadLibraryDependenciesFlags::SkipDependencies;
+    auto &metaInfo = m_setup.building.metaInfo;
+    auto metaInfoLock = metaInfo.lockToRead();
+    const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::ReloadLibraryDependencies);
+    const auto packageExcludeRegexSetting = typeInfo.settings[static_cast<std::size_t>(ReloadLibraryDependenciesSettings::PackageExcludeRegex)].param;
+    metaInfoLock.unlock();
+    const auto &packageExcludeRegexValue = findSetting(packageExcludeRegexSetting);
+    auto packageExcludeRegex = std::regex();
+    if (!packageExcludeRegexValue.empty()) {
+        try {
+            packageExcludeRegex = std::regex(packageExcludeRegexValue);
+        } catch (const std::regex_error &e) {
+            reportError(argsToString("configured package exclude regex is invalid: ", e.what()));
+            return;
+        }
+    }
+
+    // initialize
     m_remainingPackages = 0;
     auto configReadLock = init(BuildActionAccess::ReadConfig, RequiredDatabases::MaybeDestination, RequiredParameters::None);
     if (holds_alternative<monostate>(configReadLock)) {
@@ -87,6 +105,11 @@ void ReloadLibraryDependencies::run()
             // allow aborting the build action
             if (reportAbortedIfAborted()) {
                 return;
+            }
+            // skip if package should be excluded
+            if (!packageExcludeRegexValue.empty() && std::regex_match(package->name, packageExcludeRegex)) {
+                m_messages.notes.emplace_back(db->name % '/' % packageName + ": matches exclude regex");
+                continue;
             }
             // skip if the package info is missing (we need the binary package's file name here)
             const auto &packageInfo = package->packageInfo;

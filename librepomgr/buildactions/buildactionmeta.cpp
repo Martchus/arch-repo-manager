@@ -104,7 +104,13 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .param = "skip-dependencies",
                 },
             },
-            .settings = {},
+            .settings = {
+                BuildActionSettingMetaInfo{
+                    .name = "Package exclude regex",
+                    .desc = "Regular expression to match package names against; matching packages will be excluded.",
+                    .param = "pkg-exclude-regex",
+                },
+            },
             .directory = false,
             .sourceDb = false,
             .destinationDb = true,
