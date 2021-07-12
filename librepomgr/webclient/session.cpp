@@ -41,7 +41,8 @@ void Session::setChunkHandler(ChunkHandler &&handler)
     m_chunkProcessing->handler = std::move(handler);
 }
 
-void Session::run(const char *host, const char *port, http::verb verb, const char *target, std::optional<std::uint64_t> bodyLimit, unsigned int version)
+void Session::run(
+    const char *host, const char *port, http::verb verb, const char *target, std::optional<std::uint64_t> bodyLimit, unsigned int version)
 {
     // set SNI Hostname (many hosts need this to handshake successfully)
     auto *const sslStream = std::get_if<SslStream>(&m_stream);

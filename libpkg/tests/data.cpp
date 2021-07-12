@@ -181,8 +181,7 @@ void DataTests::testDependencyMatching()
         "equal constraint with explicitly specified pkgrel must not match", !pkg3.providesDependency(Dependency::fromString(depStr, 16)));
 
     depStr = "crypto++>=5.6.5-1";
-    CPPUNIT_ASSERT_MESSAGE(
-        "greater equal constraint with explicitly specified pkgrel", pkg2.providesDependency(Dependency::fromString(depStr, 17)));
+    CPPUNIT_ASSERT_MESSAGE("greater equal constraint with explicitly specified pkgrel", pkg2.providesDependency(Dependency::fromString(depStr, 17)));
     CPPUNIT_ASSERT_MESSAGE("greater equal constraint, default pkgrel should match", pkg2.providesDependency(Dependency::fromString(depStr, 15)));
     CPPUNIT_ASSERT_MESSAGE("greater equal constrainer, any pkgrel should match", pkg3.providesDependency(Dependency::fromString(depStr, 15)));
     CPPUNIT_ASSERT_MESSAGE(

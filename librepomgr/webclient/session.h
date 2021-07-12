@@ -62,7 +62,8 @@ public:
     explicit Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, Handler &&handler);
 
     void setChunkHandler(ChunkHandler &&handler);
-    void run(const char *host, const char *port, boost::beast::http::verb verb, const char *target, std::optional<std::uint64_t> bodyLimit = std::nullopt, unsigned int version = 11);
+    void run(const char *host, const char *port, boost::beast::http::verb verb, const char *target,
+        std::optional<std::uint64_t> bodyLimit = std::nullopt, unsigned int version = 11);
 
 private:
     using RawSocket = boost::asio::ip::tcp::socket;
