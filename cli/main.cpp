@@ -608,7 +608,7 @@ int main(int argc, const char *argv[])
     LibRepoMgr::WebClient::runSessionFromUrl(ioContext, sslContext, url,
         std::bind(&handleResponse, std::ref(url), std::placeholders::_1, std::placeholders::_2, rawArg.isPresent() ? printRawData : printer,
             std::ref(returnCode)),
-        std::string(), config.userName, config.password, verb, chunkHandler);
+        std::string(), config.userName, config.password, verb, std::nullopt, chunkHandler);
     ioContext.run();
     return returnCode;
 }

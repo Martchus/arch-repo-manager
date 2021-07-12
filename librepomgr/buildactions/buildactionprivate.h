@@ -434,6 +434,7 @@ private:
     std::vector<DatabaseToConsider> m_relevantPackagesByDatabase;
     std::atomic_size_t m_remainingPackages;
     WebClient::PackageCachingDataForSession m_cachingData;
+    std::uint64_t m_packageDownloadSizeLimit;
 };
 
 struct LIBREPOMGR_EXPORT CheckForProblems : public InternalBuildAction {

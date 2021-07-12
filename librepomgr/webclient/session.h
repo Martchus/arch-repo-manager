@@ -11,6 +11,7 @@
 #include <boost/asio/ssl.hpp>
 
 #include <functional>
+#include <optional>
 #include <stdexcept>
 #include <variant>
 
@@ -61,7 +62,7 @@ public:
     explicit Session(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, Handler &&handler);
 
     void setChunkHandler(ChunkHandler &&handler);
-    void run(const char *host, const char *port, boost::beast::http::verb verb, const char *target, unsigned int version = 11);
+    void run(const char *host, const char *port, boost::beast::http::verb verb, const char *target, std::optional<std::uint64_t> bodyLimit = std::nullopt, unsigned int version = 11);
 
 private:
     using RawSocket = boost::asio::ip::tcp::socket;
@@ -141,7 +142,8 @@ inline Session::Session(boost::asio::io_context &ioContext, boost::asio::ssl::co
 LIBREPOMGR_EXPORT std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asio::io_context &ioContext,
     boost::asio::ssl::context &sslContext, std::string_view url, Session::Handler &&handler, std::string &&destinationPath = std::string(),
     std::string_view userName = std::string_view(), std::string_view password = std::string_view(),
-    boost::beast::http::verb verb = boost::beast::http::verb::get, Session::ChunkHandler &&chunkHandler = Session::ChunkHandler());
+    boost::beast::http::verb verb = boost::beast::http::verb::get, std::optional<std::uint64_t> bodyLimit = std::nullopt,
+    Session::ChunkHandler &&chunkHandler = Session::ChunkHandler());
 
 } // namespace WebClient
 } // namespace LibRepoMgr

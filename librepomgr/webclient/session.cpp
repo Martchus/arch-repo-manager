@@ -41,7 +41,7 @@ void Session::setChunkHandler(ChunkHandler &&handler)
     m_chunkProcessing->handler = std::move(handler);
 }
 
-void Session::run(const char *host, const char *port, http::verb verb, const char *target, unsigned int version)
+void Session::run(const char *host, const char *port, http::verb verb, const char *target, std::optional<std::uint64_t> bodyLimit, unsigned int version)
 {
     // set SNI Hostname (many hosts need this to handshake successfully)
     auto *const sslStream = std::get_if<SslStream>(&m_stream);
@@ -65,7 +65,7 @@ void Session::run(const char *host, const char *port, http::verb verb, const cha
     if (!destinationFilePath.empty()) {
         auto &fileResponse = response.emplace<FileResponse>();
         boost::beast::error_code errorCode;
-        fileResponse.body_limit(100 * 1024 * 1024);
+        fileResponse.body_limit(bodyLimit.value_or(500 * 1024 * 1024));
         fileResponse.get().body().open(destinationFilePath.data(), file_mode::write, errorCode);
         if (errorCode != boost::beast::errc::success) {
             m_handler(*this, HttpClientError("opening output file", errorCode));
@@ -247,7 +247,7 @@ void Session::closed(boost::beast::error_code ec)
 
 std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext,
     std::string_view url, Session::Handler &&handler, std::string &&destinationPath, std::string_view userName, std::string_view password,
-    boost::beast::http::verb verb, Session::ChunkHandler &&chunkHandler)
+    boost::beast::http::verb verb, std::optional<std::uint64_t> bodyLimit, Session::ChunkHandler &&chunkHandler)
 {
     std::string host, port, target;
     auto ssl = false;
@@ -294,7 +294,7 @@ std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asi
     if (chunkHandler) {
         session->setChunkHandler(std::move(chunkHandler));
     }
-    session->run(host.data(), port.data(), verb, target.data());
+    session->run(host.data(), port.data(), verb, target.data(), bodyLimit);
     return std::variant<std::string, std::shared_ptr<Session>>(std::move(session));
 }
 

@@ -100,6 +100,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::vector<std::string> makechrootpkgFlags;
         std::vector<std::string> makepkgFlags;
         std::string packageCacheDir;
+        std::uint64_t packageDownloadSizeLimit = 500 * 1024 * 1024;
         std::string testFilesDir;
         BuildPresets presets;
         bool loadFilesDbs = false;

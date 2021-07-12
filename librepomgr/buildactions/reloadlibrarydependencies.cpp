@@ -55,6 +55,7 @@ void ReloadLibraryDependencies::run()
     // use cache directory from global configuration
     auto buildLock = m_setup.building.lockToRead();
     const auto cacheDir = m_setup.building.packageCacheDir + '/';
+    m_packageDownloadSizeLimit = m_setup.building.packageDownloadSizeLimit;
     buildLock.unlock();
 
     // find relevant databases and packages
@@ -237,7 +238,7 @@ void LibRepoMgr::ReloadLibraryDependencies::downloadPackagesFromMirror()
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Downloading ", packagesWhichNeedCaching, " binary packages from mirror ...\n");
     WebClient::cachePackages(m_buildAction->log(),
         std::make_shared<WebClient::PackageCachingSession>(m_cachingData, m_setup.building.ioContext, m_setup.webServer.sslContext,
-            std::bind(&ReloadLibraryDependencies::loadPackageInfoFromContents, this)));
+            std::bind(&ReloadLibraryDependencies::loadPackageInfoFromContents, this)), m_packageDownloadSizeLimit);
 }
 
 void ReloadLibraryDependencies::loadPackageInfoFromContents()

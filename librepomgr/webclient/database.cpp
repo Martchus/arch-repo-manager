@@ -190,7 +190,7 @@ PackageCachingDataForPackage *PackageCachingSession::getCurrentDataAndSelectNext
     return data;
 }
 
-void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&packageCachingSession, std::size_t maxParallelDownloads)
+void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&packageCachingSession, std::optional<std::uint64_t> bodyLimit, std::size_t maxParallelDownloads)
 {
     for (std::size_t startedDownloads = 0; startedDownloads < maxParallelDownloads; ++startedDownloads) {
         auto *const cachingData = packageCachingSession->getCurrentDataAndSelectNext();
@@ -217,7 +217,7 @@ void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&pac
                 }
                 cachePackages(log, std::move(packageCachingSession), 1);
             },
-            std::string(cachingData->destinationFilePath));
+            std::string(cachingData->destinationFilePath), std::string_view(), std::string_view(), boost::beast::http::verb::get, bodyLimit);
     }
 }
 

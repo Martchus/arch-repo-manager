@@ -6,6 +6,7 @@
 
 #include "./session.h"
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -44,10 +45,10 @@ using PackageCachingDataForDatabase = std::unordered_map<std::string_view, Packa
 using PackageCachingDataForSession = std::unordered_map<std::string_view, PackageCachingDataForDatabase>;
 
 struct PackageCachingSession;
-void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&packageCachingSession, std::size_t maxParallelDownloads = 8);
+void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&packageCachingSession, std::optional<std::uint64_t> bodyLimit = std::nullopt, std::size_t maxParallelDownloads = 8);
 
 struct PackageCachingSession : public MultiSession<void> {
-    friend void cachePackages(LogContext &, std::shared_ptr<PackageCachingSession> &&, std::size_t);
+    friend void cachePackages(LogContext &, std::shared_ptr<PackageCachingSession> &&, std::optional<std::uint64_t>, std::size_t);
     using SharedPointerType = std::shared_ptr<PackageCachingSession>;
 
     explicit PackageCachingSession(
