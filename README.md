@@ -327,7 +327,8 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
 * [ ] Show statistics like CPU and RAM usage about ongoing build processes
 * [ ] Stop a build process which doesn't produce output after a certain time
 * [ ] Find out why the web service sometimes gets stuck
-    * Weirdly, restarting the client (browser) helps in these cases
+    * Restarting the client (browser) helps in most cases, it likely just hits
+      [a limitation to the maximum number of open connections](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#receiving_events_from_the_server)
     * Add "stress" test for live-streaming
         * Start process producing lots of output very fast
         * Let different clients connect and disconnect fast
