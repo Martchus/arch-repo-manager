@@ -351,12 +351,14 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
     locks.clear(); // FIXME: Do this regularly to avoid the locks table growing potentially endlessly?
 
     // log the most important config values
-    cerr << Phrases::InfoMessage << "Working directory: " << workingDirectory << Phrases::EndFlush;
-    cerr << Phrases::InfoMessage << "Package cache directory: " << building.packageCacheDir << Phrases::EndFlush;
-    cerr << Phrases::InfoMessage << "Chroot directory: " << building.chrootDir << Phrases::EndFlush;
-    cerr << Phrases::InfoMessage << "Chroot root user: " << building.chrootRootUser << Phrases::EndFlush;
-    cerr << Phrases::InfoMessage << "Chroot default user: " << building.chrootDefaultUser << Phrases::EndFlush;
-    cerr << Phrases::InfoMessage << "Ccache directory: " << building.ccacheDir << Phrases::EndFlush;
+    cerr << Phrases::InfoMessage << "Working directory: " << workingDirectory << Phrases::End;
+    cerr << Phrases::InfoMessage << "Build configuration:" << Phrases::End;
+    cerr << Phrases::SubMessage << "Package cache directory: " << building.packageCacheDir << Phrases::End;
+    cerr << Phrases::SubMessage << "Package download limit: " << dataSizeToString(building.packageDownloadSizeLimit) << Phrases::End;
+    cerr << Phrases::SubMessage << "Chroot directory: " << building.chrootDir << Phrases::End;
+    cerr << Phrases::SubMessage << "Chroot root user: " << building.chrootRootUser << Phrases::End;
+    cerr << Phrases::SubMessage << "Chroot default user: " << building.chrootDefaultUser << Phrases::End;
+    cerr << Phrases::SubMessage << "Ccache directory: " << building.ccacheDir << Phrases::End;
 }
 
 void ServiceSetup::printDatabases()
