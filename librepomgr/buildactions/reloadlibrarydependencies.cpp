@@ -239,7 +239,7 @@ void LibRepoMgr::ReloadLibraryDependencies::downloadPackagesFromMirror()
     WebClient::cachePackages(m_buildAction->log(),
         std::make_shared<WebClient::PackageCachingSession>(m_cachingData, m_setup.building.ioContext, m_setup.webServer.sslContext,
             std::bind(&ReloadLibraryDependencies::loadPackageInfoFromContents, this)),
-        m_packageDownloadSizeLimit);
+        m_packageDownloadSizeLimit ? std::make_optional(m_packageDownloadSizeLimit) : std::nullopt);
 }
 
 void ReloadLibraryDependencies::loadPackageInfoFromContents()
