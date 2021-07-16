@@ -293,43 +293,6 @@ void BuildProcessSession::conclude()
     buildAction->m_ongoingProcesses.erase(m_logFilePath);
 }
 
-void BufferSearch::operator()(const BuildProcessSession::BufferType &buffer, std::size_t bufferSize)
-{
-    if (m_hasResult || (!m_giveUpTerm.empty() && m_giveUpTermIterator == m_giveUpTerm.end())) {
-        return;
-    }
-    for (auto i = buffer->data(), end = buffer->data() + bufferSize; i != end; ++i) {
-        const auto currentChar = *i;
-        if (m_searchTermIterator == m_searchTerm.end()) {
-            for (const auto &terminationChar : m_terminationChars) {
-                if (currentChar == terminationChar) {
-                    m_hasResult = true;
-                    break;
-                }
-            }
-            if (m_hasResult) {
-                m_callback(std::move(m_result));
-                return;
-            }
-            m_result += currentChar;
-            continue;
-        }
-        if (currentChar == *m_searchTermIterator) {
-            ++m_searchTermIterator;
-        } else {
-            m_searchTermIterator = m_searchTerm.begin();
-        }
-        if (m_giveUpTerm.empty()) {
-            continue;
-        }
-        if (currentChar == *m_giveUpTermIterator) {
-            ++m_giveUpTermIterator;
-        } else {
-            m_giveUpTermIterator = m_giveUpTerm.begin();
-        }
-    }
-}
-
 std::shared_ptr<BuildProcessSession> BuildAction::makeBuildProcess(
     std::string &&displayName, std::string &&logFilePath, ProcessHandler &&handler, AssociatedLocks &&locks)
 {

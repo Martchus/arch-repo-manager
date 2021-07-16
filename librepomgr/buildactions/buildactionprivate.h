@@ -32,6 +32,10 @@ namespace boost::process {
 class child;
 }
 
+namespace CppUtilities {
+class BufferSearch;
+}
+
 namespace LibRepoMgr {
 
 enum class BuildActionAccess {
@@ -267,35 +271,6 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
         return;
     }
     readMoreFromPipe();
-}
-
-/// \brief The BufferSearch struct invokes a callback if an initially given search term occurs in consecutively specified buffers.
-struct LIBREPOMGR_EXPORT BufferSearch {
-    BufferSearch(
-        std::string_view searchTerm, std::string_view terminationChars, std::string_view giveUpTerm, std::function<void(std::string &&)> &&callback);
-    void operator()(const BuildProcessSession::BufferType &buffer, std::size_t bufferSize);
-
-private:
-    const std::string_view m_searchTerm;
-    const std::string_view m_terminationChars;
-    const std::string_view m_giveUpTerm;
-    const std::function<void(std::string &&)> m_callback;
-    std::string_view::const_iterator m_searchTermIterator;
-    std::string_view::const_iterator m_giveUpTermIterator;
-    std::string m_result;
-    bool m_hasResult;
-};
-
-inline BufferSearch::BufferSearch(
-    std::string_view searchTerm, std::string_view terminationChars, std::string_view giveUpTerm, std::function<void(std::string &&)> &&callback)
-    : m_searchTerm(searchTerm)
-    , m_terminationChars(terminationChars)
-    , m_giveUpTerm(giveUpTerm)
-    , m_callback(std::move(callback))
-    , m_searchTermIterator(m_searchTerm.begin())
-    , m_giveUpTermIterator(m_giveUpTerm.begin())
-    , m_hasResult(false)
-{
 }
 
 struct ProcessResult;
@@ -620,7 +595,8 @@ private:
     void checkBuildErrors(BatchProcessingSession::ContainerType &&failedPackages);
     void dumpBuildProgress();
     void addLogFile(std::string &&logFilePath);
-    void assignNewVersion(const std::string &packageName, PackageBuildProgress &packageProgress, std::string &&updatedVersionInfo);
+    void assignNewVersion(
+        const std::string &packageName, PackageBuildProgress &packageProgress, CppUtilities::BufferSearch &, std::string &&updatedVersionInfo);
     void copyPkgbuildToOriginalSourceDirectory(
         const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     PackageStagingNeeded checkWhetherStagingIsNeededAndPopulateRebuildList(

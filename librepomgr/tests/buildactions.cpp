@@ -39,7 +39,6 @@ class BuildActionsTests : public TestFixture {
     CPPUNIT_TEST(testLogging);
     CPPUNIT_TEST(testProcessSession);
     CPPUNIT_TEST(testBuildActionProcess);
-    CPPUNIT_TEST(testBufferSearch);
     CPPUNIT_TEST(testParsingInfoFromPkgFiles);
     CPPUNIT_TEST(testPreparingBuild);
     CPPUNIT_TEST(testConductingBuild);
@@ -53,7 +52,6 @@ public:
     void testLogging();
     void testProcessSession();
     void testBuildActionProcess();
-    void testBufferSearch();
     void testParsingInfoFromPkgFiles();
     void testPreparingBuild();
     void testConductingBuild();
@@ -268,38 +266,6 @@ void BuildActionsTests::testBuildActionProcess()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("trailing line break", ""sv, logLines.back());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("last line", "line 5000"sv, logLines[logLines.size() - 2u]);
     TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*Launched \"test\", PID\\: [0-9]+.*\n.*"s, std::regex::extended, m_buildAction->output);
-}
-
-/*!
- * \brief Tests the BufferSearch class.
- */
-void BuildActionsTests::testBufferSearch()
-{
-    // make a buffer
-    BuildProcessSession::BufferPoolType bufferPool(30);
-    auto buffer = bufferPool.newBuffer();
-
-    // setup testing the search
-    std::string expectedResult;
-    bool hasResult = false;
-    BufferSearch bs("Updated version: ", "\e\n", "Starting build", [&expectedResult, &hasResult](std::string &&result) {
-        CPPUNIT_ASSERT_EQUAL(expectedResult, result);
-        CPPUNIT_ASSERT_MESSAGE("callback only invoked once", !hasResult);
-        hasResult = true;
-    });
-
-    // feed data into the search
-    bs(buffer, 0);
-    std::strcpy(buffer->data(), "Starting Updated");
-    bs(buffer, 16);
-    std::strcpy(buffer->data(), " version: some ");
-    bs(buffer, 15);
-    expectedResult = "some version number";
-    std::strcpy(buffer->data(), "version number\emore chars");
-    bs(buffer, 25);
-    CPPUNIT_ASSERT(hasResult);
-    std::strcpy(buffer->data(), "... Starting build ...");
-    bs(buffer, 22);
 }
 
 /*!

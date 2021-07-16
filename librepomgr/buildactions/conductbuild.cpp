@@ -9,6 +9,7 @@
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
+#include <c++utilities/io/buffersearch.h>
 #include <c++utilities/io/inifile.h>
 #include <c++utilities/io/misc.h>
 #include <c++utilities/io/path.h>
@@ -929,9 +930,10 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
             std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
     processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
-        std::bind(&ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1)));
+        std::bind(
+            &ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2)));
     processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "\n", std::string_view(),
-        [processSession = processSession.get()](std::string &&) { processSession->locks().pop_back(); }));
+        [processSession = processSession.get()](BufferSearch &, std::string &&) { processSession->locks().pop_back(); }));
 
     // lock the chroot directory to prevent other build tasks from using it
     m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
@@ -1406,7 +1408,8 @@ void ConductBuild::addLogFile(std::string &&logFilePath)
     m_buildAction->logfiles.emplace_back(std::move(logFilePath));
 }
 
-void ConductBuild::assignNewVersion(const std::string &packageName, PackageBuildProgress &packageProgress, string &&updatedVersionInfo)
+void ConductBuild::assignNewVersion(
+    const std::string &packageName, PackageBuildProgress &packageProgress, BufferSearch &, std::string &&updatedVersionInfo)
 {
     auto updatedVersionInfoParts = splitString(updatedVersionInfo, " ", EmptyPartsTreat::Omit);
     if (updatedVersionInfoParts.empty()) {
