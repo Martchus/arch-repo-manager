@@ -133,14 +133,13 @@ void ReloadLibraryDependencies::run()
             const auto &arch = packageInfo->arch;
             if (!db->localPkgDir.empty()) {
                 path = db->localPkgDir % '/' + fileName;
-            } else if (std::filesystem::exists(cachePath = cacheDir + fileName, ec)) {
+            } else if (std::filesystem::file_size(cachePath = cacheDir + fileName, ec) && !ec) {
                 path = std::move(cachePath);
-            } else if (std::filesystem::exists(cachePath = cacheDir % arch % '/' + fileName, ec)) {
+            } else if (std::filesystem::file_size(cachePath = cacheDir % arch % '/' + fileName, ec) && !ec) {
                 path = std::move(cachePath);
             } else {
                 for (const auto &possibleCachePath : m_setup.config.packageCacheDirs) {
-                    std::error_code ecFileExists;
-                    if (std::filesystem::exists(path = possibleCachePath % '/' + fileName, ecFileExists)) {
+                    if (std::filesystem::file_size(path = possibleCachePath % '/' + fileName, ec) && !ec) {
                         break;
                     }
                     path.clear();
