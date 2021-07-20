@@ -215,6 +215,22 @@ you start the server with has permissions to read and write there. Otherwise the
 configure errors can be confusing. Internally the server is mounting that directory like
 described in [the wiki](https://wiki.archlinux.org/index.php/Ccache#makechrootpkg).
 
+If you want to use the existing `ccache` directory owned by your current user, you could do
+the following to grant the `buildservice` user access to it:
+
+1. Add new group for accessing the cache and add the users to it:
+   `sudo groupadd ccache`, `sudo usermod -a -G ccache "$USER"`, `sudo usermod -a -G ccache buildservice`
+2. Set group ownership: `sudo chown -R $USER:ccache $ccache_dir`
+3. Ensure dirs are readable by the group and that the group is inherited:
+   `sudo find "$ccache_dir" -type d -exec chmod 2775 {} \+`
+4. Ensure that all files are readable by the group:
+   `sudo find "$ccache_dir" -type f -exec chmod 664 {} \+`
+5. Add `umask = 002` to the ccache config so new files/dirs created by it are fully accessible by
+   the group.
+6. Patch `devtools` so additional groups are configured within the container (see
+   https://github.com/Martchus/devtools/commit/b981c6afe81219ff4ca1ea34d0be5cc681408962)
+
+
 Note that ccache *slows* down the initial compilation. It is only useful to enable it if rebuilds
 with only slight changes are expected. Currently it is *not* possible to enable/disable ccache usage
 per package (e.g. via a regex).
