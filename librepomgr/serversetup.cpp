@@ -660,7 +660,7 @@ void ServiceSetup::run()
 void ServiceSetup::Locks::clear()
 {
     auto log = LogContext();
-    const auto lock = std::lock_guard(m_mutex);
+    const auto lock = std::unique_lock(m_cleanupMutex);
     for (auto i = m_locksByName.begin(), end = m_locksByName.end(); i != end;) {
         if (auto lock2 = i->second.tryLockToWrite(log, std::string(i->first)); lock2.lock()) { // check whether nobody holds the lock anymore
             lock2.lock().unlock(); // ~shared_mutex(): The behavior is undefined if the mutex is owned by any thread [...].

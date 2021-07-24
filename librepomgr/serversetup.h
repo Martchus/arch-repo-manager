@@ -127,15 +127,17 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     struct LIBREPOMGR_EXPORT Locks {
         using LockTable = std::unordered_map<std::string, GlobalLockable>;
 
+        [[nodiscard]] GlobalLockable &namedLock(const std::string &lockName);
         [[nodiscard]] SharedLoggingLock acquireToRead(LogContext &log, std::string &&lockName);
         [[nodiscard]] UniqueLoggingLock acquireToWrite(LogContext &log, std::string &&lockName);
-        [[nodiscard]] std::pair<LockTable *, std::unique_lock<std::mutex>> acquireLockTable();
+        [[nodiscard]] std::pair<LockTable *, std::unique_lock<std::shared_mutex>> acquireLockTable();
         void clear();
         static std::string forDatabase(std::string_view dbName, std::string_view dbArch);
         static std::string forDatabase(const LibPkg::Database &db);
 
     private:
-        std::mutex m_mutex;
+        std::mutex m_accessMutex;
+        std::shared_mutex m_cleanupMutex;
         LockTable m_locksByName;
     } locks;
 
@@ -155,21 +157,27 @@ inline std::shared_ptr<BuildAction> ServiceSetup::BuildSetup::getBuildAction(Bui
     return id < actions.size() ? actions[id] : nullptr;
 }
 
+inline GlobalLockable &ServiceSetup::Locks::namedLock(const std::string &lockName)
+{
+    const auto locktableLock = std::unique_lock(m_accessMutex);
+    return m_locksByName[lockName];
+}
+
 inline SharedLoggingLock ServiceSetup::Locks::acquireToRead(LogContext &log, std::string &&lockName)
 {
-    const auto lock = std::lock_guard(m_mutex);
-    return m_locksByName[lockName].lockToRead(log, std::move(lockName));
+    const auto locktableLock = std::shared_lock(m_cleanupMutex);
+    return namedLock(lockName).lockToRead(log, std::move(lockName));
 }
 
 inline UniqueLoggingLock ServiceSetup::Locks::acquireToWrite(LogContext &log, std::string &&lockName)
 {
-    const auto lock = std::lock_guard(m_mutex);
-    return m_locksByName[lockName].lockToWrite(log, std::move(lockName));
+    const auto locktableLock = std::shared_lock(m_cleanupMutex);
+    return namedLock(lockName).lockToWrite(log, std::move(lockName));
 }
 
-inline std::pair<ServiceSetup::Locks::LockTable *, std::unique_lock<std::mutex>> ServiceSetup::Locks::acquireLockTable()
+inline std::pair<ServiceSetup::Locks::LockTable *, std::unique_lock<std::shared_mutex>> ServiceSetup::Locks::acquireLockTable()
 {
-    return std::make_pair(&m_locksByName, std::unique_lock(m_mutex));
+    return std::make_pair(&m_locksByName, std::unique_lock(m_cleanupMutex));
 }
 
 struct LIBREPOMGR_EXPORT ServiceStatus : public ReflectiveRapidJSON::JsonSerializable<ServiceStatus> {
