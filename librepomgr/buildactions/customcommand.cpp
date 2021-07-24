@@ -77,8 +77,8 @@ void CustomCommand::run()
     // acquire locks
     // note: Using an std::set here (instead of a std::vector) to ensure we don't attempt to acquire the same lock twice and to ensure
     //       locks are always acquired in the same order (to prevent deadlocks).
-    const auto sharedLockNames = splitStringSimple<std::set<std::string>>(findSetting(sharedLocksSetting), ",");
-    const auto exclusiveLockNames = splitStringSimple<std::set<std::string>>(findSetting(exclusiveLocksSetting), ",");
+    const auto sharedLockNames = splitStringSimple<std::set<std::string_view>>(findSetting(sharedLocksSetting), ",");
+    const auto exclusiveLockNames = splitStringSimple<std::set<std::string_view>>(findSetting(exclusiveLocksSetting), ",");
     auto &locks = process->locks();
     auto &log = m_buildAction->log();
     locks.reserve(sharedLockNames.size() + exclusiveLockNames.size());
