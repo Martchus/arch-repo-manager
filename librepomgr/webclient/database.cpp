@@ -201,7 +201,7 @@ void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&pac
         log(Phrases::InfoMessage, "Downloading \"", cachingData->url, "\" to \"", cachingData->destinationFilePath, "\"\n");
         runSessionFromUrl(
             packageCachingSession->ioContext(), packageCachingSession->m_sslContext, cachingData->url,
-            [&log, packageCachingSession, cachingData](Session &session, const WebClient::HttpClientError &error) mutable {
+            [&log, bodyLimit, packageCachingSession, cachingData](Session &session, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode != boost::asio::ssl::error::stream_truncated) {
                     const auto msg = std::make_tuple(
                         "Error downloading \"", cachingData->url, "\" to \"", cachingData->destinationFilePath, "\": ", error.what());
@@ -216,7 +216,7 @@ void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&pac
                     cachingData->error = tupleToString(msg);
                     log(Phrases::ErrorMessage, msg, '\n');
                 }
-                cachePackages(log, std::move(packageCachingSession), 1);
+                cachePackages(log, std::move(packageCachingSession), bodyLimit, 1);
             },
             std::string(cachingData->destinationFilePath), std::string_view(), std::string_view(), boost::beast::http::verb::get, bodyLimit);
     }
