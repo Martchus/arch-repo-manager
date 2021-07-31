@@ -40,6 +40,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     // -> acquire the setup lock for these
     std::string configFilePath = "server.conf";
     std::string pacmanConfigFilePath = "/etc/pacman.conf";
+    std::filesystem::path initialWorkingDirectory;
     std::string workingDirectory = "workingdir";
 
     // variables relevant for the web server; only changed when (re)loading config

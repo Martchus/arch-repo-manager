@@ -237,8 +237,16 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
             }
         }
         // apply working directory
+        // note: As this function can run multiple times (as live-reconfigurations are supported) we
+        //       must restore the initial working directory here so relative paths are always treated
+        //       relative to the initial working directory.
         if (!workingDirectory.empty()) {
             try {
+                if (initialWorkingDirectory.empty()) {
+                    initialWorkingDirectory = std::filesystem::current_path();
+                } else {
+                    std::filesystem::current_path(initialWorkingDirectory);
+                }
                 workingDirectory = std::filesystem::absolute(workingDirectory);
             } catch (const std::filesystem::filesystem_error &e) {
                 cerr << Phrases::WarningMessage << "Unable to determine absolute path of specified working directory: " << e.what()
@@ -247,6 +255,11 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
             if (chdir(workingDirectory.c_str()) != 0) {
                 cerr << Phrases::WarningMessage << "Unable to change the working directory to \"" << workingDirectory
                      << "\": " << std::strerror(errno) << Phrases::EndFlush;
+                try {
+                    workingDirectory = std::filesystem::current_path();
+                } catch (const std::filesystem::filesystem_error &e) {
+                    cerr << Phrases::WarningMessage << "Unable to determine effective working directory: " << e.what() << Phrases::EndFlush;
+                }
             }
         }
         // restore state/cache and discard databases
