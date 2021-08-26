@@ -970,7 +970,6 @@ void ConductBuild::addPackageToRepo(
 {
     // make arrays to store binary package names
     auto binaryPackages = std::vector<BinaryPackageInfo>{};
-    static const auto anyArch = std::vector<std::string>{ "any" };
 
     // determine name of source package to be copied
     auto buildResult = BuildResult{};
@@ -983,8 +982,7 @@ void ConductBuild::addPackageToRepo(
     binaryPackages.reserve(buildData.packages.size());
     buildResult.binaryPackageNames.reserve(buildData.packages.size());
     for (const auto &package : buildData.packages) {
-        const auto isAny = package->sourceInfo->archs
-            == anyArch; // FIXME: Shouldn't there still be a package->archs if e.g. base is x86_64 but a split package any?
+        const auto isAny = package->isArchAny();
         const auto &arch = isAny ? "any" : m_buildPreparation.targetArch;
         const auto &packageFileName = buildResult.binaryPackageNames.emplace_back(
             package->name % '-' % (packageProgress.updatedVersion.empty() ? package->version : packageProgress.updatedVersion) % '-' % arch

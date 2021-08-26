@@ -230,10 +230,15 @@ void addPackageInfo(
     else_if_field("arch")
     {
         if (isPackageInfo) {
+            // add as binary arch when parsing PKGINFO
             ensure_pkg_info;
             package.packageInfo->arch = valueString;
-        } else {
+        } else if (package.sourceInfo.use_count() <= 1) {
+            // add to sourceInfo when still parsing base info
             package.sourceInfo->archs.emplace_back(value, valueSize);
+        } else {
+            // add to package itself when a split package overrides the archs from the base
+            package.archs.emplace_back(value, valueSize);
         }
     }
     else_if_field("license")

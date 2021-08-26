@@ -162,7 +162,7 @@ struct SourceFile : public ReflectiveRapidJSON::JsonSerializable<SourceFile>, pu
 struct LIBPKG_EXPORT SourceInfo : public ReflectiveRapidJSON::JsonSerializable<SourceInfo>,
                                   public ReflectiveRapidJSON::BinarySerializable<SourceInfo> {
     std::string name;
-    std::vector<std::string> archs;
+    std::vector<std::string> archs; // archs specified in base package
     std::vector<Dependency> makeDependencies;
     std::vector<Dependency> checkDependencies;
     std::string maintainer;
@@ -186,7 +186,7 @@ struct LIBPKG_EXPORT PackageInfo : public ReflectiveRapidJSON::JsonSerializable<
     std::string md5;
     std::string sha256;
     std::string pgpSignature;
-    std::string arch;
+    std::string arch; // arch of concrete binary package
     std::uint32_t size = 0;
 };
 
@@ -302,6 +302,7 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     void addDepsAndProvidesFromContents(const FileMap &contents);
     void processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);
+    bool isArchAny() const;
 
     static bool isPkgInfoFileOrBinary(const char *filePath, const char *fileName, mode_t mode);
     static bool isLicense(const char *filePath, const char *fileName, mode_t mode);
@@ -319,6 +320,7 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     CppUtilities::DateTime timestamp;
     std::string name;
     std::string version;
+    std::vector<std::string> archs; // set if a split package overrides the base archs; if empty, archs from sourceInfo apply
     std::string description;
     std::string upstreamUrl;
     std::vector<std::string> licenses;

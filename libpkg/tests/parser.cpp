@@ -32,6 +32,7 @@ class ParserTests : public TestFixture {
     CPPUNIT_TEST(testParsingConfig);
     CPPUNIT_TEST(testParsingPlainSrcInfo);
     CPPUNIT_TEST(testParsingSplitPackageSrcInfo);
+    CPPUNIT_TEST(testParsingSplitPackageSrcInfoWithDifferentArchs);
     CPPUNIT_TEST(testParsingPkgInfo);
     CPPUNIT_TEST(testParsingPkgName);
     CPPUNIT_TEST(testExtractingPkgFile);
@@ -51,6 +52,7 @@ public:
     void testParsingConfig();
     void testParsingPlainSrcInfo();
     void testParsingSplitPackageSrcInfo();
+    void testParsingSplitPackageSrcInfoWithDifferentArchs();
     void testParsingPkgInfo();
     void testParsingPkgName();
     void testExtractingPkgFile();
@@ -226,6 +228,25 @@ void ParserTests::testParsingSplitPackageSrcInfo()
     const vector<string> archs = { "any"s };
     CPPUNIT_ASSERT_EQUAL_MESSAGE("arch (1)"s, archs, pkg1.sourceInfo->archs);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("arch (2)"s, archs, pkg2.sourceInfo->archs);
+}
+
+void ParserTests::testParsingSplitPackageSrcInfoWithDifferentArchs()
+{
+    const auto srcInfo = readFile(testFilePath("jdk/SRCINFO"s));
+    const auto packages = Package::fromInfo(srcInfo, false);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("3 (split) packages present"s, 3ul, packages.size());
+
+    const auto &jre = packages[0], &jdk = packages[1], &doc = packages[2];
+    CPPUNIT_ASSERT_MESSAGE("source info present", jdk->sourceInfo);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jre has same source info as base", jdk->sourceInfo, jre->sourceInfo);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk-doc has same source info as base", jdk->sourceInfo, doc->sourceInfo);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jre name", "jre"s, jre->name);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk name", "jdk"s, jdk->name);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk-doc name", "jdk-doc"s, doc->name);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("base archs", std::vector{ "x86_64"s }, jre->sourceInfo->archs);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jre archs (empty, base applies)", std::vector<std::string>{}, jre->archs);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk archs (empty, base applies)", std::vector<std::string>{}, jdk->archs);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk-doc archs (overidden)", std::vector{ "any"s }, doc->archs);
 }
 
 void ParserTests::testParsingPkgInfo()

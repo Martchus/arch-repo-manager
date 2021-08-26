@@ -439,7 +439,9 @@ LIBPKG_EXPORT void push<LibPkg::PackageSearchResult>(
         push(pkgInfo->arch, "arch", obj, allocator);
         push(pkgInfo->buildDate, "buildDate", obj, allocator);
     }
-    if (const auto &srcInfo = pkg->sourceInfo) {
+    if (!pkg->archs.empty()) {
+        push(pkg->archs, "archs", obj, allocator);
+    } else if (const auto &srcInfo = pkg->sourceInfo) {
         push(srcInfo->archs, "archs", obj, allocator);
     }
     if (const auto *const dbInfo = std::get_if<LibPkg::DatabaseInfo>(&reflectable.db)) {
@@ -484,11 +486,7 @@ LIBPKG_EXPORT void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult
     }
     ReflectiveRapidJSON::JsonReflector::pull(pkgInfo->arch, "arch", obj, errors);
     ReflectiveRapidJSON::JsonReflector::pull(pkgInfo->buildDate, "buildDate", obj, errors);
-    auto &srcInfo = pkg->sourceInfo;
-    if (!srcInfo) {
-        srcInfo = make_shared<LibPkg::SourceInfo>();
-    }
-    ReflectiveRapidJSON::JsonReflector::pull(srcInfo->archs, "archs", obj, errors);
+    ReflectiveRapidJSON::JsonReflector::pull(pkg->archs, "archs", obj, errors);
     auto &dbInfo = reflectable.db.emplace<LibPkg::DatabaseInfo>();
     ReflectiveRapidJSON::JsonReflector::pull(dbInfo.name, "db", obj, errors);
     ReflectiveRapidJSON::JsonReflector::pull(dbInfo.arch, "dbArch", obj, errors);

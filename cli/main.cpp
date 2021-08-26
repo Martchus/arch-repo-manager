@@ -133,6 +133,8 @@ static void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type
         t.format().hide_border();
         if (pkg->packageInfo) {
             t.add_row({ "Arch", pkg->packageInfo->arch });
+        } else if (!pkg->archs.empty()) {
+            t.add_row({ "Archs", formatList(pkg->archs) });
         } else if (pkg->sourceInfo) {
             t.add_row({ "Archs", formatList(pkg->sourceInfo->archs) });
         }

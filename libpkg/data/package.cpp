@@ -404,6 +404,20 @@ bool Package::addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bo
     return true;
 }
 
+bool Package::isArchAny() const
+{
+    const auto &a = archs.empty() && sourceInfo ? sourceInfo->archs : archs;
+    if (a.empty()) {
+        return false;
+    }
+    for (const auto &arch : a) {
+        if (arch != "any") {
+            return false;
+        }
+    }
+    return true;
+}
+
 DependencySetBase::iterator DependencySet::find(const Dependency &dependency)
 {
     for (auto range = equal_range(dependency.name); range.first != range.second; ++range.first) {
