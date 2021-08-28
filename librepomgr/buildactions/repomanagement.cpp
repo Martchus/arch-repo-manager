@@ -712,7 +712,7 @@ void CleanRepository::run()
                 if (fileName.ends_with(".sig")) {
                     if (!std::filesystem::exists(std::filesystem::symlink_status(
                             dirInfo.canonicalPath / std::string_view(fileName.data(), fileName.data() + fileName.size() - 4)))) {
-                        dirInfo.toDelete.emplace_back(fileName);
+                        dirInfo.toDelete.emplace_back(repoItem);
                     }
                     continue;
                 }
@@ -781,7 +781,7 @@ void CleanRepository::run()
                 if (!m_dryRun) {
                     const auto signatureFile = std::filesystem::path(argsToString(toDelete, ".sig"));
                     std::filesystem::remove(toDelete);
-                    if (std::filesystem::exists(signatureFile)) {
+                    if (std::filesystem::exists(std::filesystem::symlink_status(signatureFile))) {
                         std::filesystem::remove(signatureFile);
                     }
                 }
@@ -807,7 +807,7 @@ void CleanRepository::run()
                     const auto destPath = archiveDir / path.filename();
                     const auto signatureFile = std::filesystem::path(argsToString(path, ".sig"));
                     std::filesystem::rename(path, destPath);
-                    if (std::filesystem::exists(signatureFile)) {
+                    if (std::filesystem::exists(std::filesystem::symlink_status(signatureFile))) {
                         std::filesystem::rename(signatureFile, argsToString(destPath, ".sig"));
                     }
                 }
