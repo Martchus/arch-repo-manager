@@ -1,5 +1,6 @@
-﻿#include "./parser_helper.h"
+#include "./parser_helper.h"
 
+#include "../json.h"
 #include "../logging.h"
 #include "../serversetup.h"
 
@@ -42,6 +43,7 @@ class BuildActionsTests : public TestFixture {
     CPPUNIT_TEST(testParsingInfoFromPkgFiles);
     CPPUNIT_TEST(testPreparingBuild);
     CPPUNIT_TEST(testConductingBuild);
+    CPPUNIT_TEST(testCleanup);
     CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -55,6 +57,7 @@ public:
     void testParsingInfoFromPkgFiles();
     void testPreparingBuild();
     void testConductingBuild();
+    void testCleanup();
 
 private:
     void loadBasicTestSetup();
@@ -575,4 +578,147 @@ void BuildActionsTests::testConductingBuild()
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
     CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+}
+
+static void copyRepo(const std::filesystem::path &origRepoDir, const std::filesystem::path &destRepoDir)
+{
+    const auto origFiles = std::filesystem::directory_iterator(origRepoDir);
+    std::filesystem::create_directories(destRepoDir);
+    for (const auto &origFile : origFiles) {
+        // preserve "../any/…" symlinks, otherwise create hard links to avoid copies (we won't modify any files here, just possibly delete
+        // them again)
+        if (origFile.is_symlink()) {
+            const auto target = std::filesystem::read_symlink(origFile);
+            if (const auto parentPath = target.parent_path(); parentPath.empty() || parentPath == "../any") {
+                std::filesystem::copy(origFile.path(), destRepoDir / origFile.path().filename(), std::filesystem::copy_options::copy_symlinks);
+            } else {
+                std::filesystem::copy(std::filesystem::absolute(origRepoDir / target), destRepoDir / origFile.path().filename(),
+                    std::filesystem::copy_options::create_hard_links);
+            }
+        } else {
+            std::filesystem::copy(origFile.path(), destRepoDir / origFile.path().filename(), std::filesystem::copy_options::create_hard_links);
+        }
+    }
+}
+
+static std::set<std::string> listFiles(const std::filesystem::path &dir)
+{
+    auto res = std::set<std::string>();
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(dir)) {
+        if (!entry.is_directory()) {
+            res.emplace(entry.path().lexically_relative(dir).string());
+        }
+    }
+    return res;
+}
+
+void BuildActionsTests::testCleanup()
+{
+    // create a working copy of the test repo "misc" which this test is going to run the cleanup on
+    const auto workingDir = std::filesystem::absolute(TestApplication::instance()->workingDirectory()) / "cleanup-test";
+    std::filesystem::remove_all(workingDir);
+    m_setup.workingDirectory = workingDir;
+    m_setup.configFilePath = std::filesystem::absolute(testFilePath("test-config/server.conf"));
+    const auto origRepoDir = std::filesystem::absolute(testDirPath("test-config/repos/misc/os"));
+    const auto repoDir = workingDir / "misc/os";
+    const auto repoDirAny = repoDir / "any", repoDirSrc = repoDir / "src";
+    const auto repoDir32 = repoDir / "i686", repoDir64 = repoDir / "x86_64";
+    copyRepo(origRepoDir / "any", repoDirAny);
+    copyRepo(origRepoDir / "src", repoDirSrc);
+    copyRepo(origRepoDir / "i686", repoDir32);
+    copyRepo(origRepoDir / "x86_64", repoDir64);
+
+    // parse db
+    // note: The db actually only contains source-highlight and mingw-w64-harfbuzz
+    auto &miscDb = m_setup.config.databases.emplace_back("misc", repoDir64 / "misc.db");
+    miscDb.localDbDir = miscDb.localPkgDir = repoDir64;
+    miscDb.loadPackages();
+
+    // create and run build action
+    m_buildAction = std::make_shared<BuildAction>(0, &m_setup);
+    m_buildAction->type = BuildActionType::CleanRepository;
+    m_buildAction->flags = static_cast<BuildActionFlagType>(CleanRepositoryFlags::DryRun);
+    m_buildAction->destinationDbs = { "misc" };
+    runBuildAction("repo cleanup, dry run");
+
+    // check generated messages
+    auto &messages = std::get<BuildActionMessages>(m_buildAction->resultData);
+    std::sort(messages.notes.begin(), messages.notes.end());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no warnings", std::vector<std::string>(), messages.warnings);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no errors", std::vector<std::string>(), messages.errors);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("notes present", 6_st, messages.notes.size());
+    TESTUTILS_ASSERT_LIKE("archived (in any)", "Archived .*misc/os/any/mingw-w64-crt-6\\.0\\.0-1-any\\.pkg\\.tar\\.xz \\(current version: removed\\)",
+        messages.notes[0]);
+    TESTUTILS_ASSERT_LIKE("archived (in x86_64)",
+        "Archived .*misc/os/x86_64/mingw-w64-crt-6\\.0\\.0-1-any\\.pkg\\.tar\\.xz \\(current version: removed\\)", messages.notes[1]);
+    TESTUTILS_ASSERT_LIKE("archived (only in x86_64, file in any preserved)",
+        "Archived .*misc/os/x86_64/perl-linux-desktopfiles-0\\.22-2-any\\.pkg\\.tar\\.xz \\(current version: removed\\)", messages.notes[2]);
+    TESTUTILS_ASSERT_LIKE("archived (only in x86_64, no file in any)",
+        "Archived .*misc/os/x86_64/syncthingtray-0\\.6\\.2-1-x86_64\\.pkg\\.tar\\.xz \\(current version: removed\\)", messages.notes[3]);
+    TESTUTILS_ASSERT_LIKE("deleted chunk file", "Deleted .*misc/os/x86_64/chunk-file", messages.notes[4]);
+    TESTUTILS_ASSERT_LIKE(
+        "deleted orphaned signature", "Deleted .*x86_64/mingw-w64-harfbuzz-1\\.4\\.1-1-any\\.pkg\\.tar\\.xz\\.sig", messages.notes[5]);
+
+    // check whether dry-run preserved all files
+    const auto presentFiles = listFiles(repoDir);
+    const auto expectedFiles = std::set<std::string>({
+        "any/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz",
+        "any/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz.sig",
+        "any/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz",
+        "any/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz.sig",
+        "any/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz",
+        "any/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz.sig",
+        "i686/misc.db",
+        "i686/misc.db.tar.zst",
+        "i686/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz",
+        "i686/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz.sig",
+        "src/mingw-w64-crt-6.0.0-1.src.tar.xz",
+        "x86_64/chunk-file",
+        "x86_64/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz",
+        "x86_64/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz.sig",
+        "x86_64/mingw-w64-harfbuzz-1.4.1-1-any.pkg.tar.xz.sig",
+        "x86_64/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz",
+        "x86_64/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz.sig",
+        "x86_64/misc.db",
+        "x86_64/misc.db.tar.zst",
+        "x86_64/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz",
+        "x86_64/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz.sig",
+        "x86_64/source-highlight-3.1.9-2-x86_64.pkg.tar.zst",
+        "x86_64/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz",
+        "x86_64/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz.sig",
+    });
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no files deleted after dry run", expectedFiles, presentFiles);
+
+    // perform real cleanup
+    m_buildAction->flags = BuildActionFlagType(); // no dry-run
+    resetBuildAction();
+    runBuildAction("repo cleanup, normal run");
+
+    // check whether files have been preserved/archived/deleted as expected
+    const auto presentFiles2 = listFiles(repoDir);
+    const auto expectedFiles2 = std::set<std::string>({
+        "any/archive/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz",
+        "any/archive/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz.sig",
+        "any/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz",
+        "any/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz.sig",
+        "any/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz",
+        "any/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz.sig",
+        "i686/misc.db",
+        "i686/misc.db.tar.zst",
+        "i686/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz",
+        "i686/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz.sig",
+        "src/mingw-w64-crt-6.0.0-1.src.tar.xz", // skipped for now
+        "x86_64/archive/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz",
+        "x86_64/archive/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz.sig",
+        "x86_64/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz",
+        "x86_64/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz.sig",
+        "x86_64/misc.db",
+        "x86_64/misc.db.tar.zst",
+        "x86_64/archive/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz",
+        "x86_64/archive/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz.sig",
+        "x86_64/source-highlight-3.1.9-2-x86_64.pkg.tar.zst",
+        "x86_64/archive/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz",
+        "x86_64/archive/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz.sig",
+    });
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("files preserved/archived/deleted", expectedFiles2, presentFiles2);
 }

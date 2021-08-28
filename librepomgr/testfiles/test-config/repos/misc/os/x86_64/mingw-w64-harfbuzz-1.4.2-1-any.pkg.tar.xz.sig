@@ -1,0 +1,1 @@
+../any/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz.sig

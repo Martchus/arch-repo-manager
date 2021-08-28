@@ -1,0 +1,1 @@
+../any/mingw-w64-crt-6.0.0-1-any.pkg.tar.xz.sig

@@ -69,15 +69,20 @@ void writeJsonDocument(const RAPIDJSON_NAMESPACE::Document &document, std::strin
     if (!fileHandle) {
         throw std::runtime_error("unable to open \"" % outputPath % "\": " + strerror(errno));
     }
-    char writeBuffer[65536];
-    RAPIDJSON_NAMESPACE::FileWriteStream fileStream(fileHandle, writeBuffer, sizeof(writeBuffer));
-    RAPIDJSON_NAMESPACE::PrettyWriter<RAPIDJSON_NAMESPACE::FileWriteStream> writer(fileStream);
-    document.Accept(writer);
-    std::fflush(fileHandle);
-    if (std::ferror(fileHandle)) {
-        throw std::runtime_error("unable to write to \"" % outputPath % "\": " + strerror(errno));
+    try {
+        char writeBuffer[65536];
+        RAPIDJSON_NAMESPACE::FileWriteStream fileStream(fileHandle, writeBuffer, sizeof(writeBuffer));
+        RAPIDJSON_NAMESPACE::PrettyWriter<RAPIDJSON_NAMESPACE::FileWriteStream> writer(fileStream);
+        document.Accept(writer);
+        std::fflush(fileHandle);
+        if (std::ferror(fileHandle)) {
+            throw std::runtime_error("unable to write to \"" % outputPath % "\": " + strerror(errno));
+        }
+        std::fclose(fileHandle);
+    } catch (...) {
+        std::fclose(fileHandle);
+        throw;
     }
-    std::fclose(fileHandle);
 }
 
 std::filesystem::path handleOldJsonFile(const std::filesystem::path &jsonFilePath)
