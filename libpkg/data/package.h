@@ -300,7 +300,7 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     void addDepsAndProvidesFromContainedDirectory(const std::string &directoryPath);
     void addDepsAndProvidesFromContainedFile(const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
     void addDepsAndProvidesFromContents(const FileMap &contents);
-    void processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
+    std::vector<std::string> processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);
     bool isArchAny() const;
 

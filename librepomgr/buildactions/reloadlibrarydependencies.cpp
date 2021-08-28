@@ -249,11 +249,11 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
     }
 
     // load info from package contents utilizing hardware concurrency
-    std::mutex nextPackageMutex, submitErrorMutex;
+    std::mutex nextPackageMutex, submitErrorMutex, submitWarningMutex;
     auto dbIterator = m_relevantPackagesByDatabase.begin(), dbEnd = m_relevantPackagesByDatabase.end();
     auto pkgIterator = dbIterator->packages.begin(), pkgEnd = dbIterator->packages.end();
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Parsing ", m_remainingPackages.load(), " binary packages ...\n");
-    const auto processPackage = [this, &dbIterator, &dbEnd, &pkgIterator, &pkgEnd, &nextPackageMutex, &submitErrorMutex] {
+    const auto processPackage = [this, &dbIterator, &dbEnd, &pkgIterator, &pkgEnd, &nextPackageMutex, &submitErrorMutex, &submitWarningMutex] {
         for (; !m_buildAction->isAborted();) {
             // get the next package
             std::unique_lock<std::mutex> nextPackagelock(nextPackageMutex);
@@ -307,7 +307,12 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
                         }
                         currentPkg.info.addDepsAndProvidesFromContainedDirectory(directoryPath);
                     });
-                currentPkg.info.processDllsReferencedByImportLibs(std::move(dllsReferencedByImportLibs));
+                if (auto dllIssues = currentPkg.info.processDllsReferencedByImportLibs(std::move(dllsReferencedByImportLibs)); !dllIssues.empty()) {
+                    std::unique_lock<std::mutex> submitWarningLock(submitWarningMutex);
+                    for (auto &issue : dllIssues) {
+                        m_messages.warnings.emplace_back(std::move(issue));
+                    }
+                }
                 currentPkg.info.origin = LibPkg::PackageOrigin::PackageContents;
             } catch (const std::runtime_error &e) {
                 std::unique_lock<std::mutex> submitErrorLock(submitErrorMutex);

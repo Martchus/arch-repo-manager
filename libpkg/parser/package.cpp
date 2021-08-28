@@ -785,23 +785,29 @@ void Package::addDepsAndProvidesFromContainedFile(const ArchiveFile &file, std::
     }
 }
 
-void Package::processDllsReferencedByImportLibs(std::set<string> &&dllsReferencedByImportLibs)
+std::vector<std::string> Package::processDllsReferencedByImportLibs(std::set<string> &&dllsReferencedByImportLibs)
 {
     // check whether all DLLs referenced by import libraries are actually part of the package
+    auto issues = std::vector<std::string>();
     if (dllsReferencedByImportLibs.empty()) {
-        return;
+        return issues;
     } else if (name == "mingw-w64-crt") {
         // assume the CRT references DLLs provided by Windows itself
         libprovides = move(dllsReferencedByImportLibs);
     }
     for (const auto &referencedDLL : dllsReferencedByImportLibs) {
-        // TODO: report these errors in a better way
         if (libprovides.find(referencedDLL) == libprovides.end()) {
-            cerr << Phrases::SubMessage << "DLL " << referencedDLL << " is missing in " << name << Phrases::End;
+            issues.emplace_back("DLL " % referencedDLL % " is missing in " + name);
         }
     }
+    return issues;
 }
 
+/*!
+ * \brief Adds dependencies and provides from the specified \a contents.
+ * \deprecated This function is not actually used anymore because ReloadLibraryDependencies does this in a better way
+ *             using LibPkg::walkThroughArchive().
+ */
 void Package::addDepsAndProvidesFromContents(const FileMap &contents)
 {
     std::set<std::string> dllsReferencedByImportLibs;
