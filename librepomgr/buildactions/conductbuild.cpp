@@ -1504,6 +1504,10 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
     m_buildAction->log()(Phrases::SubMessage,
         "checking the following databases for affected packages: ", joinStrings(names<std::vector<std::string>>(relevantDbs), ", "), '\n');
     auto listOfAffectedPackages = std::vector<std::string>();
+    const auto isPackageWeWantToUpdateItself = [&builtPackages](const LibPkg::Package &affectedPackage) {
+        return std::find_if(builtPackages.begin(), builtPackages.end(), [affectedPackage](const auto &p) { return p.name == affectedPackage.name; })
+            != builtPackages.end();
+    };
     for (const auto &db : relevantDbs) {
         const auto isDestinationDb = db->name == m_buildPreparation.targetDb && db->arch == m_buildPreparation.targetArch;
         const auto &requiredDeps = db->requiredDeps;
@@ -1520,7 +1524,7 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
                 }
                 const auto &affectedPackages = affectedDependencies.first->second.relevantPackages;
                 for (const auto &affectedPackage : affectedPackages) {
-                    if (isDestinationDb && affectedPackage->name == packageName) {
+                    if (isDestinationDb && isPackageWeWantToUpdateItself(*affectedPackage)) {
                         continue; // skip if that's just the package we want to update itself
                     }
                     needsStaging = true;
@@ -1537,7 +1541,7 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
                     continue;
                 }
                 for (const auto &affectedPackage : affectedPackages) {
-                    if (isDestinationDb && affectedPackage->name == packageName) {
+                    if (isDestinationDb && isPackageWeWantToUpdateItself(*affectedPackage)) {
                         continue; // skip if that's just the package we want to update itself
                     }
                     if (!rebuildInfoForDb) {
