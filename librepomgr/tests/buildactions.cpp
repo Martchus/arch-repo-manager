@@ -580,6 +580,19 @@ void BuildActionsTests::testConductingBuild()
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
 }
 
+static void hardlinkOrCopy(
+    const std::filesystem::path &from, const std::filesystem::path &to, std::filesystem::copy_options options = std::filesystem::copy_options::none)
+{
+    try {
+        std::filesystem::copy(from, to, options | std::filesystem::copy_options::create_hard_links);
+    } catch (const std::filesystem::filesystem_error &e) {
+        if (e.code() != std::errc::cross_device_link) {
+            throw;
+        }
+        std::filesystem::copy(from, to, options);
+    }
+}
+
 static void copyRepo(const std::filesystem::path &origRepoDir, const std::filesystem::path &destRepoDir)
 {
     const auto origFiles = std::filesystem::directory_iterator(origRepoDir);
@@ -592,11 +605,10 @@ static void copyRepo(const std::filesystem::path &origRepoDir, const std::filesy
             if (const auto parentPath = target.parent_path(); parentPath.empty() || parentPath == "../any") {
                 std::filesystem::copy(origFile.path(), destRepoDir / origFile.path().filename(), std::filesystem::copy_options::copy_symlinks);
             } else {
-                std::filesystem::copy(std::filesystem::absolute(origRepoDir / target), destRepoDir / origFile.path().filename(),
-                    std::filesystem::copy_options::create_hard_links);
+                hardlinkOrCopy(std::filesystem::absolute(origRepoDir / target), destRepoDir / origFile.path().filename());
             }
         } else {
-            std::filesystem::copy(origFile.path(), destRepoDir / origFile.path().filename(), std::filesystem::copy_options::create_hard_links);
+            hardlinkOrCopy(origFile.path(), destRepoDir / origFile.path().filename());
         }
     }
 }
