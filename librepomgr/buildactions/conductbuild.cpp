@@ -1091,17 +1091,17 @@ void ConductBuild::addPackageToRepo(
         auto anyRepoPath = std::filesystem::path();
         const auto sourceRepoPath = std::filesystem::path(argsToString(buildResult.repoPath, "/../src/"));
         std::filesystem::create_directories(sourceRepoPath);
-        std::filesystem::copy(sourcePackagePath, sourceRepoPath / sourcePackageName, std::filesystem::copy_options::update_existing);
+        std::filesystem::copy(sourcePackagePath, sourceRepoPath / sourcePackageName, std::filesystem::copy_options::overwrite_existing);
         for (const auto &binaryPackage : binaryPackages) {
             if (!binaryPackage.isAny) {
                 std::filesystem::copy(
-                    binaryPackage.path, *buildResult.repoPath % '/' + binaryPackage.fileName, std::filesystem::copy_options::update_existing);
+                    binaryPackage.path, *buildResult.repoPath % '/' + binaryPackage.fileName, std::filesystem::copy_options::overwrite_existing);
                 continue;
             }
             if (anyRepoPath.empty()) {
                 std::filesystem::create_directories(anyRepoPath = argsToString(buildResult.repoPath, "/../any"));
             }
-            std::filesystem::copy(binaryPackage.path, anyRepoPath / binaryPackage.fileName, std::filesystem::copy_options::update_existing);
+            std::filesystem::copy(binaryPackage.path, anyRepoPath / binaryPackage.fileName, std::filesystem::copy_options::overwrite_existing);
             const auto symlink = std::filesystem::path(*buildResult.repoPath % '/' + binaryPackage.fileName);
             if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
                 std::filesystem::remove(symlink);
@@ -1178,11 +1178,11 @@ void ConductBuild::invokeGpg(
                             "\" could not be created: ", buildDirSignaturePath, " does not exist after invoking gpg\n");
                     } else if (!isAny) {
                         std::filesystem::copy(buildDirSignaturePath, *signingSession->repoPath % '/' % binaryPackageName + ".sig",
-                            std::filesystem::copy_options::update_existing);
+                            std::filesystem::copy_options::overwrite_existing);
                         return;
                     } else {
                         std::filesystem::copy(buildDirSignaturePath, argsToString(signingSession->repoPath, "/../any/", binaryPackageName, ".sig"),
-                            std::filesystem::copy_options::update_existing);
+                            std::filesystem::copy_options::overwrite_existing);
                         const auto symlink = std::filesystem::path(argsToString(signingSession->repoPath, '/', binaryPackageName, ".sig"));
                         if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
                             std::filesystem::remove(symlink);
