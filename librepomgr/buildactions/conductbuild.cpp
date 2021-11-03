@@ -1182,9 +1182,7 @@ void ConductBuild::invokeGpg(
                         std::filesystem::copy(buildDirSignaturePath, argsToString(signingSession->repoPath, "/../any/", binaryPackageName, ".sig"),
                             std::filesystem::copy_options::overwrite_existing);
                         const auto symlink = std::filesystem::path(argsToString(signingSession->repoPath, '/', binaryPackageName, ".sig"));
-                        if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
-                            std::filesystem::remove(symlink);
-                        }
+                        std::filesystem::remove(symlink);
                         std::filesystem::create_symlink("../any/" % binaryPackageName + ".sig", symlink);
                         return;
                     }
