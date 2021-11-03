@@ -1103,9 +1103,7 @@ void ConductBuild::addPackageToRepo(
             }
             std::filesystem::copy(binaryPackage.path, anyRepoPath / binaryPackage.fileName, std::filesystem::copy_options::overwrite_existing);
             const auto symlink = std::filesystem::path(*buildResult.repoPath % '/' + binaryPackage.fileName);
-            if (std::filesystem::exists(symlink) && !std::filesystem::is_symlink(symlink)) {
-                std::filesystem::remove(symlink);
-            }
+            std::filesystem::remove(symlink);
             std::filesystem::create_symlink("../any/" + binaryPackage.fileName, symlink);
         }
     } catch (const std::filesystem::filesystem_error &e) {
