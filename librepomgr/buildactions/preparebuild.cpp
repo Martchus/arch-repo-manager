@@ -436,12 +436,16 @@ void PrepareBuild::fetchMissingBuildData()
         }
         for (const auto &pkgbuildsDir : m_pkgbuildsDirs) {
             const auto variant = packageNameData.variant();
-            auto pkgbuildPath = pkgbuildsDir % '/' % packageNameData.actualName % '/' % variant;
             try {
-                if (!filesystem::exists(pkgbuildPath + "/PKGBUILD")) {
+                if (const auto pkgbuildPath = pkgbuildsDir % '/' % packageName;
+                    std::filesystem::exists(pkgbuildsDir % '/' % packageName + "/PKGBUILD")) {
+                    buildData.originalSourceDirectory = tupleToString(pkgbuildPath);
+                } else if (const auto pkgbuildPath = pkgbuildsDir % '/' % packageNameData.actualName % '/' % variant;
+                           filesystem::exists(pkgbuildPath + "/PKGBUILD")) {
+                    buildData.originalSourceDirectory = tupleToString(pkgbuildPath);
+                } else {
                     continue;
                 }
-                buildData.originalSourceDirectory = tupleToString(pkgbuildPath);
                 filesystem::create_directories(buildData.sourceDirectory);
                 filesystem::copy(buildData.originalSourceDirectory, buildData.sourceDirectory, std::filesystem::copy_options::recursive);
 
