@@ -562,6 +562,7 @@ private:
         bool needsStaging = false;
     };
 
+    [[nodiscard]] std::string locateGlobalConfigPath(const std::string &chrootDir, std::string_view trailingPath) const;
     void makeMakepkgConfigFile(const std::filesystem::path &makepkgConfigPath);
     void makePacmanConfigFile(
         const std::filesystem::path &pacmanConfigPath, const std::vector<std::pair<std::string, std::multimap<std::string, std::string>>> &dbConfig);

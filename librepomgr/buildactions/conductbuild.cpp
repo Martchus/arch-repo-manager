@@ -186,6 +186,18 @@ ConductBuild::ConductBuild(ServiceSetup &setup, const std::shared_ptr<BuildActio
 {
 }
 
+[[nodiscard]] std::string ConductBuild::locateGlobalConfigPath(const std::string &chrootDir, std::string_view trailingPath) const
+{
+    const auto start = (chrootDir.empty() ? m_setup.building.chrootDir : chrootDir) % "/config-";
+    const auto path = std::filesystem::path(start % m_buildPreparation.targetDb % '-' % m_buildPreparation.targetArch + trailingPath);
+    if (std::filesystem::exists(path)) {
+        // return repository-specific path if it exists
+        return path.string();
+    }
+    // fallback to generic (but still arch-specific) location
+    return start % m_buildPreparation.targetArch + trailingPath;
+}
+
 void ConductBuild::run()
 {
     // validate and read parameter/settings
@@ -313,10 +325,8 @@ void ConductBuild::run()
         reportError("The chroot directory is not configured.");
         return;
     }
-    m_globalPacmanConfigPath
-        = (chrootDir.empty() ? m_setup.building.chrootDir : chrootDir) % "/config-" % m_buildPreparation.targetArch + "/pacman.conf";
-    m_globalMakepkgConfigFilePath
-        = (chrootDir.empty() ? m_setup.building.chrootDir : chrootDir) % "/config-" % m_buildPreparation.targetArch + "/makepkg.conf";
+    m_globalPacmanConfigPath = locateGlobalConfigPath(chrootDir, "/pacman.conf");
+    m_globalMakepkgConfigFilePath = locateGlobalConfigPath(chrootDir, "/makepkg.conf");
     if (m_globalCcacheDir.empty()) {
         m_globalCcacheDir = m_setup.building.ccacheDir;
     }
