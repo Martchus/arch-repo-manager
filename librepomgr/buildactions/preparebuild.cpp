@@ -443,6 +443,8 @@ void PrepareBuild::fetchMissingBuildData()
                 } else if (const auto pkgbuildPath = pkgbuildsDir % '/' % packageNameData.actualName % '/' % variant;
                            filesystem::exists(pkgbuildPath + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(pkgbuildPath);
+                } else if (const auto pkgbuildPath = pkgbuildsDir % '/' % packageName % "/trunk"; filesystem::exists(pkgbuildPath + "/PKGBUILD")) {
+                    buildData.originalSourceDirectory = tupleToString(pkgbuildPath);
                 } else {
                     continue;
                 }
