@@ -348,9 +348,9 @@ void PrepareBuild::processSrcInfo(WebClient::AurSnapshotQuerySession &multiSessi
 void PrepareBuild::addResultFromSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &packageName, const std::string &srcInfo)
 {
     auto snapshotResult = WebClient::AurSnapshotResult{ .packageName = packageName, .packages = LibPkg::Package::fromInfo(srcInfo, false) };
-    if (snapshotResult.packages.empty() || snapshotResult.packages.front()->name.empty()) {
+    if (snapshotResult.packages.empty() || snapshotResult.packages.front().pkg->name.empty()) {
         snapshotResult.error = "Unable to parse .SRCINFO: no package name present";
-    } else if (!(snapshotResult.sourceInfo = snapshotResult.packages.front()->sourceInfo)) {
+    } else if (!(snapshotResult.sourceInfo = snapshotResult.packages.front().pkg->sourceInfo)) {
         snapshotResult.error = "Unable to parse .SRCINFO: no source info present";
     }
     multiSession.addResponse(std::move(snapshotResult));
@@ -507,7 +507,7 @@ bool PrepareBuild::pullFurtherDependencies(const std::vector<LibPkg::Dependency>
             continue;
         }
         for (const auto &[packageName, buildData] : m_buildDataByPackage) {
-            for (const auto &package : buildData.packages) {
+            for (const auto &[packageID, package] : buildData.packages) {
                 if (package->providesDependency(dependency)) {
                     dependencyExists = true;
                     break;
@@ -744,7 +744,7 @@ void PrepareBuild::bumpVersions()
         auto existingVersion = existingVersionStr.empty() ? LibPkg::PackageVersion{} : LibPkg::PackageVersion::fromString(existingVersionStr);
         LibPkg::PackageAmendment amendment;
         LibPkg::PackageVersion newVersion;
-        for (const auto &package : buildData.packages) {
+        for (const auto &[packageID, package] : buildData.packages) {
             newVersion = LibPkg::PackageVersion::fromString(package->version);
             if (existingVersionStr.empty()) {
                 existingVersion = newVersion;
@@ -787,7 +787,7 @@ void PrepareBuild::bumpVersions()
                 newVersion.package = std::move(amendedVersions.newPkgRel);
             }
             const auto newVersionStr = newVersion.toString();
-            for (const auto &package : buildData.packages) {
+            for (const auto &[packageID, package] : buildData.packages) {
                 package->version = newVersionStr;
             }
             m_warnings.emplace_back("New version of " % packageName % " (and its split packages) is " + newVersionStr);
@@ -847,7 +847,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         }
         furtherDependenciesNeeded = pullFurtherDependencies(buildData.sourceInfo->makeDependencies) || furtherDependenciesNeeded;
         furtherDependenciesNeeded = pullFurtherDependencies(buildData.sourceInfo->checkDependencies) || furtherDependenciesNeeded;
-        for (const auto &package : buildData.packages) {
+        for (const auto &[packageID, package] : buildData.packages) {
             furtherDependenciesNeeded = pullFurtherDependencies(package->dependencies) || furtherDependenciesNeeded;
         }
     }
@@ -909,7 +909,7 @@ std::unordered_map<std::string, BatchItem> PrepareBuild::prepareBatches()
         auto [i, newItem] = batchItems.try_emplace(packageName, BatchItem{ .name = &packageName, .buildData = &buildData });
         auto &batchItem = i->second;
         const auto &sourceInfo = buildData.sourceInfo;
-        for (const auto &package : buildData.packages) {
+        for (const auto &[packageID, package] : buildData.packages) {
             for (const auto &deps : { sourceInfo->makeDependencies, sourceInfo->checkDependencies, package->dependencies }) {
                 for (const auto &dep : deps) {
                     batchItem.requiredDependencies.add(dep, package);

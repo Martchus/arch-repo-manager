@@ -271,7 +271,7 @@ void ConductBuild::run()
     m_pacmanStagingConfigPath = m_workingDirectory + "/pacman-staging.conf";
 
     // parse build preparation
-    ReflectiveRapidJSON::JsonDeserializationErrors errors;
+    auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
     try {
         m_buildPreparationFilePath = restoreJsonObject(
             m_buildPreparation, m_workingDirectory, buildPreparationFileName, RestoreJsonExistingFileHandling::RequireExistingFile);
@@ -293,9 +293,7 @@ void ConductBuild::run()
         reportError("The destination database and target architecture specified in build-preparation.json must not be empty.");
         return;
     }
-    for (const auto &buildDataForPackage : m_buildPreparation.buildData) {
-        const auto &packageName = buildDataForPackage.first;
-        const auto &buildData = buildDataForPackage.second;
+    for (const auto &[packageName, buildData] : m_buildPreparation.buildData) {
         if (packageName.empty()) {
             reportError("The build data contains an empty package name.");
             return;
@@ -308,7 +306,7 @@ void ConductBuild::run()
             reportError(argsToString("The build data for \"" % packageName % "\" has no packages."));
             return;
         }
-        for (const auto &package : buildData.packages) {
+        for (const auto &[packageID, package] : buildData.packages) {
             if (!package) {
                 reportError(argsToString("The package of build data for \"" % packageName % "\" is null."));
                 return;
@@ -742,7 +740,7 @@ bool ConductBuild::checkForFailedDependency(
         if (buildProgress != m_buildProgress.progressByPackage.end() && buildProgress->second.addedToRepo) {
             continue;
         }
-        for (const auto &package : buildData.packages) {
+        for (const auto &[packageID, package] : buildData.packages) {
             for (const auto &deps : dependencies) {
                 for (const auto &dependency : *deps) {
                     if (package->providesDependency(dependency)) {
@@ -862,11 +860,11 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     // previous batch have been built and that the order batch compution is correct)
     if ((m_buildAsFarAsPossible || m_buildPreparation.manuallyOrdered) && hasFailuresInPreviousBatches) {
         const auto &buildData = m_buildPreparation.buildData[packageName];
-        std::vector<const std::vector<LibPkg::Dependency> *> dependencies;
+        auto dependencies = std::vector<const std::vector<LibPkg::Dependency> *>();
         dependencies.reserve(buildData.packages.size() + 2);
         dependencies.emplace_back(&buildData.sourceInfo->makeDependencies);
         dependencies.emplace_back(&buildData.sourceInfo->checkDependencies);
-        for (const auto &package : buildData.packages) {
+        for (const auto &[packageID, package] : buildData.packages) {
             dependencies.emplace_back(&package->dependencies);
         }
         if (checkForFailedDependency(packageName, dependencies)) {
@@ -985,13 +983,13 @@ void ConductBuild::addPackageToRepo(
     auto buildResult = BuildResult{};
     auto readLock = lockToRead();
     const auto &buildData = m_buildPreparation.buildData[packageName];
-    const auto &firstPackage = buildData.packages.front();
+    const auto &firstPackage = buildData.packages.front().pkg;
     auto sourcePackageName = packageName % '-' % firstPackage->version + m_sourcePackageExtension;
 
     // determine names of binary packages to be copied
     binaryPackages.reserve(buildData.packages.size());
     buildResult.binaryPackageNames.reserve(buildData.packages.size());
-    for (const auto &package : buildData.packages) {
+    for (const auto &[packageID, package] : buildData.packages) {
         const auto isAny = package->isArchAny();
         const auto &arch = isAny ? "any" : m_buildPreparation.targetArch;
         const auto &packageFileName = buildResult.binaryPackageNames.emplace_back(
@@ -1467,13 +1465,14 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
         if (!db) {
             throw std::runtime_error("Configured database \"" % dbName + "\" has been removed.");
         }
-        const auto &packages = db->packages;
         for (const auto &builtPackage : builtPackages) {
-            if (const auto i = packages.find(builtPackage.name); i != packages.end()) {
-                LibPkg::Package::exportProvides(i->second, removedProvides, removedLibProvides);
-                if (affectedDbName.empty()) {
-                    affectedDbName = dbName;
-                }
+            auto existingPackage = db->findPackage(builtPackage.name);
+            if (!existingPackage) {
+                continue;
+            }
+            LibPkg::Package::exportProvides(existingPackage, removedProvides, removedLibProvides);
+            if (affectedDbName.empty()) {
+                affectedDbName = dbName;
             }
         }
     }
@@ -1516,48 +1515,38 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
     };
     for (const auto &db : relevantDbs) {
         const auto isDestinationDb = db->name == m_buildPreparation.targetDb && db->arch == m_buildPreparation.targetArch;
-        const auto &requiredDeps = db->requiredDeps;
         RebuildInfoByPackage *rebuildInfoForDb = nullptr;
-        for (const auto &[removedDependencyName, removedDependencyDetail] : removedProvides) {
-            for (auto affectedDependencies = requiredDeps.equal_range(removedDependencyName);
-                 affectedDependencies.first != affectedDependencies.second; ++affectedDependencies.first) {
-                if (!LibPkg::Dependency::matches(
-                        removedDependencyDetail.mode, removedDependencyDetail.version, affectedDependencies.first->second.version)) {
-                    continue;
-                }
-                if (!rebuildInfoForDb) {
-                    rebuildInfoForDb = &m_buildProgress.rebuildList[db->name];
-                }
-                const auto &affectedPackages = affectedDependencies.first->second.relevantPackages;
-                for (const auto &affectedPackage : affectedPackages) {
-                    if (isDestinationDb && isPackageWeWantToUpdateItself(*affectedPackage)) {
-                        continue; // skip if that's just the package we want to update itself
-                    }
-                    needsStaging = true;
-                    (*rebuildInfoForDb)[affectedPackage->name].provides.emplace_back(
-                        removedDependencyName, removedDependencyDetail.version, removedDependencyDetail.mode);
-                    listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage->name);
-                }
-            }
-        }
-        for (const auto &removedLibProvide : removedLibProvides) {
-            if (const auto affectedLibRequires = db->requiredLibs.find(removedLibProvide); affectedLibRequires != db->requiredLibs.end()) {
-                const auto &affectedPackages = affectedLibRequires->second;
-                if (affectedPackages.empty()) {
-                    continue;
-                }
-                for (const auto &affectedPackage : affectedPackages) {
-                    if (isDestinationDb && isPackageWeWantToUpdateItself(*affectedPackage)) {
-                        continue; // skip if that's just the package we want to update itself
+        for (const auto &removedDependency : removedProvides) {
+            const auto &removedDependencyName = removedDependency.first;
+            const auto &removedDependencyDetail = removedDependency.second;
+            db->providingPackages(LibPkg::Dependency(removedDependencyName, removedDependencyDetail.version, removedDependencyDetail.mode), true,
+                [&](LibPkg::StorageID, LibPkg::Package &&affectedPackage) {
+                    if (isDestinationDb && isPackageWeWantToUpdateItself(affectedPackage)) {
+                        return false; // skip if that's just the package we want to update itself
                     }
                     if (!rebuildInfoForDb) {
                         rebuildInfoForDb = &m_buildProgress.rebuildList[db->name];
                     }
                     needsStaging = true;
-                    (*rebuildInfoForDb)[affectedPackage->name].libprovides.emplace_back(removedLibProvide);
-                    listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage->name);
+                    (*rebuildInfoForDb)[affectedPackage.name].provides.emplace_back(
+                        removedDependencyName, removedDependencyDetail.version, removedDependencyDetail.mode);
+                    listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage.name);
+                    return false;
+                });
+        }
+        for (const auto &removedLibProvide : removedLibProvides) {
+            db->providingPackages(removedLibProvide, true, [&](LibPkg::StorageID, LibPkg::Package &&affectedPackage) {
+                if (isDestinationDb && isPackageWeWantToUpdateItself(affectedPackage)) {
+                    return false; // skip if that's just the package we want to update itself
                 }
-            }
+                if (!rebuildInfoForDb) {
+                    rebuildInfoForDb = &m_buildProgress.rebuildList[db->name];
+                }
+                needsStaging = true;
+                (*rebuildInfoForDb)[affectedPackage.name].libprovides.emplace_back(removedLibProvide);
+                listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage.name);
+                return false;
+            });
         }
     }
 

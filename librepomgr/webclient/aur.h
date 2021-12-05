@@ -20,7 +20,7 @@ struct AurSnapshotResult {
     std::string packageName;
     std::string errorOutput;
     std::shared_ptr<LibPkg::SourceInfo> sourceInfo;
-    std::vector<std::shared_ptr<LibPkg::Package>> packages;
+    std::vector<LibPkg::PackageSpec> packages;
     std::string error;
 };
 struct AurSnapshotQueryParams {
@@ -28,7 +28,7 @@ struct AurSnapshotQueryParams {
     const std::string *targetDirectory;
 };
 
-using AurQuerySession = MultiSession<std::shared_ptr<LibPkg::Package>>;
+using AurQuerySession = MultiSession<LibPkg::PackageSpec>;
 using AurSnapshotQuerySession = MultiSession<AurSnapshotResult>;
 
 void searchAurPackages(LogContext &log, ServiceSetup &setup, const std::string &searchTerms, boost::asio::io_context &ioContext,

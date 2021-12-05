@@ -484,7 +484,7 @@ DependencySetBase::iterator DependencySet::add(const Dependency &dependency, con
 {
     auto iterator = findExact(dependency);
     if (iterator == end()) {
-        iterator = insert(make_pair(dependency.name, DependencyDetail(dependency.version, dependency.mode, { relevantPackage })));
+        iterator = insert(std::make_pair(dependency.name, DependencyDetail(dependency.version, dependency.mode, { relevantPackage })));
     } else {
         iterator->second.relevantPackages.emplace(relevantPackage);
     }
@@ -497,7 +497,7 @@ DependencySetBase::iterator DependencySet::add(
 {
     auto iterator = findExact(dependencyName, dependencyDetail);
     if (iterator == end()) {
-        iterator = insert(make_pair(dependencyName, DependencyDetail{ dependencyDetail.version, dependencyDetail.mode, { relevantPackage } }));
+        iterator = insert(std::make_pair(dependencyName, DependencyDetail{ dependencyDetail.version, dependencyDetail.mode, { relevantPackage } }));
     } else {
         iterator->second.relevantPackages.emplace(relevantPackage);
     }
@@ -536,3 +536,27 @@ void DependencySet::remove(const string &name)
 }
 
 } // namespace LibPkg
+
+namespace ReflectiveRapidJSON {
+
+namespace JsonReflector {
+
+template <>
+LIBPKG_EXPORT void push<LibPkg::PackageSpec>(
+    const LibPkg::PackageSpec &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+{
+    // just serialize the package (and ignore the ID)
+    push(reflectable.pkg, value, allocator);
+}
+
+template <>
+LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,
+    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors)
+{
+    // just deserialize the package (and ignore the ID)
+    pull(reflectable.pkg, value, errors);
+}
+
+} // namespace JsonReflector
+
+} // namespace ReflectiveRapidJSON

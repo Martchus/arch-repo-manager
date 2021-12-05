@@ -1,5 +1,5 @@
 #include "./config.h"
-#include "./global.h"
+#include "./storageprivate.h"
 
 #include <reflective_rapidjson/json/reflector.h>
 
@@ -35,13 +35,31 @@ static const std::string &firstNonLocalMirror(const std::vector<std::string> &mi
 
 DatabaseStatistics::DatabaseStatistics(const Database &db)
     : name(db.name)
-    , packageCount(db.packages.size())
+    , packageCount(db.packageCount())
     , arch(db.arch)
     , lastUpdate(db.lastUpdate)
     , localPkgDir(db.localPkgDir)
     , mainMirror(firstNonLocalMirror(db.mirrors))
     , syncFromMirror(db.syncFromMirror)
 {
+}
+
+Config::Config()
+{
+}
+
+Config::~Config()
+{
+}
+
+void Config::initStorage(const char *path, std::uint32_t maxDbs)
+{
+    assert(m_storage == nullptr); // only allow initializing storage once
+    m_storage = std::make_unique<StorageDistribution>(path, maxDbs ? maxDbs : databases.size() * 10 + 15);
+    for (auto &db : databases) {
+        db.initStorage(*m_storage);
+    }
+    aur.initStorage(*m_storage);
 }
 
 static std::string addDatabaseDependencies(
@@ -123,18 +141,28 @@ std::vector<Database *> Config::computeDatabasesRequiringDatabase(Database &data
 }
 
 void Config::pullDependentPackages(const std::vector<Dependency> &dependencies, const std::shared_ptr<Package> &relevantPackage,
-    const std::unordered_set<LibPkg::Database *> &relevantDbs, std::unordered_set<Package *> &runtimeDependencies, DependencySet &missingDependencies)
+    const std::unordered_set<LibPkg::Database *> &relevantDbs,
+    std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
+    std::unordered_set<StorageID> &visited)
 {
+    auto found = false;
     for (const auto &dependency : dependencies) {
-        const auto results = findPackages(dependency);
-        auto found = false;
-        for (const auto &result : results) {
-            if (relevantDbs.find(std::get<Database *>(result.db)) != relevantDbs.end()) {
-                found = true;
-                if (runtimeDependencies.emplace(result.pkg.get()).second) {
-                    pullDependentPackages(result.pkg, relevantDbs, runtimeDependencies, missingDependencies);
-                }
+        for (auto &db : databases) {
+            if (relevantDbs.find(&db) == relevantDbs.end()) {
+                continue;
             }
+            db.providingPackages(dependency, false, [&](StorageID packageID, Package &&package) {
+                found = true;
+                // FIXME: avoid copy
+                if (visited.emplace(packageID).second) {
+                    const auto &[i, inserted] = runtimeDependencies.try_emplace(packageID);
+                    if (inserted) {
+                        i->second = std::make_shared<Package>(std::move(package));
+                    }
+                    pullDependentPackages(i->second, relevantDbs, runtimeDependencies, missingDependencies, visited);
+                }
+                return false;
+            });
         }
         if (!found) {
             missingDependencies.add(dependency, relevantPackage);
@@ -143,10 +171,11 @@ void Config::pullDependentPackages(const std::vector<Dependency> &dependencies, 
 }
 
 void Config::pullDependentPackages(const std::shared_ptr<Package> &package, const std::unordered_set<LibPkg::Database *> &relevantDbs,
-    std::unordered_set<Package *> &runtimeDependencies, DependencySet &missingDependencies)
+    std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
+    std::unordered_set<StorageID> &visited)
 {
-    pullDependentPackages(package->dependencies, package, relevantDbs, runtimeDependencies, missingDependencies);
-    pullDependentPackages(package->optionalDependencies, package, relevantDbs, runtimeDependencies, missingDependencies);
+    pullDependentPackages(package->dependencies, package, relevantDbs, runtimeDependencies, missingDependencies, visited);
+    pullDependentPackages(package->optionalDependencies, package, relevantDbs, runtimeDependencies, missingDependencies, visited);
 }
 
 void Config::markAllDatabasesToBeDiscarded()

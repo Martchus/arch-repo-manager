@@ -11,6 +11,7 @@
 #include <reflective_rapidjson/json/serializable.h>
 
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <regex>
 #include <set>
@@ -24,6 +25,7 @@ enum class SignatureStatus { Valid, KeyExpired, SigExpired, KeyUnknown, KeyDisab
 
 struct Config;
 struct Database;
+struct StorageDistribution;
 
 struct LIBPKG_EXPORT DatabaseStatistics : public ReflectiveRapidJSON::JsonSerializable<Config> {
     DatabaseStatistics(const Database &config);
@@ -104,11 +106,16 @@ constexpr bool operator&(BuildOrderOptions lhs, BuildOrderOptions rhs)
 }
 
 struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::BinarySerializable<Config> {
+    explicit Config();
+    ~Config();
+
     // load config and packages
     void loadPacmanConfig(const char *pacmanConfigPath);
     void loadAllPackages(bool withFiles);
 
-    // caching
+    // storage and caching
+    void initStorage(const char *path = "libpkg.db", std::uint32_t maxDbs = 0);
+    std::unique_ptr<StorageDistribution> &storage();
     std::uint64_t restoreFromCache();
     std::uint64_t dumpCacheFile();
     void markAllDatabasesToBeDiscarded();
@@ -121,10 +128,12 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     std::variant<std::vector<Database *>, std::string> computeDatabaseDependencyOrder(Database &database, bool addSelf = true);
     std::vector<Database *> computeDatabasesRequiringDatabase(Database &database);
     void pullDependentPackages(const std::vector<Dependency> &dependencies, const std::shared_ptr<Package> &relevantPackage,
-        const std::unordered_set<LibPkg::Database *> &relevantDbs, std::unordered_set<Package *> &runtimeDependencies,
-        DependencySet &missingDependencies);
+        const std::unordered_set<LibPkg::Database *> &relevantDbs,
+        std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
+        std::unordered_set<StorageID> &visited);
     void pullDependentPackages(const std::shared_ptr<Package> &package, const std::unordered_set<LibPkg::Database *> &relevantDbs,
-        std::unordered_set<LibPkg::Package *> &runtimeDependencies, DependencySet &missingDependencies);
+        std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
+        std::unordered_set<StorageID> &visited);
 
     // search for packages
     static std::pair<std::string_view, std::string_view> parseDatabaseDenotation(std::string_view databaseDenotation);
@@ -146,10 +155,6 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
         const std::function<bool(const Database &)> &databasePred, const std::function<bool(const Database &, const Package &)> &packagePred);
     std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &, const Package &)> &pred);
 
-    // utilities
-    std::list<std::string> forEachPackage(const std::function<std::string(Database *db)> &processNextDatabase,
-        const std::function<std::string(Database *db, std::shared_ptr<Package> &pkg, std::mutex &dbMutex)> &processNextPackage);
-
     std::vector<Database> databases;
     Database aur = Database("aur");
     std::set<std::string> architectures;
@@ -158,12 +163,20 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     SignatureLevelConfig signatureLevel;
 
 private:
+    Database *createDatabase(std::string &&name);
     bool addDepsRecursivelyInTopoOrder(std::vector<std::unique_ptr<TopoSortItem>> &allItems, std::vector<TopoSortItem *> &items,
         std::vector<std::string> &ignored, std::vector<PackageSearchResult> &cycleTracking, const Dependency &dependency, BuildOrderOptions options,
         bool onlyDependency);
     bool addLicenseInfo(LicenseResult &result, const Dependency &dependency);
     std::string addLicenseInfo(LicenseResult &result, PackageSearchResult &searchResult, const std::shared_ptr<Package> &package);
+
+    std::unique_ptr<StorageDistribution> m_storage;
 };
+
+inline std::unique_ptr<StorageDistribution> &Config::storage()
+{
+    return m_storage;
+}
 
 inline Status Config::computeStatus() const
 {

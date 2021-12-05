@@ -36,6 +36,18 @@ Database *Config::findDatabaseFromDenotation(std::string_view databaseDenotation
 }
 
 /*!
+ * \brief Creates a database with the specified \a name and appends it to the configuration.
+ */
+Database *Config::createDatabase(std::string &&name)
+{
+    auto *const db = &databases.emplace_back(std::string(name));
+    if (storage()) {
+        db->initStorage(*storage());
+    }
+    return db;
+}
+
+/*!
  * \brief Returns the database with the specified \a name and \a architecture or creates a new one if it doesn't exist.
  * \remarks Resets the database's configuration. You'll end up with a blank database in any case.
  */
@@ -45,7 +57,7 @@ Database *Config::findOrCreateDatabase(std::string &&name, std::string_view arch
     if (db) {
         db->resetConfiguration();
     } else {
-        db = &databases.emplace_back(move(name));
+        db = createDatabase(std::move(name));
     }
     if (!architecture.empty()) {
         db->arch = architecture;
@@ -63,7 +75,7 @@ Database *Config::findOrCreateDatabase(std::string_view name, std::string_view a
     if (db) {
         db->resetConfiguration();
     } else {
-        db = &databases.emplace_back(std::string(name));
+        db = createDatabase(std::string(name));
     }
     if (!architecture.empty()) {
         db->arch = architecture;
@@ -83,113 +95,11 @@ Database *Config::findOrCreateDatabaseFromDenotation(std::string_view databaseDe
 }
 
 /*!
- * \brief Runs \a processNextPackage for each package of each database using as many threads as CPU cores available.
- *
- * Databases and packages are iterated in order. \a processNextDatabase is called when "reaching" the next database.
- *
- * \a processNextDatabase and \a processNextPackage are supposed to return an empty string on success and an error message
- * on failure. If \a processNextDatabase fails, the whole database is skipped.
- *
- * \a processNextDatabase is not ran in parallel and therefore expected to be fast.
- *
- * \returns Returns the error messages returned by \a processNextDatabase and \a processNextPackage.
- * \remarks Not used anymore. Possibly still useful at some point?
- */
-std::list<std::string> Config::forEachPackage(const std::function<std::string(Database *db)> &processNextDatabase,
-    const std::function<std::string(Database *db, std::shared_ptr<Package> &pkg, std::mutex &dbMutex)> &processNextPackage)
-{
-    // define mutex to sync getting the next package
-    std::mutex getNextPathMutex, submitFailureMutex, dbMutex;
-    std::list<std::string> errorMessages;
-
-    // define and initialize iterators
-    auto dbIterator = databases.begin(), dbEnd = databases.end();
-    auto error = processNextDatabase(&*dbIterator);
-    while (dbIterator != dbEnd) {
-        if (error.empty()) {
-            break;
-        }
-        errorMessages.emplace_back(move(error));
-        error = processNextDatabase(&*++dbIterator);
-    }
-    if (dbIterator == dbEnd) {
-        return errorMessages;
-    }
-    auto pkgIterator = dbIterator->packages.begin(), pkgEnd = dbIterator->packages.end();
-
-    // get the first database
-    Database *currentDb = &*dbIterator;
-    ++dbIterator;
-
-    const auto recordError = [&](auto &&errorMessage) {
-        lock_guard<mutex> lock(submitFailureMutex);
-        cerr << Phrases::SubError << errorMessage << Phrases::End;
-        errorMessages.emplace_back(errorMessage);
-    };
-
-    const auto processPackages = [&] {
-        for (;;) {
-            // get next package
-            shared_ptr<Package> currentPackage;
-            {
-                lock_guard<mutex> lock(getNextPathMutex);
-                for (;;) {
-                    if (pkgIterator != pkgEnd) {
-                        currentPackage = pkgIterator->second;
-                        ++pkgIterator;
-                        break;
-                    } else if (dbIterator != dbEnd) {
-                        // process next database
-                        auto errorMessage = processNextDatabase(&*dbIterator);
-                        if (!errorMessage.empty()) {
-                            if (error != "skip") {
-                                recordError(std::move(errorMessage));
-                            }
-                            ++dbIterator;
-                            continue;
-                        }
-                        currentDb = &*dbIterator;
-                        pkgIterator = dbIterator->packages.begin();
-                        pkgEnd = dbIterator->packages.end();
-                        ++dbIterator;
-                        continue;
-                    } else {
-                        return;
-                    }
-                }
-            }
-
-            // process next package
-            try {
-                auto errorMessage = processNextPackage(currentDb, currentPackage, dbMutex);
-                if (!errorMessage.empty()) {
-                    recordError(std::move(errorMessage));
-                }
-            } catch (const std::runtime_error &e) {
-                recordError(argsToString(currentPackage->name, ':', ' ', e.what()));
-                continue;
-            }
-        }
-    };
-
-    vector<thread> threads(thread::hardware_concurrency() + 2); // FIXME: make this thread count configurable?
-    for (thread &t : threads) {
-        t = thread(processPackages);
-    }
-    processPackages();
-    for (thread &t : threads) {
-        t.join();
-    }
-
-    return errorMessages;
-}
-
-/*!
  * \brief Returns all packages with the specified database name, database architecture and package name.
  */
 std::vector<PackageSearchResult> Config::findPackages(std::tuple<std::string_view, std::string_view, std::string_view> dbAndPackageName)
 {
-    vector<PackageSearchResult> pkgs;
+    auto pkgs = std::vector<PackageSearchResult>();
     const auto &[dbName, dbArch, packageName] = dbAndPackageName;
 
     // don't allow to get a list of all packages
@@ -202,8 +112,8 @@ std::vector<PackageSearchResult> Config::findPackages(std::tuple<std::string_vie
         if ((!dbName.empty() && dbName != db.name) || (!dbArch.empty() && dbArch != db.arch)) {
             continue;
         }
-        if (const auto i = db.packages.find(name); i != db.packages.end()) {
-            pkgs.emplace_back(db, i->second);
+        if (const auto [id, package] = db.findPackageWithID(name); package) {
+            pkgs.emplace_back(db, package, id);
         }
     }
     return pkgs;
@@ -215,26 +125,20 @@ std::vector<PackageSearchResult> Config::findPackages(std::tuple<std::string_vie
  */
 PackageSearchResult Config::findPackage(const Dependency &dependency)
 {
-    PackageSearchResult result;
+    auto result = PackageSearchResult();
+    auto exactMatch = false;
     for (auto &db : databases) {
-        for (auto range = db.providedDeps.equal_range(dependency.name); range.first != range.second; ++range.first) {
-            const auto &providedDependency = range.first->second;
-            if (!Dependency::matches(dependency.mode, dependency.version, providedDependency.version)) {
-                continue;
-            }
-            const auto pkgs = providedDependency.relevantPackages;
-            for (const auto &pkg : pkgs) {
-                if (!result.pkg) {
-                    result.db = &db;
-                    result.pkg = pkg;
-                }
-                // prefer package where the name matches exactly; so if we found one no need to look further
-                if (dependency.name == pkg->name) {
-                    result.db = &db;
-                    result.pkg = pkg;
-                    return result;
-                }
-            }
+        db.providingPackages(dependency, false, [&](StorageID id, Package &&package) {
+            // FIXME: avoid copy
+            exactMatch = dependency.name == package.name;
+            result.db = &db;
+            result.pkg = std::make_shared<Package>(std::move(package));
+            result.id = id;
+            // prefer package where the name matches exactly; so if we found one no need to look further
+            return exactMatch;
+        });
+        if (exactMatch) {
+            break;
         }
     }
     return result;
@@ -245,20 +149,16 @@ PackageSearchResult Config::findPackage(const Dependency &dependency)
  */
 std::vector<PackageSearchResult> Config::findPackages(const Dependency &dependency, bool reverse)
 {
-    const auto dependencySet = reverse ? &Database::requiredDeps : &Database::providedDeps;
-    vector<PackageSearchResult> results;
+    auto results = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        for (auto range = (db.*dependencySet).equal_range(dependency.name); range.first != range.second; ++range.first) {
-            const auto &providedDependency = range.first->second;
-            if (!Dependency::matches(dependency.mode, dependency.version, providedDependency.version)) {
-                continue;
+        auto visited = std::unordered_set<StorageID>();
+        db.providingPackages(dependency, reverse, [&](StorageID packageID, Package &&package) {
+            // FIXME: avoid copy
+            if (visited.emplace(packageID).second) {
+                results.emplace_back(db, std::make_shared<Package>(std::move(package)), packageID);
             }
-            for (const auto &pkg : providedDependency.relevantPackages) {
-                if (std::find_if(results.begin(), results.end(), [&pkg](const auto &res) { return res.pkg == pkg; }) == results.end()) {
-                    results.emplace_back(db, pkg);
-                }
-            }
-        }
+            return false;
+        });
     }
     return results;
 }
@@ -266,18 +166,18 @@ std::vector<PackageSearchResult> Config::findPackages(const Dependency &dependen
 /*!
  * \brief Returns all packages providing \a library or - if \a reverse is true - all packages requiring \a library.
  */
-std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const string &library, bool reverse)
+std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const std::string &library, bool reverse)
 {
-    const auto packagesByLibraryName = reverse ? &Database::requiredLibs : &Database::providedLibs;
-    vector<PackageSearchResult> results;
+    auto results = std::vector<PackageSearchResult>();
+    auto visited = std::unordered_set<StorageID>();
     for (auto &db : databases) {
-        for (auto range = (db.*packagesByLibraryName).equal_range(library); range.first != range.second; ++range.first) {
-            for (const auto &pkg : range.first->second) {
-                if (std::find_if(results.begin(), results.end(), [&pkg](const auto &res) { return res.pkg == pkg; }) == results.end()) {
-                    results.emplace_back(db, pkg);
-                }
+        db.providingPackages(library, reverse, [&](StorageID packageID, Package &&package) {
+            // FIXME: avoid copy
+            if (visited.emplace(packageID).second) {
+                results.emplace_back(db, std::make_shared<Package>(std::move(package)), packageID);
             }
-        }
+            return false;
+        });
     }
     return results;
 }
@@ -285,15 +185,17 @@ std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const stri
 /*!
  * \brief Returns all packages which names matches \a regex.
  */
-std::vector<PackageSearchResult> Config::findPackages(const regex &regex)
+std::vector<PackageSearchResult> Config::findPackages(const std::regex &regex)
 {
-    vector<PackageSearchResult> pkgs;
+    auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        for (const auto &pkg : db.packages) {
-            if (regex_match(pkg.second->name, regex)) {
-                pkgs.emplace_back(db, pkg.second);
+        db.allPackages([&](StorageID packageID, Package &&package) {
+            if (std::regex_match(package.name, regex)) {
+                // FIXME: avoid copy
+                pkgs.emplace_back(db, std::make_shared<Package>(std::move(package)), packageID);
             }
-        }
+            return false;
+        });
     }
     return pkgs;
 }
@@ -304,13 +206,10 @@ std::vector<PackageSearchResult> Config::findPackages(const regex &regex)
  */
 std::vector<PackageSearchResult> Config::findPackages(const Package &package)
 {
-    vector<PackageSearchResult> pkgs;
+    auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        for (const auto &pkg : db.packages) {
-            if (pkg.second->isSame(package)) {
-                pkgs.emplace_back(db, pkg.second);
-                break;
-            }
+        if (const auto [id, pkg] = db.findPackageWithID(package.name); pkg && pkg->isSame(package)) {
+            pkgs.emplace_back(db, pkg, id);
         }
     }
     return pkgs;
@@ -322,16 +221,18 @@ std::vector<PackageSearchResult> Config::findPackages(const Package &package)
 std::vector<PackageSearchResult> Config::findPackages(
     const std::function<bool(const Database &)> &databasePred, const std::function<bool(const Database &, const Package &)> &packagePred)
 {
-    std::vector<PackageSearchResult> pkgs;
+    auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
         if (!databasePred(db)) {
             continue;
         }
-        for (const auto &pkg : db.packages) {
-            if (packagePred(db, *pkg.second)) {
-                pkgs.emplace_back(db, pkg.second);
+        db.allPackages([&](StorageID packageID, const Package &package) {
+            if (packagePred(db, package)) {
+                // FIXME: avoid copy
+                pkgs.emplace_back(db, std::make_shared<Package>(package), packageID);
             }
-        }
+            return false;
+        });
     }
     return pkgs;
 }
@@ -341,13 +242,15 @@ std::vector<PackageSearchResult> Config::findPackages(
  */
 std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &, const Package &)> &pred)
 {
-    std::vector<PackageSearchResult> pkgs;
+    auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        for (const auto &pkg : db.packages) {
-            if (pred(db, *pkg.second)) {
-                pkgs.emplace_back(db, pkg.second);
+        db.allPackages([&](StorageID packageID, const Package &package) {
+            if (pred(db, package)) {
+                // FIXME: avoid copy
+                pkgs.emplace_back(db, std::make_shared<Package>(package), packageID);
             }
-        }
+            return false;
+        });
     }
     return pkgs;
 }

@@ -12,8 +12,6 @@
 #include <optional>
 #include <regex>
 
-using namespace std;
-using namespace LibPkg;
 using namespace CppUtilities;
 
 int main(int argc, const char *argv[])
@@ -43,38 +41,51 @@ int main(int argc, const char *argv[])
     OperationArgument listArg("list", '\0', "lists the files contained within the specified package");
     ConfigValueArgument packageArg("package", '\0', "the name of the package", { "name" });
     packageArg.setImplicit(true);
+    packageArg.setRequired(true);
     listArg.setSubArguments({ &packageArg, &dbFileArg, &loadPacmanConfigArg });
     parser.setMainArguments({ &searchArg, &listArg, &helpArg });
     parser.setDefaultArgument(&helpArg);
     parser.parseArgs(argc, argv);
 
     // init config from pacman config to get relevant dbs
-    Config cfg;
+    auto cfg = LibPkg::Config();
     if (loadPacmanConfigArg.isPresent()) {
         try {
             cfg.loadPacmanConfig("/etc/pacman.conf");
-        } catch (const runtime_error &e) {
-            cerr << "Unable to load pacman config." << endl;
-            exit(1);
+        } catch (const std::runtime_error &e) {
+            std::cerr << "Unable to load pacman config: " << e.what() << std::endl;
+            std::exit(1);
         }
     }
 
     // allow adding custom db paths
     if (dbFileArg.isPresent()) {
-        for (const char *dbPath : dbFileArg.values(0)) {
-            Database &db = cfg.databases.emplace_back(string(), dbPath);
+        for (const char *const dbPath : dbFileArg.values()) {
+            auto &db = cfg.databases.emplace_back(std::string(), dbPath);
             db.name = std::filesystem::path(db.path).stem().string();
             db.localPkgDir = directory(db.path);
         }
     }
 
     if (cfg.databases.empty()) {
-        cerr << "No databases configured." << endl;
-        exit(2);
+        std::cerr << "No databases configured." << std::endl;
+        std::exit(2);
     }
 
     // load all packages for the dbs
-    for (Database &db : cfg.databases) {
+    auto ec = std::error_code();
+    auto tmpDir = std::filesystem::temp_directory_path(ec);
+    if (ec) {
+        std::cerr << "Unable to locate temp directory path: " << ec.message() << std::endl;
+        std::exit(4);
+    }
+    try {
+        cfg.initStorage((tmpDir.string() + "/pacfind.db").data());
+    } catch (const std::runtime_error &e) {
+        std::cerr << "Unable to initialize temporary storage: " << e.what() << std::endl;
+        std::exit(1);
+    }
+    for (auto &db : cfg.databases) {
         try {
             if (endsWith(db.path, ".files")) {
                 db.filesPath = db.path;
@@ -82,27 +93,27 @@ int main(int argc, const char *argv[])
                 db.filesPath = db.filesPathFromRegularPath();
             }
             db.loadPackages(true);
-        } catch (const runtime_error &e) {
-            cerr << "Unable to load database \"" << db.name << "\": " << e.what() << '\n';
+        } catch (const std::runtime_error &e) {
+            std::cerr << "Unable to load database \"" << db.name << "\": " << e.what() << '\n';
         }
     }
 
     // print file list for certain package
-    if (packageArg.isPresent()) {
+    if (listArg.isPresent()) {
         const auto pkgs = cfg.findPackages(packageArg.firstValue());
         for (const auto &pkg : pkgs) {
-            if (const auto *const db = std::get<Database *>(pkg.db); !db->name.empty()) {
-                cout << db->name << '/';
+            if (const auto *const db = std::get<LibPkg::Database *>(pkg.db); !db->name.empty()) {
+                std::cout << db->name << '/';
             }
-            cout << pkg.pkg->name;
+            std::cout << pkg.pkg->name;
             if (!pkg.pkg->packageInfo) {
-                cout << '\n';
+                std::cout << '\n';
                 continue;
             }
             for (const auto &path : pkg.pkg->packageInfo->files) {
-                cout << "\n - " << path;
+                std::cout << "\n - " << path;
             }
-            cout << '\n';
+            std::cout << '\n';
         }
         return 0;
     }
@@ -115,19 +126,19 @@ int main(int argc, const char *argv[])
         try {
             regex = std::regex(searchTerm, std::regex::egrep);
         } catch (const std::regex_error &e) {
-            cerr << "Specified regex is invalid: " << e.what() << endl;
-            exit(3);
+            std::cerr << "Specified regex is invalid: " << e.what() << std::endl;
+            std::exit(3);
         }
     }
-    for (const Database &db : cfg.databases) {
-        for (const auto &pkg : db.packages) {
-            const auto &pkgInfo = pkg.second->packageInfo;
+    for (auto &db : cfg.databases) {
+        db.allPackages([&](LibPkg::StorageID, LibPkg::Package &&package) {
+            const auto &pkgInfo = package.packageInfo;
             if (!pkgInfo) {
-                continue;
+                return false;
             }
             auto foundOne = false;
-            for (const string &file : pkgInfo->files) {
-                const auto found = regex.has_value() ? std::regex_match(file, regex.value()) : file.find(searchTerm) != string::npos;
+            for (const auto &file : pkgInfo->files) {
+                const auto found = regex.has_value() ? std::regex_match(file, regex.value()) : file.find(searchTerm) != std::string::npos;
                 if (negate) {
                     if (found) {
                         foundOne = true;
@@ -141,20 +152,21 @@ int main(int argc, const char *argv[])
                 }
                 if (!foundOne) {
                     if (!db.name.empty()) {
-                        cout << db.name << '/';
+                        std::cout << db.name << '/';
                     }
-                    cout << pkg.first << '\n';
+                    std::cout << package.name << '\n';
                     foundOne = true;
                 }
-                cout << " - " << file << '\n';
+                std::cout << " - " << file << '\n';
             }
             if (negate && !foundOne) {
                 if (!db.name.empty()) {
-                    cout << db.name << '/';
+                    std::cout << db.name << '/';
                 }
-                cout << pkg.first << '\n';
+                std::cout << package.name << '\n';
             }
-        }
+            return false;
+        });
     }
 
     return 0;

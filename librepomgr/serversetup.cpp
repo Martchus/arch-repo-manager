@@ -222,18 +222,19 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
 {
     // read config file
     cout << Phrases::InfoMessage << "Reading config file: " << configFilePath << Phrases::EndFlush;
-    IniFile configIni;
+    auto configIni = IniFile();
     try {
         // parse ini
-        ifstream configFile;
-        configFile.exceptions(fstream::badbit | fstream::failbit);
-        configFile.open(configFilePath, fstream::in);
+        auto configFile = std::ifstream();
+        configFile.exceptions(std::fstream::badbit | std::fstream::failbit);
+        configFile.open(configFilePath, std::fstream::in);
         configIni.parse(configFile);
         // read basic configuration values (not cached)
         for (const auto &iniEntry : configIni.data()) {
             if (iniEntry.first.empty()) {
                 convertValue(iniEntry.second, "pacman_config_file_path", pacmanConfigFilePath);
                 convertValue(iniEntry.second, "working_directory", workingDirectory);
+                convertValue(iniEntry.second, "max_dbs", maxDbs);
             }
         }
         // apply working directory
@@ -265,6 +266,7 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
         // restore state/cache and discard databases
         if (restoreStateAndDiscardDatabases) {
             restoreState();
+            config.initStorage(dbPath.data(), maxDbs);
             config.markAllDatabasesToBeDiscarded();
             restoreStateAndDiscardDatabases = false;
         }
@@ -378,11 +380,11 @@ void ServiceSetup::printDatabases()
 {
     cerr << Phrases::SuccessMessage << "Found " << config.databases.size() << " databases:" << Phrases::End;
     for (const auto &db : config.databases) {
-        cerr << Phrases::SubMessage << db.name << "@" << db.arch << ": " << db.packages.size() << " packages, last updated on "
+        cerr << Phrases::SubMessage << db.name << "@" << db.arch << ": " << db.packageCount() << " packages, last updated on "
              << db.lastUpdate.toString(DateTimeOutputFormat::DateAndTime) << Phrases::End << "     - path: " << db.path
              << "\n     - local db dir: " << db.localDbDir << "\n     - local package dir: " << db.localPkgDir << '\n';
     }
-    cerr << Phrases::SubMessage << "AUR (" << config.aur.packages.size() << " packages cached)" << Phrases::End;
+    cerr << Phrases::SubMessage << "AUR (" << config.aur.packageCount() << " packages cached)" << Phrases::End;
 }
 
 std::string_view ServiceSetup::cacheFilePath() const
@@ -390,40 +392,41 @@ std::string_view ServiceSetup::cacheFilePath() const
     return "cache-v" LIBREPOMGR_CACHE_VERSION ".bin";
 }
 
-RAPIDJSON_NAMESPACE::Document ServiceSetup::libraryDependenciesToJson() const
+RAPIDJSON_NAMESPACE::Document ServiceSetup::libraryDependenciesToJson()
 {
     namespace JR = ReflectiveRapidJSON::JsonReflector;
     auto document = RAPIDJSON_NAMESPACE::Document(RAPIDJSON_NAMESPACE::kObjectType);
     auto &alloc = document.GetAllocator();
-    for (const auto &db : config.databases) {
+    for (auto &db : config.databases) {
         auto dbValue = RAPIDJSON_NAMESPACE::Value(RAPIDJSON_NAMESPACE::Type::kObjectType);
-        for (const auto &[pkgName, pkg] : db.packages) {
-            if (!pkg->packageInfo) {
-                continue;
+        db.allPackages([&](StorageID, Package &&package) {
+            if (!package.packageInfo) {
+                return false;
             }
-            if (pkg->libdepends.empty() && pkg->libprovides.empty()) {
+            if (package.libdepends.empty() && package.libprovides.empty()) {
                 auto hasVersionedPythonOrPerlDep = false;
-                for (const auto &dependency : pkg->dependencies) {
+                for (const auto &dependency : package.dependencies) {
                     if (dependency.mode == DependencyMode::Any || dependency.version.empty()
                         || (dependency.name != "python" && dependency.name != "python2" && dependency.name != "perl")) {
-                        continue;
+                        return false;
                     }
                     hasVersionedPythonOrPerlDep = true;
                     break;
                 }
                 if (!hasVersionedPythonOrPerlDep) {
-                    continue;
+                    return false;
                 }
             }
             auto pkgValue = RAPIDJSON_NAMESPACE::Value(RAPIDJSON_NAMESPACE::Type::kObjectType);
             auto pkgObj = pkgValue.GetObject();
-            JR::push(pkg->version, "v", pkgObj, alloc);
-            JR::push(pkg->packageInfo->buildDate, "t", pkgObj, alloc);
-            JR::push(pkg->dependencies, "d", pkgObj, alloc); // for versioned Python/Perl deps
-            JR::push(pkg->libdepends, "ld", pkgObj, alloc);
-            JR::push(pkg->libprovides, "lp", pkgObj, alloc);
-            dbValue.AddMember(RAPIDJSON_NAMESPACE::StringRef(pkgName.data(), JR::rapidJsonSize(pkgName.size())), pkgValue, alloc);
-        }
+            JR::push(package.version, "v", pkgObj, alloc);
+            JR::push(package.packageInfo->buildDate, "t", pkgObj, alloc);
+            JR::push(package.dependencies, "d", pkgObj, alloc); // for versioned Python/Perl deps
+            JR::push(package.libdepends, "ld", pkgObj, alloc);
+            JR::push(package.libprovides, "lp", pkgObj, alloc);
+            dbValue.AddMember(RAPIDJSON_NAMESPACE::StringRef(package.name.data(), JR::rapidJsonSize(package.name.size())), pkgValue, alloc);
+            return false;
+        });
         document.AddMember(RAPIDJSON_NAMESPACE::Value(db.name % '@' + db.arch, alloc), dbValue, alloc);
     }
     return document;
@@ -442,7 +445,7 @@ void ServiceSetup::restoreLibraryDependenciesFromJson(const string &json, Reflec
     const auto dbObj = document.GetObject();
     for (const auto &dbEntry : dbObj) {
         if (!dbEntry.value.IsObject()) {
-            errors->reportTypeMismatch<decltype(LibPkg::Database::packages)>(document.GetType());
+            errors->reportTypeMismatch<RAPIDJSON_NAMESPACE::kObjectType>(document.GetType());
             continue;
         }
         auto *const db = config.findOrCreateDatabaseFromDenotation(std::string_view(dbEntry.name.GetString()));
@@ -454,7 +457,7 @@ void ServiceSetup::restoreLibraryDependenciesFromJson(const string &json, Reflec
             }
             const auto pkgObj = pkgEntry.value.GetObject();
             auto name = std::string(pkgEntry.name.GetString());
-            auto &pkg = db->packages[name];
+            auto [pkgID, pkg] = db->findPackageWithID(name);
             if (pkg) {
                 // do not mess with already existing packages; this restoring stuff is supposed to be done before loading packages from DBs
                 continue;
@@ -468,7 +471,7 @@ void ServiceSetup::restoreLibraryDependenciesFromJson(const string &json, Reflec
             JR::pull(pkg->dependencies, "d", pkgObj, errors); // for versioned Python/Perl deps
             JR::pull(pkg->libdepends, "ld", pkgObj, errors);
             JR::pull(pkg->libprovides, "lp", pkgObj, errors);
-            db->addPackageDependencies(pkg);
+            db->updatePackage(pkg);
         }
     }
 }

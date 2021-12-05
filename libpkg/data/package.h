@@ -1,6 +1,8 @@
 #ifndef LIBPKG_DATA_PACKAGE_H
 #define LIBPKG_DATA_PACKAGE_H
 
+#include "./storagefwd.h"
+
 #include "../global.h"
 
 #include "../parser/utils.h"
@@ -83,6 +85,8 @@ struct LIBPKG_EXPORT Dependency : public ReflectiveRapidJSON::JsonSerializable<D
     explicit Dependency() = default;
     explicit Dependency(const std::string &name, const std::string &version = std::string(), DependencyMode mode = DependencyMode::Any,
         const std::string &description = std::string());
+    explicit Dependency(std::string &&name, std::string &&version = std::string(), DependencyMode mode = DependencyMode::Any,
+        std::string &&description = std::string());
     explicit Dependency(const char *denotation, std::size_t denotationSize = std::numeric_limits<std::size_t>::max());
     explicit Dependency(std::string_view denotation);
     bool operator==(const Dependency &other) const;
@@ -103,6 +107,14 @@ inline Dependency::Dependency(const std::string &name, const std::string &versio
     : name(name)
     , version(version)
     , description(description)
+    , mode(mode)
+{
+}
+
+inline Dependency::Dependency(std::string &&name, std::string &&version, DependencyMode mode, std::string &&description)
+    : name(std::move(name))
+    , version(std::move(version))
+    , description(std::move(description))
     , mode(mode)
 {
 }
@@ -130,6 +142,38 @@ inline Dependency Dependency::fromString(const char *denotation, size_t denotati
 inline Dependency Dependency::fromString(std::string_view dependency)
 {
     return Dependency(dependency);
+}
+
+struct LIBPKG_EXPORT DatabaseDependency : public Dependency,
+                                          public ReflectiveRapidJSON::JsonSerializable<DatabaseDependency>,
+                                          public ReflectiveRapidJSON::BinarySerializable<DatabaseDependency> {
+    explicit DatabaseDependency() = default;
+    explicit DatabaseDependency(const std::string &name, const std::string &version, DependencyMode mode);
+    explicit DatabaseDependency(std::string &&name, std::string &&version, DependencyMode mode);
+    std::unordered_set<StorageID> relevantPackages;
+};
+
+inline DatabaseDependency::DatabaseDependency(std::string &&name, std::string &&version, DependencyMode mode)
+    : Dependency(std::move(name), std::move(version), mode, std::string())
+{
+}
+
+inline DatabaseDependency::DatabaseDependency(const std::string &name, const std::string &version, DependencyMode mode)
+    : Dependency(std::move(name), std::move(version), mode, std::string())
+{
+}
+
+struct LIBPKG_EXPORT DatabaseLibraryDependency : public ReflectiveRapidJSON::JsonSerializable<DatabaseLibraryDependency>,
+                                                 public ReflectiveRapidJSON::BinarySerializable<DatabaseLibraryDependency> {
+    explicit DatabaseLibraryDependency() = default;
+    explicit DatabaseLibraryDependency(const std::string &name);
+    std::string name;
+    std::unordered_set<StorageID> relevantPackages;
+};
+
+inline DatabaseLibraryDependency::DatabaseLibraryDependency(const std::string &name)
+    : name(name)
+{
 }
 
 } // namespace LibPkg
@@ -283,11 +327,54 @@ struct LIBPKG_EXPORT PackageNameData {
 };
 
 struct DependencySet;
+struct Package;
+
+/*!
+ * \brief The PackageSpec struct holds a reference to a package.
+ * \remarks If id is non-zero, the package is part of a database using that ID.
+ */
+struct LIBPKG_EXPORT PackageSpec : public ReflectiveRapidJSON::JsonSerializable<PackageSpec>,
+                                   public ReflectiveRapidJSON::BinarySerializable<PackageSpec> {
+    explicit PackageSpec(StorageID id = 0, const std::shared_ptr<Package> &pkg = nullptr);
+    bool operator==(const PackageSpec &other) const;
+
+    StorageID id;
+    std::shared_ptr<Package> pkg;
+};
+
+inline PackageSpec::PackageSpec(StorageID id, const std::shared_ptr<Package> &pkg)
+    : id(id)
+    , pkg(pkg)
+{
+}
+
+inline bool PackageSpec::operator==(const PackageSpec &other) const
+{
+    return id ? id == other.id : pkg == other.pkg;
+}
+
+} // namespace LibPkg
+
+namespace std {
+
+template <> struct hash<LibPkg::PackageSpec> {
+    std::size_t operator()(const LibPkg::PackageSpec &spec) const
+    {
+        using std::hash;
+        return spec.id ? hash<decltype(spec.id)>()(spec.id) : hash<decltype(spec.pkg)>()(spec.pkg);
+    }
+};
+
+} // namespace std
+
+namespace LibPkg {
 
 struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Package>, public ReflectiveRapidJSON::BinarySerializable<Package> {
     Package() = default;
     Package(const Package &other);
     Package(Package &&other) = default;
+    //Package &operator=(const Package &other);
+    Package &operator=(Package &&other) = default;
     bool providesDependency(const Dependency &dependency) const;
     static void exportProvides(
         const std::shared_ptr<Package> &package, DependencySet &destinationProvides, std::unordered_set<std::string> &destinationLibProvides);
@@ -307,14 +394,13 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     static bool isPkgInfoFileOrBinary(const char *filePath, const char *fileName, mode_t mode);
     static bool isLicense(const char *filePath, const char *fileName, mode_t mode);
 
-    static std::vector<std::shared_ptr<Package>> fromInfo(const std::string &info, bool isPackageInfo = false);
+    static std::vector<PackageSpec> fromInfo(const std::string &info, bool isPackageInfo = false);
     static std::shared_ptr<Package> fromDescription(const std::vector<std::string> &descriptionParts);
     static std::vector<std::shared_ptr<Package>> fromDatabaseFile(FileMap &&databaseFile);
     static std::shared_ptr<Package> fromPkgFile(const std::string &path);
     static std::tuple<std::string_view, std::string_view, std::string_view> fileNameComponents(std::string_view fileName);
     static std::shared_ptr<Package> fromPkgFileName(std::string_view fileName);
-    static std::vector<std::shared_ptr<Package>> fromAurRpcJson(
-        const char *jsonData, std::size_t jsonSize, PackageOrigin origin = PackageOrigin::AurRpcInfo);
+    static std::vector<PackageSpec> fromAurRpcJson(const char *jsonData, std::size_t jsonSize, PackageOrigin origin = PackageOrigin::AurRpcInfo);
 
     PackageOrigin origin = PackageOrigin::Default;
     CppUtilities::DateTime timestamp;
@@ -356,6 +442,16 @@ inline Package::Package(const Package &other)
     , installInfo()
 {
 }
+
+/*
+Package &Package::operator=(const Package &other)
+{
+    if (this != &other) {
+
+    }
+    return *this;
+}
+*/
 
 inline bool Package::isSame(const Package &other) const
 {
@@ -414,6 +510,18 @@ struct LIBPKG_EXPORT DependencySet : public DependencySetBase {
 namespace ReflectiveRapidJSON {
 
 REFLECTIVE_RAPIDJSON_TREAT_AS_MULTI_MAP_OR_HASH(LibPkg::DependencySet);
-}
+
+namespace JsonReflector {
+
+// declare custom (de)serialization for PackageSearchResult
+template <>
+LIBPKG_EXPORT void push<LibPkg::PackageSpec>(
+    const LibPkg::PackageSpec &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator);
+template <>
+LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,
+    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors);
+
+} // namespace JsonReflector
+} // namespace ReflectiveRapidJSON
 
 #endif // LIBPKG_DATA_PACKAGE_H

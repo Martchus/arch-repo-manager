@@ -50,15 +50,13 @@ void searchAurPackages(LogContext &log, ServiceSetup &setup, const std::string &
             // parse retrieved JSON
             const auto &body = get<Response>(session2.response).body();
             try {
-                const auto packages = Package::fromAurRpcJson(body.data(), body.size(), PackageOrigin::AurRpcSearch);
-
-                // cache the AUR packages
+                // parse and cache the AUR packages
+                auto packages = Package::fromAurRpcJson(body.data(), body.size(), PackageOrigin::AurRpcSearch);
                 auto lock = setup.config.lockToWrite();
-                for (auto &package : packages) {
-                    setup.config.aur.updatePackage(package);
+                for (auto &[packageID, package] : packages) {
+                    packageID = setup.config.aur.updatePackage(package);
                 }
                 lock.unlock();
-
                 multiSession->addResponses(packages);
             } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
                 log(Phrases::ErrorMessage, "Unable to parse AUR search result: ", serializeParseError(e), '\n');
@@ -98,15 +96,15 @@ std::shared_ptr<AurQuerySession> queryAurPackagesInternal(LogContext &log, Servi
                 // parse retrieved JSON
                 const auto &body = get<Response>(session2.response).body();
                 try {
-                    const auto packagesFromAur = Package::fromAurRpcJson(body.data(), body.size());
-
-                    // cache the AUR packages
+                    // parse and cache the AUR packages
+                    auto packagesFromAur = Package::fromAurRpcJson(body.data(), body.size());
                     auto lock = setup.config.lockToWrite();
-                    for (auto &package : packagesFromAur) {
-                        setup.config.aur.updatePackage(package);
+                    auto updater = PackageUpdater(setup.config.aur);
+                    for (auto &[packageID, package] : packagesFromAur) {
+                        packageID = updater.update(package);
                     }
+                    updater.commit();
                     lock.unlock();
-
                     multiSession->addResponses(packagesFromAur);
                 } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
                     log(Phrases::ErrorMessage, "Unable to parse AUR package from RPC: ", serializeParseError(e), '\n');
@@ -164,18 +162,19 @@ std::shared_ptr<AurQuerySession> queryAurPackages(LogContext &log, ServiceSetup 
 std::shared_ptr<AurQuerySession> queryAurPackagesForDatabase(LogContext &log, ServiceSetup &setup, boost::asio::io_context &ioContext,
     std::shared_lock<std::shared_mutex> *configReadLock, LibPkg::Database &database, typename AurQuerySession::HandlerType &&handler)
 {
-    vector<string> missingPackages;
-    std::shared_lock<std::shared_mutex> ownConfigReadLock;
+    auto missingPackages = std::vector<std::string>();
+    auto ownConfigReadLock = std::shared_lock<std::shared_mutex>();
     if (!configReadLock) {
         ownConfigReadLock = setup.config.lockToRead();
         configReadLock = &ownConfigReadLock;
     }
-    const auto &aurPackages = setup.config.aur.packages;
-    for (const auto &package : database.packages) {
-        if (aurPackages.find(package.first) == aurPackages.end()) {
-            missingPackages.emplace_back(package.first);
+    auto &aurDb = setup.config.aur;
+    database.allPackages([&aurDb, &missingPackages](StorageID, Package &&package) {
+        if (const auto aurPackage = aurDb.findPackage(package.name); !aurPackage) {
+            missingPackages.emplace_back(package.name);
         }
-    }
+        return false;
+    });
     if (missingPackages.empty()) {
         return nullptr;
     }
@@ -279,9 +278,9 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 if (!havePkgbuild) {
                     result.error = "PKGINFO is missing";
                 }
-                if (result.packages.empty() || result.packages.front()->name.empty()) {
+                if (result.packages.empty() || result.packages.front().pkg->name.empty()) {
                     result.error = "Unable to parse .SRCINFO: no package name present";
-                } else if (!(result.sourceInfo = result.packages.front()->sourceInfo)) {
+                } else if (!(result.sourceInfo = result.packages.front().pkg->sourceInfo)) {
                     result.error = "Unable to parse .SRCINFO: no source info present";
                 }
                 multiSession->addResponse(move(result));

@@ -1,5 +1,6 @@
 #include "./database.h"
 #include "./config.h"
+#include "./storageprivate.h"
 
 #include "reflection/database.h"
 
@@ -9,6 +10,77 @@ using namespace std;
 using namespace CppUtilities;
 
 namespace LibPkg {
+
+struct AffectedPackages {
+    std::unordered_set<StorageID> newPackages;
+    std::unordered_set<StorageID> removedPackages;
+};
+
+struct AffectedPackagesWithDependencyDetail : public AffectedPackages {
+    std::string version;
+    DependencyMode mode = DependencyMode::Any;
+};
+
+struct PackageUpdaterPrivate {
+    using AffectedDeps = std::unordered_multimap<std::string, AffectedPackagesWithDependencyDetail>;
+    using AffectedLibs = std::unordered_map<std::string, AffectedPackages>;
+
+    explicit PackageUpdaterPrivate(DatabaseStorage &storage);
+    void update(const PackageCache::StoreResult &res, const std::shared_ptr<Package> &package);
+    void update(const StorageID packageID, bool removed, const std::shared_ptr<Package> &package);
+    void submit(const std::string &dependencyName, AffectedDeps::mapped_type &affected, DependencyStorage::RWTransaction &txn);
+    void submit(const std::string &libraryName, AffectedLibs::mapped_type &affected, LibraryDependencyStorage::RWTransaction &txn);
+
+    PackageStorage::RWTransaction packagesTxn;
+    AffectedDeps affectedProvidedDeps;
+    AffectedDeps affectedRequiredDeps;
+    AffectedLibs affectedProvidedLibs;
+    AffectedLibs affectedRequiredLibs;
+
+private:
+    static AffectedDeps::iterator findDependency(const Dependency &dependency, AffectedDeps &affected);
+    static void addDependency(StorageID packageID, const Dependency &dependency, bool removed, AffectedDeps &affected);
+    static void addLibrary(StorageID packageID, const std::string &libraryName, bool removed, AffectedLibs &affected);
+};
+
+Database::Database(const std::string &name, const std::string &path)
+    : name(name)
+    , path(path)
+{
+}
+
+Database::Database(std::string &&name, std::string &&path)
+    : name(std::move(name))
+    , path(std::move(path))
+{
+}
+
+Database::Database(Database &&other)
+    : name(std::move(other.name))
+    , path(std::move(other.path))
+    , filesPath(std::move(other.filesPath))
+    , mirrors(std::move(other.mirrors))
+    , usage(other.usage)
+    , signatureLevel(other.signatureLevel)
+    , arch(std::move(other.arch))
+    , dependencies(std::move(other.dependencies))
+    , localPkgDir(std::move(other.localPkgDir))
+    , localDbDir(std::move(other.localDbDir))
+    , lastUpdate(other.lastUpdate)
+    , syncFromMirror(other.syncFromMirror)
+    , toBeDiscarded(other.toBeDiscarded)
+    , m_storage(std::move(other.m_storage))
+{
+}
+
+Database::~Database()
+{
+}
+
+void Database::initStorage(StorageDistribution &storage)
+{
+    m_storage = storage.forDatabase(name % '@' + arch);
+}
 
 void LibPkg::Database::deducePathsFromLocalDirs()
 {
@@ -39,154 +111,285 @@ void Database::resetConfiguration()
 
 void Database::clearPackages()
 {
-    packages.clear();
-    providedLibs.clear();
-    requiredLibs.clear();
-    providedDeps.clear();
-    requiredDeps.clear();
     lastUpdate = CppUtilities::DateTime::gmtNow();
+    if (m_storage) {
+        m_storage->packageCache.clear(*m_storage);
+    }
 }
 
 std::vector<std::shared_ptr<Package>> Database::findPackages(const std::function<bool(const Database &, const Package &)> &pred)
 {
-    std::vector<std::shared_ptr<Package>> pkgs;
-    for (const auto &pkg : packages) {
-        if (pred(*this, *pkg.second)) {
-            pkgs.emplace_back(pkg.second);
+    // TODO: use cache here
+    // TODO: avoid std::move()
+    auto pkgs = std::vector<std::shared_ptr<Package>>();
+    auto txn = m_storage->packages.getROTransaction();
+    for (auto i = txn.begin(); i != txn.end(); ++i) {
+        if (pred(*this, *i)) {
+            pkgs.emplace_back(std::make_shared<Package>(std::move(*i)));
         }
     }
     return pkgs;
 }
 
-void Database::removePackageDependencies(PackageMap::const_iterator packageIterator)
+static void removeDependency(DependencyStorage::RWTransaction &txn, StorageID packageID, const std::string &dependencyName)
 {
-    const auto &package = packageIterator->second;
-    providedDeps.remove(Dependency(package->name, package->version), package);
-    for (const auto &dep : package->provides) {
-        providedDeps.remove(dep, package);
-    }
-    for (const auto &dep : package->dependencies) {
-        requiredDeps.remove(dep, package);
-    }
-    for (const auto &dep : package->optionalDependencies) {
-        requiredDeps.remove(dep, package);
-    }
-    for (const auto &lib : package->libprovides) {
-        const auto iterator(providedLibs.find(lib));
-        if (iterator == providedLibs.end()) {
-            continue;
-        }
-        auto &relevantPackages(iterator->second);
-        relevantPackages.erase(remove(relevantPackages.begin(), relevantPackages.end(), package), relevantPackages.end());
-        if (relevantPackages.empty()) {
-            providedLibs.erase(iterator);
-        }
-    }
-    for (const auto &lib : package->libdepends) {
-        const auto iterator(requiredLibs.find(lib));
-        if (iterator == requiredLibs.end()) {
-            continue;
-        }
-        auto &relevantPackages(iterator->second);
-        relevantPackages.erase(remove(relevantPackages.begin(), relevantPackages.end(), package), relevantPackages.end());
-        if (relevantPackages.empty()) {
-            requiredLibs.erase(iterator);
+    for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
+        auto &dependency = i.value();
+        dependency.relevantPackages.erase(packageID);
+        if (dependency.relevantPackages.empty()) {
+            i.del();
+        } else {
+            txn.put(dependency, i.getID());
         }
     }
 }
 
-void Database::addPackageDependencies(const std::shared_ptr<Package> &package)
+static void removeLibDependency(LibraryDependencyStorage::RWTransaction &txn, StorageID packageID, const std::string &dependencyName)
 {
-    providedDeps.add(Dependency(package->name, package->version), package);
-    for (const auto &dep : package->provides) {
-        providedDeps.add(dep, package);
+    for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
+        auto &dependency = i.value();
+        dependency.relevantPackages.erase(packageID);
+        if (dependency.relevantPackages.empty()) {
+            i.del();
+        } else {
+            txn.put(dependency, i.getID());
+        }
     }
-    for (const auto &dep : package->dependencies) {
-        requiredDeps.add(dep, package);
+}
+
+void Database::removePackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package)
+{
+    {
+        auto txn = m_storage->providedDeps.getRWTransaction();
+        removeDependency(txn, packageID, package->name);
+        for (const auto &dep : package->provides) {
+            removeDependency(txn, packageID, dep.name);
+        }
+        txn.commit();
     }
-    for (const auto &dep : package->optionalDependencies) {
-        requiredDeps.add(dep, package);
+    {
+        auto txn = m_storage->requiredDeps.getRWTransaction();
+        for (const auto &dep : package->dependencies) {
+            removeDependency(txn, packageID, dep.name);
+        }
+        for (const auto &dep : package->optionalDependencies) {
+            removeDependency(txn, packageID, dep.name);
+        }
+        txn.commit();
     }
-    for (const auto &lib : package->libprovides) {
-        providedLibs[lib].emplace_back(package);
+    {
+        auto txn = m_storage->providedLibs.getRWTransaction();
+        for (const auto &lib : package->libprovides) {
+            removeLibDependency(txn, packageID, lib);
+        }
+        txn.commit();
     }
-    for (const auto &lib : package->libdepends) {
-        requiredLibs[lib].emplace_back(package);
+    {
+        auto txn = m_storage->requiredLibs.getRWTransaction();
+        for (const auto &lib : package->libdepends) {
+            removeLibDependency(txn, packageID, lib);
+        }
+        txn.commit();
     }
+}
+
+static void addDependency(DependencyStorage::RWTransaction &txn, StorageID packageID, const std::string &dependencyName,
+    const std::string &dependencyVersion, DependencyMode dependencyMode = DependencyMode::Any)
+{
+    for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
+        auto &existingDependency = i.value();
+        if (static_cast<const Dependency &>(existingDependency).version != dependencyVersion) {
+            continue;
+        }
+        const auto [i2, newID] = existingDependency.relevantPackages.emplace(packageID);
+        if (newID) {
+            txn.put(existingDependency, i.getID());
+        }
+        return;
+    }
+    auto newDependency = DatabaseDependency(dependencyName, dependencyVersion, dependencyMode);
+    newDependency.relevantPackages.emplace(packageID);
+    txn.put(newDependency);
+}
+
+static void addLibDependency(LibraryDependencyStorage::RWTransaction &txn, StorageID packageID, const std::string &dependencyName)
+{
+    for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
+        auto &existingDependency = i.value();
+        const auto [i2, newID] = existingDependency.relevantPackages.emplace(packageID);
+        if (newID) {
+            txn.put(existingDependency, i.getID());
+        }
+        return;
+    }
+    auto newDependency = DatabaseLibraryDependency(dependencyName);
+    newDependency.relevantPackages.emplace(packageID);
+    txn.put(newDependency);
+}
+
+void Database::addPackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package)
+{
+    {
+        auto txn = m_storage->providedDeps.getRWTransaction();
+        addDependency(txn, packageID, package->name, package->version);
+        for (const auto &dep : package->provides) {
+            addDependency(txn, packageID, dep.name, dep.version, dep.mode);
+        }
+        txn.commit();
+    }
+    {
+        auto txn = m_storage->requiredDeps.getRWTransaction();
+        for (const auto &dep : package->dependencies) {
+            addDependency(txn, packageID, dep.name, dep.version, dep.mode);
+        }
+        for (const auto &dep : package->optionalDependencies) {
+            addDependency(txn, packageID, dep.name, dep.version, dep.mode);
+        }
+        txn.commit();
+    }
+    {
+        auto txn = m_storage->providedLibs.getRWTransaction();
+        for (const auto &lib : package->libprovides) {
+            addLibDependency(txn, packageID, lib);
+        }
+        txn.commit();
+    }
+    {
+        auto txn = m_storage->requiredLibs.getRWTransaction();
+        for (const auto &lib : package->libdepends) {
+            addLibDependency(txn, packageID, lib);
+        }
+        txn.commit();
+    }
+}
+
+void Database::allPackages(const PackageVisitor &visitor)
+{
+    // TODO: use cache here
+    //auto &cachedPackages = m_storage->packageCache;
+    auto txn = m_storage->packages.getROTransaction();
+    for (auto i = txn.begin(); i != txn.end(); ++i) {
+        if (visitor(i.getID(), std::move(i.value()))) {
+            return;
+        }
+    }
+}
+
+std::size_t Database::packageCount() const
+{
+    return m_storage->packages.getROTransaction().size();
+}
+
+void Database::providingPackages(const Dependency &dependency, bool reverse, const PackageVisitor &visitor)
+{
+    // TODO: use cache here
+    auto package = Package();
+    auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
+    auto packagesTxn = m_storage->packages.getROTransaction();
+    for (auto [i, end] = providesTxn.equal_range<0>(dependency.name); i != end; ++i) {
+        const Dependency &providedDependency = i.value();
+        if (!Dependency::matches(dependency.mode, dependency.version, providedDependency.version)) {
+            continue;
+        }
+        for (const auto packageID : i->relevantPackages) {
+            if (packagesTxn.get(packageID, package) && visitor(packageID, std::move(package))) {
+                return;
+            }
+        }
+    }
+}
+
+void Database::providingPackages(const std::string &libraryName, bool reverse, const PackageVisitor &visitor)
+{
+    // TODO: use cache here
+    auto package = Package();
+    auto providesTxn = (reverse ? m_storage->requiredLibs : m_storage->providedLibs).getROTransaction();
+    auto packagesTxn = m_storage->packages.getROTransaction();
+    for (auto [i, end] = providesTxn.equal_range<0>(libraryName); i != end; ++i) {
+        for (const auto packageID : i->relevantPackages) {
+            if (packagesTxn.get(packageID, package) && visitor(packageID, std::move(package))) {
+                return;
+            }
+        }
+    }
+}
+
+bool Database::provides(const Dependency &dependency, bool reverse) const
+{
+    auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
+    for (auto [i, end] = providesTxn.equal_range<0>(dependency.name); i != end; ++i) {
+        const Dependency &providedDependency = i.value();
+        if (Dependency::matches(dependency.mode, dependency.version, providedDependency.version)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Database::provides(const std::string &libraryName, bool reverse) const
+{
+    auto providesTxn = (reverse ? m_storage->requiredLibs : m_storage->providedLibs).getROTransaction();
+    return providesTxn.find<0>(libraryName) != providesTxn.end();
+}
+
+std::shared_ptr<Package> Database::findPackage(StorageID packageID)
+{
+    // TODO: use cache here
+    auto package = std::make_shared<Package>();
+    auto txn = m_storage->packages.getROTransaction();
+    return txn.get(packageID, *package) ? package : std::shared_ptr<Package>();
+}
+
+std::shared_ptr<Package> Database::findPackage(const std::string &packageName)
+{
+    return m_storage->packageCache.retrieve(*m_storage, packageName).pkg;
+}
+
+PackageSpec Database::findPackageWithID(const std::string &packageName)
+{
+    return m_storage->packageCache.retrieve(*m_storage, packageName);
 }
 
 void Database::removePackage(const std::string &packageName)
 {
-    const auto packageIterator = packages.find(packageName);
-    if (packageIterator == packages.end()) {
-        return;
+    const auto [packageID, package] = m_storage->packageCache.retrieve(*m_storage, packageName);
+    if (package) {
+        removePackageDependencies(packageID, package);
+        m_storage->packageCache.invalidate(*m_storage, packageName);
     }
-    removePackage(packageIterator);
 }
 
-void LibPkg::Database::removePackage(PackageMap::const_iterator packageIterator)
+StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
 {
-    removePackageDependencies(packageIterator);
-    packages.erase(packageIterator);
+    const auto res = m_storage->packageCache.store(*m_storage, package, false);
+    if (!res.updated) {
+        return res.id;
+    }
+    if (res.oldPackage) {
+        removePackageDependencies(res.id, res.oldPackage);
+    }
+    addPackageDependencies(res.id, package);
+    return res.id;
 }
 
-void Database::updatePackage(const std::shared_ptr<Package> &package)
+StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
 {
-    // check whether the package already exists
-    const auto packageIterator = packages.find(package->name);
-    if (packageIterator != packages.end()) {
-        const auto &existingPackage = packageIterator->second;
-        if (package == existingPackage) {
-            return;
-        }
-        // retain certain information obtained from package contents if this is actually the same package as before
-        package->addDepsAndProvidesFromOtherPackage(*existingPackage);
-        // remove the existing package
-        removePackage(packageIterator);
+    const auto res = m_storage->packageCache.store(*m_storage, package, true);
+    if (res.oldPackage) {
+        removePackageDependencies(res.id, res.oldPackage);
     }
-
-    // add the new package
-    addPackageDependencies(package);
-    packages.emplace(package->name, package);
-}
-
-void Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
-{
-    // check whether the package already exists
-    const auto packageIterator = packages.find(package->name);
-    auto differentPackage = true;
-    if (packageIterator != packages.end()) {
-        const auto &existingPackage = packageIterator->second;
-        if ((differentPackage = package != existingPackage)) {
-            // retain certain information obtained from package contents if this is actually the same package as before
-            package->addDepsAndProvidesFromOtherPackage(*existingPackage);
-            // remove the existing package
-            removePackage(packageIterator);
-        }
-    }
-
-    // add the new package
-    addPackageDependencies(package);
-    if (differentPackage) {
-        packages.emplace(package->name, package);
-    }
+    addPackageDependencies(res.id, package);
+    return res.id;
 }
 
 void Database::replacePackages(const std::vector<std::shared_ptr<Package>> &newPackages, DateTime lastModified)
 {
-    // retain certain information obtained from package contents
-    for (auto &package : newPackages) {
-        const auto packageIterator = packages.find(package->name);
-        if (packageIterator == packages.end()) {
-            continue;
-        }
-        package->addDepsAndProvidesFromOtherPackage(*packageIterator->second);
-    }
-    // clear current packages and add new ones
     clearPackages();
-    for (auto &package : newPackages) {
-        updatePackage(package);
+    auto updater = PackageUpdater(*this);
+    for (const auto &package : newPackages) {
+        updater.update(package);
     }
+    updater.commit();
     lastUpdate = lastModified;
 }
 
@@ -200,15 +403,15 @@ void Database::replacePackages(const std::vector<std::shared_ptr<Package>> &newP
  * \remarks "Resolvable" means here (so far) just that all dependencies are present. It does not mean a package is "installable" because
  *          conflicts between dependencies might still prevent that.
  */
-std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::detectUnresolvedPackages(Config &config,
+std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolvedPackages(Config &config,
     const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedProvides,
     const std::unordered_set<std::string_view> &depsToIgnore, const std::unordered_set<std::string_view> &libsToIgnore)
 {
-    auto unresolvedPackages = std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies>();
+    auto unresolvedPackages = std::unordered_map<PackageSpec, UnresolvedDependencies>();
 
     // determine new provides
-    DependencySet newProvides;
-    set<string> newLibProvides;
+    auto newProvides = DependencySet();
+    auto newLibProvides = std::set<std::string>();
     for (const auto &newPackage : newPackages) {
         newProvides.add(Dependency(newPackage->name, newPackage->version), newPackage);
         for (const auto &newProvide : newPackage->provides) {
@@ -230,29 +433,26 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
     }
 
     // check whether all required dependencies are still provided
-    for (const auto &requiredDep : requiredDeps) {
-        const auto &[dependencyName, dependencyDetail] = requiredDep;
-        const auto &affectedPackages = dependencyDetail.relevantPackages;
-
+    for (auto txn = m_storage->requiredDeps.getROTransaction(); const auto &requiredDep : txn) {
         // skip dependencies to ignore
-        if (depsToIgnore.find(dependencyName) != depsToIgnore.end()) {
+        if (depsToIgnore.find(requiredDep.name) != depsToIgnore.end()) {
             continue;
         }
 
         // skip if new packages provide dependency
-        if (newProvides.provides(dependencyName, dependencyDetail)) {
+        if (newProvides.provides(requiredDep)) {
             continue;
         }
 
         // skip if db provides dependency
-        if (!removedProvides.provides(dependencyName, dependencyDetail) && providedDeps.provides(dependencyName, dependencyDetail)) {
+        if (!removedProvides.provides(requiredDep) && provides(requiredDep)) {
             continue;
         }
 
         // skip if dependency is provided by a database this database depends on or the protected version of this db
         auto providedByAnotherDb = false;
         for (const auto *db : deps) {
-            if ((providedByAnotherDb = db->providedDeps.provides(requiredDep.first, requiredDep.second))) {
+            if ((providedByAnotherDb = db->provides(requiredDep))) {
                 break;
             }
         }
@@ -261,33 +461,34 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
         }
 
         // add packages to list of unresolved packages
-        for (const auto &affectedPackage : affectedPackages) {
-            unresolvedPackages[affectedPackage].deps.emplace_back(Dependency(dependencyName, dependencyDetail.version, dependencyDetail.mode));
+        for (const auto &affectedPackageID : requiredDep.relevantPackages) {
+            const auto affectedPackage = findPackage(affectedPackageID);
+            unresolvedPackages[PackageSpec(affectedPackageID, affectedPackage)].deps.emplace_back(requiredDep);
         }
     }
 
     // check whether all required libraries are still provided
-    for (const auto &[requiredLib, affectedPackages] : requiredLibs) {
+    for (auto txn = m_storage->requiredLibs.getROTransaction(); const auto &requiredLib : txn) {
 
         // skip libs to ignore
-        if (libsToIgnore.find(requiredLib) != libsToIgnore.end()) {
+        if (libsToIgnore.find(requiredLib.name) != libsToIgnore.end()) {
             continue;
         }
 
         // skip if new packages provide dependency
-        if (newLibProvides.find(requiredLib) != newLibProvides.end()) {
+        if (newLibProvides.find(requiredLib.name) != newLibProvides.end()) {
             continue;
         }
 
         // skip if db provides dependency
-        if (providedLibs.find(requiredLib) != providedLibs.end()) {
+        if (provides(requiredLib.name)) {
             continue;
         }
 
         // skip if dependency is provided by a database this database depends on or the protected version of this db
         auto providedByAnotherDb = false;
         for (const auto *db : deps) {
-            if ((providedByAnotherDb = db->providedLibs.find(requiredLib) != db->providedLibs.end())) {
+            if ((providedByAnotherDb = db->provides(requiredLib.name))) {
                 break;
             }
         }
@@ -296,8 +497,9 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
         }
 
         // add packages to list of unresolved packages
-        for (const auto &affectedPackage : affectedPackages) {
-            unresolvedPackages[affectedPackage].libs.emplace_back(requiredLib);
+        for (const auto &affectedPackageID : requiredLib.relevantPackages) {
+            const auto affectedPackage = findPackage(affectedPackageID);
+            unresolvedPackages[PackageSpec(affectedPackageID, affectedPackage)].libs.emplace_back(requiredLib.name);
         }
     }
 
@@ -306,8 +508,9 @@ std::unordered_map<std::shared_ptr<Package>, UnresolvedDependencies> Database::d
 
 LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPkg::Database *> &updateSources, UpdateCheckOptions options)
 {
-    PackageUpdates results;
-    for (const auto &[myPackageName, myPackage] : packages) {
+    auto results = PackageUpdates();
+    allPackages([&](StorageID myPackageID, Package &&package) {
+        auto myPackage = std::make_shared<Package>(std::move(package));
         auto regularName = std::string();
         if (options & UpdateCheckOptions::ConsiderRegularPackage) {
             const auto decomposedName = myPackage->decomposeName();
@@ -317,12 +520,11 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
         }
         auto foundPackage = false;
         for (auto *const updateSource : updateSources) {
-            const auto updatePackageIterator = updateSource->packages.find(myPackageName);
-            if (updatePackageIterator == updateSource->packages.cend()) {
+            const auto [updatePackageID, updatePackage] = updateSource->findPackageWithID(myPackage->name);
+            if (!updatePackage) {
                 continue;
             }
             foundPackage = true;
-            const auto &updatePackage = updatePackageIterator->second;
             const auto versionDiff = myPackage->compareVersion(*updatePackage);
             std::vector<PackageUpdate> *list = nullptr;
             switch (versionDiff) {
@@ -338,21 +540,21 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
             default:;
             }
             if (list) {
-                list->emplace_back(PackageSearchResult(*this, myPackage), PackageSearchResult(*updateSource, updatePackage));
+                list->emplace_back(
+                    PackageSearchResult(*this, myPackage, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
             }
         }
         if (!foundPackage) {
-            results.orphans.emplace_back(PackageSearchResult(*this, myPackage));
+            results.orphans.emplace_back(PackageSearchResult(*this, myPackage, myPackageID));
         }
         if (regularName.empty()) {
-            continue;
+            return false;
         }
         for (auto *const updateSource : updateSources) {
-            const auto updatePackageIterator = updateSource->packages.find(regularName);
-            if (updatePackageIterator == updateSource->packages.cend()) {
+            const auto [updatePackageID, updatePackage] = updateSource->findPackageWithID(regularName);
+            if (!updatePackage) {
                 continue;
             }
-            const auto &updatePackage = updatePackageIterator->second;
             const auto versionDiff = myPackage->compareVersion(*updatePackage);
             std::vector<PackageUpdate> *list = nullptr;
             switch (versionDiff) {
@@ -368,10 +570,12 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
             default:;
             }
             if (list) {
-                list->emplace_back(PackageSearchResult(*this, myPackage), PackageSearchResult(*updateSource, updatePackage));
+                list->emplace_back(
+                    PackageSearchResult(*this, myPackage, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
             }
         }
-    }
+        return false;
+    });
     return results;
 }
 
@@ -414,6 +618,167 @@ std::string Database::filesPathFromRegularPath() const
     }
     const auto ext = path.rfind(".db");
     return ext == std::string::npos ? path : argsToString(std::string_view(path.data(), ext), ".files");
+}
+
+PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage)
+    : packagesTxn(storage.packages.getRWTransaction())
+{
+}
+
+void PackageUpdaterPrivate::update(const PackageCache::StoreResult &res, const std::shared_ptr<Package> &package)
+{
+    update(res.id, false, package);
+    if (res.oldPackage) {
+        update(res.id, true, res.oldPackage);
+    }
+}
+
+void PackageUpdaterPrivate::update(const StorageID packageID, bool removed, const std::shared_ptr<Package> &package)
+{
+    addDependency(packageID, Dependency(package->name, package->version), removed, affectedProvidedDeps);
+    for (const auto &dependeny : package->provides) {
+        addDependency(packageID, dependeny, removed, affectedProvidedDeps);
+    }
+    for (const auto &lib : package->libprovides) {
+        addLibrary(packageID, lib, removed, affectedProvidedLibs);
+    }
+    for (const auto &dependeny : package->dependencies) {
+        addDependency(packageID, dependeny, removed, affectedRequiredDeps);
+    }
+    for (const auto &dependeny : package->optionalDependencies) {
+        addDependency(packageID, dependeny, removed, affectedRequiredDeps);
+    }
+    for (const auto &lib : package->libdepends) {
+        addLibrary(packageID, lib, removed, affectedRequiredLibs);
+    }
+}
+
+void PackageUpdaterPrivate::submit(const std::string &dependencyName, AffectedDeps::mapped_type &affected, DependencyStorage::RWTransaction &txn)
+{
+    for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
+        auto &existingDependency = i.value();
+        if (static_cast<const Dependency &>(existingDependency).version != affected.version) {
+            continue;
+        }
+        auto &pkgs = existingDependency.relevantPackages;
+        auto size = pkgs.size();
+        pkgs.merge(affected.newPackages);
+        auto change = pkgs.size() != size;
+        for (auto &toRemove : affected.removedPackages) {
+            change = pkgs.erase(toRemove) || change;
+        }
+        if (change) {
+            txn.put(existingDependency, i.getID());
+        }
+        return;
+    }
+    auto newDependency = DatabaseDependency(dependencyName, affected.version, affected.mode);
+    newDependency.relevantPackages.swap(affected.newPackages);
+    txn.put(newDependency);
+}
+
+void PackageUpdaterPrivate::submit(const std::string &libraryName, AffectedLibs::mapped_type &affected, LibraryDependencyStorage::RWTransaction &txn)
+{
+    for (auto [i, end] = txn.equal_range<0>(libraryName); i != end; ++i) {
+        auto &existingDependency = i.value();
+        auto &pkgs = existingDependency.relevantPackages;
+        auto size = pkgs.size();
+        pkgs.merge(affected.newPackages);
+        auto change = pkgs.size() != size;
+        for (auto &toRemove : affected.removedPackages) {
+            change = pkgs.erase(toRemove) || change;
+        }
+        if (change) {
+            txn.put(existingDependency, i.getID());
+        }
+        return;
+    }
+    auto newDependency = DatabaseLibraryDependency(libraryName);
+    newDependency.relevantPackages.swap(affected.newPackages);
+    txn.put(newDependency);
+}
+PackageUpdaterPrivate::AffectedDeps::iterator PackageUpdaterPrivate::findDependency(const Dependency &dependency, AffectedDeps &affected)
+{
+    for (auto range = affected.equal_range(dependency.name); range.first != range.second; ++range.first) {
+        if (dependency.version == range.first->second.version) {
+            return range.first;
+        }
+    }
+    return affected.end();
+}
+
+void PackageUpdaterPrivate::addDependency(StorageID packageID, const Dependency &dependency, bool removed, AffectedDeps &affected)
+{
+    auto iterator = findDependency(dependency, affected);
+    if (iterator == affected.end()) {
+        iterator = affected.insert(AffectedDeps::value_type(dependency.name, AffectedDeps::mapped_type()));
+        iterator->second.version = dependency.version;
+        iterator->second.mode = dependency.mode;
+    }
+    if (!removed) {
+        iterator->second.newPackages.emplace(packageID);
+    } else {
+        iterator->second.removedPackages.emplace(packageID);
+    }
+}
+
+void PackageUpdaterPrivate::addLibrary(StorageID packageID, const std::string &libraryName, bool removed, AffectedLibs &affected)
+{
+    if (auto &affectedPackages = affected[libraryName]; !removed) {
+        affectedPackages.newPackages.emplace(packageID);
+    } else {
+        affectedPackages.removedPackages.emplace(packageID);
+    }
+}
+
+PackageUpdater::PackageUpdater(Database &database)
+    : m_database(database)
+    , m_d(std::make_unique<PackageUpdaterPrivate>(*m_database.m_storage))
+{
+}
+
+PackageUpdater::~PackageUpdater()
+{
+}
+
+StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
+{
+    const auto res = m_database.m_storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package);
+    m_d->update(res, package);
+    return res.id;
+}
+
+void PackageUpdater::commit()
+{
+    m_d->packagesTxn.commit();
+    {
+        auto txn = m_database.m_storage->providedDeps.getRWTransaction();
+        for (auto &[dependencyName, affected] : m_d->affectedProvidedDeps) {
+            m_d->submit(dependencyName, affected, txn);
+        }
+        txn.commit();
+    }
+    {
+        auto txn = m_database.m_storage->requiredDeps.getRWTransaction();
+        for (auto &[dependencyName, affected] : m_d->affectedRequiredDeps) {
+            m_d->submit(dependencyName, affected, txn);
+        }
+        txn.commit();
+    }
+    {
+        auto txn = m_database.m_storage->providedLibs.getRWTransaction();
+        for (auto &[libraryName, affected] : m_d->affectedProvidedLibs) {
+            m_d->submit(libraryName, affected, txn);
+        }
+        txn.commit();
+    }
+    {
+        auto txn = m_database.m_storage->requiredLibs.getRWTransaction();
+        for (auto &[libraryName, affected] : m_d->affectedRequiredLibs) {
+            m_d->submit(libraryName, affected, txn);
+        }
+        txn.commit();
+    }
 }
 
 } // namespace LibPkg

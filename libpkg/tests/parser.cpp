@@ -21,6 +21,7 @@ using CppUtilities::operator<<; // must be visible prior to the call site
 using namespace std;
 using namespace CPPUNIT_NS;
 using namespace CppUtilities;
+using namespace CppUtilities::Literals;
 using namespace LibPkg;
 using namespace TestHelper;
 
@@ -141,32 +142,33 @@ void ParserTests::testParsingPackageName()
 void ParserTests::testParsingConfig()
 {
     // prepare pacman.conf
-    const string pacmanConfigWorkingCopyPath = workingCopyPath("pacman.conf"s, WorkingCopyMode::NoCopy);
+    const auto pacmanConfigWorkingCopyPath = workingCopyPath("pacman.conf"s, WorkingCopyMode::NoCopy);
     {
-        const string mirrorListPath = testFilePath("mirrorlist"s);
-        string defaultPacmanConfig = readFile(testFilePath("pacman.conf"s), 5 * 1024);
+        const auto mirrorListPath = testFilePath("mirrorlist"s);
+        auto defaultPacmanConfig = readFile(testFilePath("pacman.conf"s), 5 * 1024);
         findAndReplace(defaultPacmanConfig, "/etc/pacman.d/mirrorlist"s, mirrorListPath);
-        ofstream pacmanConfigWorkingCopy;
+        auto pacmanConfigWorkingCopy = std::ofstream();
         pacmanConfigWorkingCopy.exceptions(ios_base::failbit | ios_base::badbit);
         pacmanConfigWorkingCopy.open(pacmanConfigWorkingCopyPath, ios_base::out | ios_base::trunc | ios_base::binary);
         pacmanConfigWorkingCopy.write(defaultPacmanConfig.data(), static_cast<streamsize>(defaultPacmanConfig.size()));
     }
 
-    Config config;
+    auto config = Config();
+    config.initStorage(workingCopyPath("test-parsing-pacman-config.db", WorkingCopyMode::Cleanup).data());
     config.loadPacmanConfig(pacmanConfigWorkingCopyPath.data());
     for (auto &db : config.databases) {
         db.deducePathsFromLocalDirs();
     }
 
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("cache dir"s, vector<string>{ "/cache/path/"s }, config.packageCacheDirs);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("cache dir"s, std::vector<std::string>{ "/cache/path/"s }, config.packageCacheDirs);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("pacman database path"s, "/db/path/"s, config.pacmanDatabasePath);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("3 databases found"s, 3ul, config.databases.size());
     CPPUNIT_ASSERT_EQUAL("core"s, config.databases[0].name);
     CPPUNIT_ASSERT_EQUAL("extra"s, config.databases[1].name);
     CPPUNIT_ASSERT_EQUAL("community"s, config.databases[2].name);
-    const vector<string> mirrorsCore = { "http://ftp.fau.de/archlinux/core/os/i686"s, "https://ftp.fau.de/archlinux/core/os/i686"s };
+    const auto mirrorsCore = std::vector<std::string>{ "http://ftp.fau.de/archlinux/core/os/i686"s, "https://ftp.fau.de/archlinux/core/os/i686"s };
     CPPUNIT_ASSERT_EQUAL_MESSAGE("mirrors read correctly in first place"s, mirrorsCore, config.databases[0].mirrors);
-    const vector<string> mirrorsExtra = { "http://ftp.fau.de/archlinux/extra/os/i686"s, "https://ftp.fau.de/archlinux/extra/os/i686"s };
+    const auto mirrorsExtra = std::vector<std::string>{ "http://ftp.fau.de/archlinux/extra/os/i686"s, "https://ftp.fau.de/archlinux/extra/os/i686"s };
     CPPUNIT_ASSERT_EQUAL_MESSAGE("reusing already parsed mirror list"s, mirrorsExtra, config.databases[1].mirrors);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("regular database file"s, "/db/path/sync/extra.db"s, config.databases[1].path);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("database file containing files"s, "/db/path/sync/extra.files"s, config.databases[1].filesPath);
@@ -181,7 +183,7 @@ void ParserTests::testParsingPlainSrcInfo()
     const auto packages = Package::fromInfo(srcInfo, false);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("1 package present"s, 1ul, packages.size());
 
-    const Package &pkg1 = *packages.front();
+    const Package &pkg1 = *packages.front().pkg;
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::SourceInfo, pkg1.origin);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("name"s, "c++utilities"s, pkg1.name);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("version"s, "4.5.0-1"s, pkg1.version);
@@ -201,7 +203,7 @@ void ParserTests::testParsingSplitPackageSrcInfo()
     const auto packages = Package::fromInfo(srcInfo, false);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("2 (split) packages present"s, 2ul, packages.size());
 
-    const Package &pkg1 = *packages.front(), &pkg2 = *packages.back();
+    const Package &pkg1 = *packages.front().pkg, &pkg2 = *packages.back().pkg;
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin (1)", PackageOrigin::SourceInfo, pkg1.origin);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin (2)", PackageOrigin::SourceInfo, pkg2.origin);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("name (1)"s, "mingw-w64-harfbuzz"s, pkg1.name);
@@ -236,7 +238,7 @@ void ParserTests::testParsingSplitPackageSrcInfoWithDifferentArchs()
     const auto packages = Package::fromInfo(srcInfo, false);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("3 (split) packages present"s, 3ul, packages.size());
 
-    const auto &jre = packages[0], &jdk = packages[1], &doc = packages[2];
+    const auto &jre = packages[0].pkg, &jdk = packages[1].pkg, &doc = packages[2].pkg;
     CPPUNIT_ASSERT_MESSAGE("source info present", jdk->sourceInfo);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("jre has same source info as base", jdk->sourceInfo, jre->sourceInfo);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk-doc has same source info as base", jdk->sourceInfo, doc->sourceInfo);
@@ -254,8 +256,8 @@ void ParserTests::testParsingPkgInfo()
     const auto pkgInfo = readFile(testFilePath("mingw-w64-harfbuzz/PKGINFO"));
     const auto packages = Package::fromInfo(pkgInfo, true);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("1 package present"s, 1ul, packages.size());
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::PackageInfo, packages.front()->origin);
-    checkHarfbuzzPackage(*packages.front());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::PackageInfo, packages.front().pkg->origin);
+    checkHarfbuzzPackage(*packages.front().pkg);
 }
 
 void ParserTests::testParsingPkgName()
@@ -290,21 +292,34 @@ void ParserTests::testParsingDescriptions()
 
 void ParserTests::testParsingDatabase()
 {
-    // init config
-    Config config;
-    config.databases.emplace_back();
+    auto dbFile = workingCopyPath("test-parsing-database.db", WorkingCopyMode::Cleanup);
 
-    // init db object
-    Database &db = config.databases.back();
-    db.path = testFilePath("core.db");
-    db.filesPath = testFilePath("core.files");
+    {
+        // init config
+        auto config = Config();
+        config.initStorage(dbFile.data());
 
-    // load packages
-    config.loadAllPackages(true);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("all 215 packages present"s, 215ul, db.packages.size());
-    const auto &autoreconf(db.packages.at("autoconf"));
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::Database, autoreconf->origin);
-    checkAutoconfPackage(*autoreconf);
+        // init db object
+        auto *const db = config.findOrCreateDatabase("test"sv, "x86_64"sv);
+        db->path = testFilePath("core.db");
+        db->filesPath = testFilePath("core.files");
+
+        // load packages
+        config.loadAllPackages(true);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("all 215 packages present"s, 215_st, db->packageCount());
+        const auto autoreconf = db->findPackage("autoconf");
+        CPPUNIT_ASSERT_MESSAGE("autoreconf exists", autoreconf != nullptr);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::Database, autoreconf->origin);
+        checkAutoconfPackage(*autoreconf);
+    }
+
+    {
+        // load config again to test persistency of database/storage
+        auto config = Config();
+        config.initStorage(dbFile.data());
+        auto *const db = config.findOrCreateDatabase("test"sv, "x86_64"sv);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("config persistent; all 215 packages still present"s, 215_st, db->packageCount());
+    }
 }
 
 void ParserTests::testParsingSignatureLevel()

@@ -62,39 +62,47 @@ public:
     void testMisc();
 
 private:
+    void setupPackages();
+
+    std::string m_dbFile;
     Config m_config;
-    shared_ptr<Package> m_pkg1, m_pkg2, m_pkg3;
+    std::shared_ptr<Package> m_pkg1, m_pkg2, m_pkg3;
+    StorageID m_pkgId1, m_pkgId2, m_pkgId3;
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(DataTests);
 
 void DataTests::setUp()
 {
-    m_pkg1 = make_shared<Package>();
-    m_pkg1->name = "foo";
-    m_pkg1->version = "5.6-6";
-    m_pkg1->dependencies.emplace_back("bar>=5.5");
-    m_pkg1->dependencies.emplace_back("bar<5.6");
-    m_pkg2 = make_shared<Package>();
-    m_pkg2->name = "bar";
-    m_pkg2->version = "5.5-1";
-    m_pkg2->provides.emplace_back("foo", "5.8-1");
-    m_pkg3 = make_shared<Package>();
-    m_pkg3->name = "foo";
-    m_pkg3->version = "5.7-1";
-    Database db1;
-    db1.name = "db1";
-    db1.updatePackage(m_pkg1);
-    db1.updatePackage(m_pkg2);
-    m_config.databases.emplace_back(move(db1));
-    Database db2;
-    db2.name = "db2";
-    db2.updatePackage(m_pkg3);
-    m_config.databases.emplace_back(move(db2));
 }
 
 void DataTests::tearDown()
 {
+}
+
+void DataTests::setupPackages()
+{
+    m_dbFile = workingCopyPath("test-data.db", WorkingCopyMode::Cleanup);
+    m_config.initStorage(m_dbFile.data());
+    m_pkg1 = std::make_shared<Package>();
+    m_pkg1->name = "foo";
+    m_pkg1->version = "5.6-6";
+    m_pkg1->dependencies.emplace_back("bar>=5.5");
+    m_pkg1->dependencies.emplace_back("bar<5.6");
+    m_pkg2 = std::make_shared<Package>();
+    m_pkg2->name = "bar";
+    m_pkg2->version = "5.5-1";
+    m_pkg2->provides.emplace_back("foo", "5.8-1");
+    m_pkg3 = std::make_shared<Package>();
+    m_pkg3->name = "foo";
+    m_pkg3->version = "5.7-1";
+    auto *const db1 = m_config.findOrCreateDatabase("db1"sv, std::string_view());
+    CPPUNIT_ASSERT_MESSAGE("ID for pkg 1 returned", m_pkgId1 = db1->updatePackage(m_pkg1));
+    CPPUNIT_ASSERT_MESSAGE("ID for pkg 2 returned", m_pkgId2 = db1->updatePackage(m_pkg2));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("packages added to db 1", 2_st, db1->packageCount());
+    auto *const db2 = m_config.findOrCreateDatabase("db2"sv, std::string_view());
+    CPPUNIT_ASSERT_MESSAGE("ID for pkg 3 returned", m_pkgId3 = db2->updatePackage(m_pkg3));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package added to db 2", 1_st, db2->packageCount());
 }
 
 void DataTests::testPackageVersionComparsion()
@@ -202,15 +210,21 @@ void DataTests::testDependencyMatching()
 
 void DataTests::testPackageSearch()
 {
-    auto pkg = m_config.findPackage(Dependency("foo"));
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "find package returns the package from the first database", &m_config.databases.front(), std::get<Database *>(pkg.db));
-    CPPUNIT_ASSERT_EQUAL(m_pkg1, pkg.pkg);
+    setupPackages();
 
     auto pkgs = m_config.findPackages("foo"sv);
     CPPUNIT_ASSERT_EQUAL(2_st, pkgs.size());
-    CPPUNIT_ASSERT_EQUAL(m_pkg1, pkgs.front().pkg);
-    CPPUNIT_ASSERT_EQUAL(m_pkg3, pkgs.back().pkg);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package from first db returned first, cached object returned", m_pkg1, pkgs.front().pkg);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package from first db returned second, cached object returned", m_pkg3, pkgs.back().pkg);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package id set as expected (1)", m_pkgId1, pkgs.front().id);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package id set as expected (2)", m_pkgId3, pkgs.back().id);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("db set as expected (1)", &m_config.databases.front(), std::get<Database *>(pkgs.front().db));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("db set as expected (2)", &m_config.databases.back(), std::get<Database *>(pkgs.back().db));
+
+    auto [db, pkg, packageID] = m_config.findPackage(Dependency("foo"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("expected package for dependency returned", m_pkgId1, packageID);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("find package returns the package from the first database", &m_config.databases.front(), std::get<Database *>(db));
+    // FIXME: check whether packge is actually (value) equivalent
 
     pkgs = m_config.findPackages("bar"sv);
     CPPUNIT_ASSERT_EQUAL(1_st, pkgs.size());
@@ -228,11 +242,13 @@ void DataTests::testPackageSearch()
 
     pkgs = m_config.findPackages(Dependency("foo", "5.8-1", DependencyMode::GreatherEqual));
     CPPUNIT_ASSERT_EQUAL(1_st, pkgs.size());
-    CPPUNIT_ASSERT_EQUAL(m_pkg2, pkgs.front().pkg);
+    CPPUNIT_ASSERT_EQUAL(m_pkgId2, pkgs.front().id);
+    // FIXME: check whether packge is actually (value) equivalent
 
     pkgs = m_config.findPackages(Dependency("bar", "5.5-1", DependencyMode::Equal));
     CPPUNIT_ASSERT_EQUAL(1_st, pkgs.size());
-    CPPUNIT_ASSERT_EQUAL(m_pkg2, pkgs.front().pkg);
+    CPPUNIT_ASSERT_EQUAL(m_pkgId2, pkgs.front().id);
+    // FIXME: check whether packge is actually (value) equivalent
 
     pkgs = m_config.findPackages(Dependency("bar", "5.8-1", DependencyMode::Equal));
     CPPUNIT_ASSERT_EQUAL(0_st, pkgs.size());
@@ -240,7 +256,7 @@ void DataTests::testPackageSearch()
 
 void DataTests::testComputingFileName()
 {
-    Package pkg;
+    auto pkg = Package();
     pkg.name = "test";
     pkg.version = "1.2-3";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("packageInfo required for computing filename", string(), pkg.computeFileName());
@@ -253,6 +269,7 @@ void DataTests::testComputingFileName()
 
 void DataTests::testDetectingUnresolved()
 {
+    setupPackages();
     auto &db1 = m_config.databases[0];
 
     CPPUNIT_ASSERT_EQUAL(0_st, db1.detectUnresolvedPackages(m_config, {}, {}).size());
@@ -263,11 +280,13 @@ void DataTests::testDetectingUnresolved()
     removedPackages.add(Dependency("bar", "5.5"), m_pkg2);
     const auto failures = db1.detectUnresolvedPackages(m_config, { m_pkg2 }, removedPackages);
     CPPUNIT_ASSERT_EQUAL(1_st, failures.size());
-    CPPUNIT_ASSERT_EQUAL(m_pkg1, failures.begin()->first);
+    CPPUNIT_ASSERT_EQUAL(m_pkgId1, failures.begin()->first.id);
 }
 
 void DataTests::testComputingBuildOrder()
 {
+    setupPackages();
+
     // order correctly changed according to dependencies
     auto res = m_config.computeBuildOrder({ "foo", "bar" }, BuildOrderOptions::None);
     CPPUNIT_ASSERT_EQUAL(true, res.success);
@@ -277,7 +296,7 @@ void DataTests::testComputingBuildOrder()
     CPPUNIT_ASSERT_EQUAL(0_st, res.ignored.size());
 
     // unknown package ignored
-    const vector<string> ignored = { "baz" };
+    const auto ignored = std::vector<std::string>{ "baz" };
     res = m_config.computeBuildOrder({ "foo", "bar", ignored[0] }, BuildOrderOptions::None);
     CPPUNIT_ASSERT_EQUAL(false, res.success);
     CPPUNIT_ASSERT_EQUAL(2_st, res.order.size());
@@ -286,13 +305,14 @@ void DataTests::testComputingBuildOrder()
     CPPUNIT_ASSERT_EQUAL(ignored, res.ignored);
 
     // add cycle
-    auto &db(m_config.databases[0]);
-    auto tar = make_shared<Package>();
+    auto &db = m_config.databases[0];
+    auto tar = std::make_shared<Package>();
     tar->name = "tar";
     tar->version = "5.6-6";
     tar->dependencies.emplace_back("foo");
     m_pkg2->dependencies.emplace_back("tar"); // let bar depend on tar
-    db.updatePackage(tar);
+    db.forceUpdatePackage(tar);
+    db.forceUpdatePackage(m_pkg2);
 
     // fail due to cycle
     res = m_config.computeBuildOrder({ "foo", "bar", "tar" }, BuildOrderOptions::None);
@@ -315,10 +335,12 @@ void DataTests::testComputingBuildOrder()
     CPPUNIT_ASSERT_EQUAL(0_st, res.ignored.size());
 
     // ignore cycle if not interested in that particular package
-    m_pkg2->packageInfo = make_unique<PackageInfo>();
-    tar->packageInfo = make_unique<PackageInfo>();
+    m_pkg2->packageInfo = std::make_unique<PackageInfo>();
+    tar->packageInfo = std::make_unique<PackageInfo>();
     tar->dependencies.clear();
     tar->dependencies.emplace_back("bar");
+    db.forceUpdatePackage(tar);
+    db.forceUpdatePackage(m_pkg2);
     res = m_config.computeBuildOrder({ "foo" }, BuildOrderOptions::None);
     CPPUNIT_ASSERT_EQUAL(true, res.success);
     CPPUNIT_ASSERT_EQUAL(0_st, res.cycle.size());
@@ -329,6 +351,7 @@ void DataTests::testComputingBuildOrder()
 
 void DataTests::setupTestDbs(std::size_t dbCount)
 {
+    setupPackages();
     m_config.databases.reserve(m_config.databases.size() + dbCount);
     for (std::size_t i = 1; i <= dbCount; ++i) {
         m_config.findOrCreateDatabase(argsToString("db", i), "x86_64");
@@ -387,16 +410,17 @@ void DataTests::testComputingDatabasesRequiringDatabase()
 
 void DataTests::testUpdateCheck()
 {
+    setupPackages();
     auto &db1 = m_config.databases.front();
     auto &db2 = m_config.databases.back();
     const auto result = db1.checkForUpdates({ &db2 });
     CPPUNIT_ASSERT_EQUAL(1_st, result.versionUpdates.size());
-    CPPUNIT_ASSERT_EQUAL(m_pkg1, result.versionUpdates.front().oldVersion.pkg);
-    CPPUNIT_ASSERT_EQUAL(m_pkg3, result.versionUpdates.front().newVersion.pkg);
+    CPPUNIT_ASSERT_EQUAL(m_pkgId1, result.versionUpdates.front().oldVersion.id);
+    CPPUNIT_ASSERT_EQUAL(m_pkgId3, result.versionUpdates.front().newVersion.id);
     CPPUNIT_ASSERT_EQUAL(0_st, result.packageUpdates.size());
     CPPUNIT_ASSERT_EQUAL(0_st, result.downgrades.size());
     CPPUNIT_ASSERT_EQUAL(1_st, result.orphans.size());
-    CPPUNIT_ASSERT_EQUAL(m_pkg2, result.orphans.front().pkg);
+    CPPUNIT_ASSERT_EQUAL(m_pkgId2, result.orphans.front().id);
 }
 
 void DataTests::testLocatePackage()
@@ -405,6 +429,7 @@ void DataTests::testLocatePackage()
     const auto syncthingTrayPkgPath = testFilePath("repo/foo/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz");
     const auto syncthingTrayStorageLocation = std::filesystem::canonical(testFilePath("syncthingtray/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz"));
 
+    setupPackages();
     auto &db = m_config.databases.front();
     db.localPkgDir = std::filesystem::path(fakePkgPath).parent_path();
 
@@ -440,6 +465,7 @@ void DataTests::testAddingDepsAndProvidesFromOtherPackage()
         Dependency{ "python", "3.5", DependencyMode::LessThan },
         Dependency{ "perl", "5.32", DependencyMode::GreatherEqual },
     };
+    setupPackages();
     m_pkg1->origin = PackageOrigin::PackageContents;
     m_pkg1->dependencies.insert(m_pkg1->dependencies.end(), dependenciesToTakeOver.begin(), dependenciesToTakeOver.end());
     m_pkg1->libdepends.emplace("foo");
@@ -465,6 +491,7 @@ void DataTests::testAddingDepsAndProvidesFromOtherPackage()
 
 void DataTests::testDependencyExport()
 {
+    setupPackages();
     m_pkg2->provides.emplace_back("yet-another-dependency");
     m_pkg2->libprovides.emplace("libfoo");
     m_pkg2->libprovides.emplace("libbar");

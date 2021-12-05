@@ -105,20 +105,14 @@ void PackageMovementAction::initWorkingDirectory()
 void PackageMovementAction::locatePackages()
 {
     // determine repo path and package paths
-    LibPkg::Database *db;
-    if (m_sourceDbs.empty()) {
-        db = *m_destinationDbs.begin();
-    } else {
-        db = *m_sourceDbs.begin();
-    }
-    const auto &packages = db->packages;
+    auto *const db = m_sourceDbs.empty() ? *m_destinationDbs.begin() : *m_sourceDbs.begin();
     for (const auto &packageName : m_buildAction->packageNames) {
-        const auto &package = packages.find(packageName);
-        if (package == packages.end()) {
+        const auto package = db->findPackage(packageName);
+        if (!package) {
             m_result.failedPackages.emplace_back(packageName, "package not listed in database file");
             continue;
         }
-        auto packageLocation = db->locatePackage(package->second->computeFileName());
+        auto packageLocation = db->locatePackage(package->computeFileName());
         if (packageLocation.error.has_value()) {
             m_result.failedPackages.emplace_back(
                 packageName, argsToString("unable to locate package within repo directory: ", packageLocation.error.value().what()));
@@ -450,24 +444,25 @@ void CheckForProblems::run()
                 problems.emplace_back(
                     RepositoryProblem{ .desc = "configured local package directory \"" % db->localPkgDir + "\" is not a directory" });
             }
-            for (const auto &[pkgName, pkg] : db->packages) {
-                if (!pkg->packageInfo) {
-                    problems.emplace_back(RepositoryProblem{ .desc = "no package info present", .pkg = pkgName });
-                    continue;
+            db->allPackages([&](LibPkg::StorageID, LibPkg::Package &&package) {
+                if (!package.packageInfo) {
+                    problems.emplace_back(RepositoryProblem{ .desc = "no package info present", .pkg = package.name });
+                    return false;
                 }
-                const auto packageLocation = db->locatePackage(pkg->packageInfo->fileName);
+                const auto packageLocation = db->locatePackage(package.packageInfo->fileName);
                 if (!packageLocation.exists) {
                     problems.emplace_back(
-                        RepositoryProblem{ .desc = "binary package \"" % pkg->packageInfo->fileName + "\" not present", .pkg = pkgName });
+                        RepositoryProblem{ .desc = "binary package \"" % package.packageInfo->fileName + "\" not present", .pkg = package.name });
                 }
                 if (m_requirePackageSignatures) {
-                    const auto signatureLocation = db->locatePackage(pkg->packageInfo->fileName + ".sig");
+                    const auto signatureLocation = db->locatePackage(package.packageInfo->fileName + ".sig");
                     if (!signatureLocation.exists) {
                         problems.emplace_back(RepositoryProblem{
-                            .desc = "signature file for package \"" % pkg->packageInfo->fileName + "\" not present", .pkg = pkgName });
+                            .desc = "signature file for package \"" % package.packageInfo->fileName + "\" not present", .pkg = package.name });
                     }
                 }
-            }
+                return false;
+            });
         } catch (const std::filesystem::filesystem_error &e) {
             problems.emplace_back(RepositoryProblem{ .desc = argsToString("unable to check presence of files: ", e.what()) });
         }
@@ -476,8 +471,8 @@ void CheckForProblems::run()
     checkForUnresolvedPackages:
         auto unresolvedPackages = db->detectUnresolvedPackages(
             m_setup.config, std::vector<std::shared_ptr<LibPkg::Package>>(), LibPkg::DependencySet(), ignoreDeps, ignoreLibDeps);
-        for (auto &[package, unresolvedDeps] : unresolvedPackages) {
-            problems.emplace_back(RepositoryProblem{ .desc = std::move(unresolvedDeps), .pkg = package->name });
+        for (auto &[packageSpec, unresolvedDeps] : unresolvedPackages) {
+            problems.emplace_back(RepositoryProblem{ .desc = std::move(unresolvedDeps), .pkg = packageSpec.pkg->name });
         }
     }
 
@@ -528,8 +523,8 @@ void CleanRepository::run()
         std::variant<std::monostate, SharedLoggingLock, UniqueLoggingLock> lock;
         RepoDirType type = RepoDirType::New;
     };
-    std::unordered_map<std::string, RepoDir> repoDirs;
-    bool fatalError = false;
+    auto repoDirs = std::unordered_map<std::string, RepoDir>();
+    auto fatalError = false;
     const auto addAnyAndSrcDir = [this, &repoDirs](LibPkg::Database &db) {
         // find the "any" directory which contains arch neutral packages which are possibly shared between databases
         try {
@@ -654,8 +649,10 @@ void CleanRepository::run()
                     "multiple/ambiguous *.db files present: " + joinStrings<decltype(dbFileNames), std::string>(dbFileNames, ", "));
             }
             // initialize temporary database object for the repository
-            auto &db = otherDbs.emplace_back(std::make_unique<LibPkg::Database>(dbFilePaths.front().stem(), dbFilePaths.front()));
+            auto &db = otherDbs.emplace_back(
+                std::make_unique<LibPkg::Database>(argsToString("clean-repository-", dbFilePaths.front().stem()), dbFilePaths.front()));
             db->arch = dirInfo.canonicalPath.stem();
+            db->initStorage(*m_setup.config.storage());
             db->loadPackages();
             dirInfo.relevantDbs.emplace(db.get());
             // acquire lock for db directory
@@ -735,12 +732,11 @@ void CleanRepository::run()
                 // check whether the file is still referenced by and relevant database and move it to archive if not
                 auto fileStillReferenced = false;
                 auto actuallyReferencedFileNames = std::vector<std::string_view>();
-                for (const auto *const db : dirInfo.relevantDbs) {
-                    const auto i = db->packages.find(packageName);
-                    if (i == db->packages.end()) {
+                for (auto *const db : dirInfo.relevantDbs) {
+                    const auto pkg = db->findPackage(packageName);
+                    if (!pkg) {
                         continue;
                     }
-                    const auto &pkg = i->second;
                     const auto &pkgInfo = pkg->packageInfo;
                     if (!pkgInfo || pkgInfo->fileName.empty()) {
                         m_messages.warnings.emplace_back(

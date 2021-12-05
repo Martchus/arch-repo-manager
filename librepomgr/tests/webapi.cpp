@@ -52,6 +52,7 @@ public:
     void testPostingBuildActionsFromTask();
 
 private:
+    std::string m_dbFile;
     ServiceSetup m_setup;
     boost::beast::error_code m_lastError;
     string m_body;
@@ -74,7 +75,9 @@ WebAPITests::WebAPITests()
 void WebAPITests::setUp()
 {
     applicationInfo.version = APP_VERSION;
+    m_dbFile = workingCopyPath("test-webapi.db", WorkingCopyMode::Cleanup);
     m_setup.webServer.port = randomPort();
+    m_setup.config.initStorage(m_dbFile.data());
 }
 
 void WebAPITests::tearDown()

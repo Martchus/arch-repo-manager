@@ -35,10 +35,10 @@ static void moveValues(vector<string> &target, multimap<string, string> &multima
 void Config::loadPacmanConfig(const char *pacmanConfigPath)
 {
     // open and parse ini
-    IniFile configIni;
-    unordered_map<string, IniFile> includedInis;
+    auto configIni = IniFile();
+    auto includedInis = std::unordered_map<std::string, IniFile>();
     {
-        ifstream configFile;
+        auto configFile = ifstream();
         configFile.exceptions(ios_base::failbit | ios_base::badbit);
         configFile.open(pacmanConfigPath, ios_base::in);
         configIni.parse(configFile);
@@ -68,7 +68,7 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
             if (packageCacheDirs.empty()) {
                 packageCacheDirs.emplace_back("/var/cache/pacman/pkg/");
             }
-            string sigLevel;
+            auto sigLevel = std::string();
             moveLastValue(sigLevel, options, "SigLevel");
             signatureLevel = SignatureLevelConfig::fromString(sigLevel);
             if (!signatureLevel.isValid()) {
@@ -79,9 +79,9 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
             }
         } else {
             // read sync database
-            auto *const db = findOrCreateDatabase(move(scope.first), architecture);
+            auto *const db = findOrCreateDatabase(std::move(scope.first), architecture);
             // read sig level
-            string sigLevel;
+            auto sigLevel = std::string();
             moveLastValue(sigLevel, scope.second, "SigLevel");
             const auto dbSpecificSignatureLevelConfig = SignatureLevelConfig::fromString(sigLevel);
             if (dbSpecificSignatureLevelConfig.databaseScope != SignatureLevel::Invalid) {
@@ -95,9 +95,9 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
             // add mirrors
             for (auto range = scope.second.equal_range("Server"); range.first != range.second; ++range.first) {
                 for (const auto &arch : architectures) {
-                    string url = range.first->second;
-                    findAndReplace<string>(url, "$repo", db->name);
-                    findAndReplace<string>(url, "$arch", arch);
+                    auto url = range.first->second;
+                    findAndReplace<std::string>(url, "$repo", db->name);
+                    findAndReplace<std::string>(url, "$arch", arch);
                     db->mirrors.emplace_back(move(url));
                 }
             }
@@ -107,7 +107,7 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
                 auto &includedIni = includedInis[path];
                 if (includedIni.data().empty()) {
                     try {
-                        ifstream includedFile;
+                        auto includedFile = std::ifstream();
                         includedFile.exceptions(ios_base::failbit | ios_base::badbit);
                         includedFile.open(path, ios_base::in);
                         includedIni.parse(includedFile);
@@ -145,7 +145,7 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
 
 void Config::loadAllPackages(bool withFiles)
 {
-    for (Database &db : databases) {
+    for (auto &db : databases) {
         try {
             db.loadPackages(withFiles);
         } catch (const runtime_error &e) {

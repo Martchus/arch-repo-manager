@@ -42,6 +42,8 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::string pacmanConfigFilePath = "/etc/pacman.conf";
     std::filesystem::path initialWorkingDirectory;
     std::string workingDirectory = "workingdir";
+    std::string dbPath = "libpkg.db";
+    std::uint32_t maxDbs = 512;
 
     // variables relevant for the web server; only changed when (re)loading config
     struct LIBREPOMGR_EXPORT WebServerSetup {
@@ -145,7 +147,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     void loadConfigFiles(bool restoreStateAndDiscardDatabases);
     void printDatabases();
     std::string_view cacheFilePath() const;
-    RAPIDJSON_NAMESPACE::Document libraryDependenciesToJson() const;
+    RAPIDJSON_NAMESPACE::Document libraryDependenciesToJson();
     void restoreLibraryDependenciesFromJson(const std::string &json, ReflectiveRapidJSON::JsonDeserializationErrors *errors);
     std::size_t restoreState();
     std::size_t saveState();

@@ -26,6 +26,7 @@ using CppUtilities::operator<<; // must be visible prior to the call site
 #include <chrono>
 
 using namespace std;
+using namespace std::literals;
 using namespace CPPUNIT_NS;
 using namespace CppUtilities;
 using namespace CppUtilities::Literals;
@@ -60,6 +61,7 @@ public:
     void testCleanup();
 
 private:
+    void initStorage();
     void loadBasicTestSetup();
     void loadTestConfig();
     void logTestSetup();
@@ -68,6 +70,7 @@ private:
     void runBuildAction(const char *message, TimeSpan timeout = TimeSpan::fromSeconds(5));
     template <typename InternalBuildActionType> InternalBuildActionType *internalBuildAction();
 
+    std::string m_dbFile;
     ServiceSetup m_setup;
     std::shared_ptr<BuildAction> m_buildAction;
     std::filesystem::path m_workingDir;
@@ -93,6 +96,12 @@ void BuildActionsTests::setUp()
 void BuildActionsTests::tearDown()
 {
     std::filesystem::current_path(m_workingDir);
+}
+
+void BuildActionsTests::initStorage()
+{
+    m_dbFile = workingCopyPath("test-build-actions.db", WorkingCopyMode::Cleanup);
+    m_setup.config.initStorage(m_dbFile.data());
 }
 
 /*!
@@ -122,6 +131,9 @@ void BuildActionsTests::loadBasicTestSetup()
  */
 void BuildActionsTests::loadTestConfig()
 {
+    if (!m_setup.config.storage()) {
+        initStorage();
+    }
     m_setup.loadConfigFiles(false);
     m_setup.building.workingDirectory = m_setup.workingDirectory + "/building";
     m_setup.printDatabases();
@@ -135,11 +147,12 @@ void BuildActionsTests::loadTestConfig()
  */
 void BuildActionsTests::logTestSetup()
 {
-    for (const auto &db : m_setup.config.databases) {
+    for (auto &db : m_setup.config.databases) {
         cout << EscapeCodes::Phrases::Info << "Packages of " << db.name << ':' << EscapeCodes::Phrases::End;
-        for (const auto &[pkgName, pkg] : db.packages) {
-            cout << " - " << pkgName << '\n';
-        }
+        db.allPackages([](LibPkg::StorageID, LibPkg::Package &&package) {
+            cout << " - " << package.name << '\n';
+            return false;
+        });
     }
     cout.flush();
 }
@@ -277,16 +290,22 @@ void BuildActionsTests::testBuildActionProcess()
 void BuildActionsTests::testParsingInfoFromPkgFiles()
 {
     // init config
-    LibPkg::Config &config = m_setup.config;
-    config.databases = { { "foo.db" }, { "bar.db" }, { "baz.db" } };
+    initStorage();
+    auto &config = m_setup.config;
+    for (const auto dbName : { "foo.db"sv, "bar.db"sv, "baz.db"sv }) {
+        config.findOrCreateDatabase(dbName, std::string_view());
+    }
 
     // init db object
-    LibPkg::Database &fooDb = config.databases[0];
-    auto harfbuzz = fooDb.packages["mingw-w64-harfbuzz"] = LibPkg::Package::fromPkgFileName("mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz");
-    auto syncthingtray = fooDb.packages["syncthingtray"] = LibPkg::Package::fromPkgFileName("syncthingtray-0.6.2-1-x86_64.pkg.tar.xz");
+    auto &fooDb = config.databases[0];
+    auto &barDb = config.databases[1];
+    const auto harfbuzz = LibPkg::Package::fromPkgFileName("mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz");
+    const auto harfbuzzID = fooDb.updatePackage(harfbuzz);
+    const auto syncthingtray = LibPkg::Package::fromPkgFileName("syncthingtray-0.6.2-1-x86_64.pkg.tar.xz");
+    const auto syncthingtrayID = fooDb.updatePackage(syncthingtray);
     fooDb.localPkgDir = directory(testFilePath("repo/foo/mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz"));
-    LibPkg::Database &barDb = config.databases[1];
-    auto cmake = barDb.packages["cmake"] = LibPkg::Package::fromPkgFileName("cmake-3.8.2-1-x86_64.pkg.tar.xz");
+    const auto cmake = LibPkg::Package::fromPkgFileName("cmake-3.8.2-1-x86_64.pkg.tar.xz");
+    barDb.updatePackage(cmake);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", LibPkg::PackageOrigin::PackageFileName, cmake->origin);
     barDb.localPkgDir = directory(testFilePath("repo/bar/cmake-3.8.2-1-x86_64.pkg.tar.xz"));
 
@@ -305,11 +324,13 @@ void BuildActionsTests::testParsingInfoFromPkgFiles()
 
     const auto pkgsRequiringLibGCC = config.findPackagesProvidingLibrary("pe-i386::libgcc_s_sjlj-1.dll", true);
     CPPUNIT_ASSERT_EQUAL(1_st, pkgsRequiringLibGCC.size());
-    CPPUNIT_ASSERT_EQUAL(harfbuzz, pkgsRequiringLibGCC.front().pkg);
+    CPPUNIT_ASSERT_EQUAL(harfbuzz->name, pkgsRequiringLibGCC.front().pkg->name);
+    CPPUNIT_ASSERT_EQUAL(harfbuzzID, pkgsRequiringLibGCC.front().id);
 
     const auto pkgsProvidingLibSyncthingConnector = config.findPackagesProvidingLibrary("elf-x86_64::libsyncthingconnector.so.0.6.2", false);
     CPPUNIT_ASSERT_EQUAL(1_st, pkgsProvidingLibSyncthingConnector.size());
-    CPPUNIT_ASSERT_EQUAL(syncthingtray, pkgsProvidingLibSyncthingConnector.front().pkg);
+    CPPUNIT_ASSERT_EQUAL(syncthingtray->name, pkgsProvidingLibSyncthingConnector.front().pkg->name);
+    CPPUNIT_ASSERT_EQUAL(syncthingtrayID, pkgsProvidingLibSyncthingConnector.front().id);
 }
 
 /*!
@@ -392,6 +413,7 @@ void BuildActionsTests::testConductingBuild()
 {
     // load basic test setup and create build action
     loadBasicTestSetup();
+    initStorage();
     m_buildAction = std::make_shared<BuildAction>(0, &m_setup);
     m_buildAction->type = BuildActionType::ConductBuild;
     m_buildAction->directory = "conduct-build-test";
@@ -533,11 +555,13 @@ void BuildActionsTests::testConductingBuild()
     auto *const miscDb = m_setup.config.findDatabase("misc"sv, "x86_64"sv);
     CPPUNIT_ASSERT_MESSAGE("boost database present", boostDb);
     CPPUNIT_ASSERT_MESSAGE("misc database present", miscDb);
-    auto &boostLibsPackage = boostDb->packages["boost-libs"];
+    auto boostLibsPackage = boostDb->findPackage("boost-libs");
+    CPPUNIT_ASSERT_MESSAGE("boost-libs package present", boostLibsPackage);
     boostLibsPackage->libprovides = { "elf-x86_64::libboost_regex.so.1.72.0" };
     boostLibsPackage->libdepends = { "elf-x86_64::libstdc++.so.6" };
     boostDb->forceUpdatePackage(boostLibsPackage);
-    auto &sourceHighlightPackage = miscDb->packages["source-highlight"];
+    auto sourceHighlightPackage = miscDb->findPackage("source-highlight");
+    CPPUNIT_ASSERT_MESSAGE("source-highlight package present", sourceHighlightPackage);
     sourceHighlightPackage->libprovides = { "elf-x86_64::libsource-highlight.so.4" };
     sourceHighlightPackage->libdepends
         = { "elf-x86_64::libboost_regex.so.1.72.0", "elf-x86_64::libsource-highlight.so.4", "elf-x86_64::libstdc++.so.6" };
@@ -642,9 +666,11 @@ void BuildActionsTests::testCleanup()
 
     // parse db
     // note: The db actually only contains source-highlight and mingw-w64-harfbuzz
-    auto &miscDb = m_setup.config.databases.emplace_back("misc", repoDir64 / "misc.db");
-    miscDb.localDbDir = miscDb.localPkgDir = repoDir64;
-    miscDb.loadPackages();
+    initStorage();
+    auto *const miscDb = m_setup.config.findOrCreateDatabase("misc"sv, std::string_view());
+    miscDb->path = repoDir64 / "misc.db";
+    miscDb->localDbDir = miscDb->localPkgDir = repoDir64;
+    miscDb->loadPackages();
 
     // create and run build action
     m_buildAction = std::make_shared<BuildAction>(0, &m_setup);

@@ -48,7 +48,7 @@ void ReloadLibraryDependencies::run()
     // initialize
     m_remainingPackages = 0;
     auto configReadLock = init(BuildActionAccess::ReadConfig, RequiredDatabases::MaybeDestination, RequiredParameters::None);
-    if (holds_alternative<monostate>(configReadLock)) {
+    if (std::holds_alternative<std::monostate>(configReadLock)) {
         return;
     }
 
@@ -61,9 +61,10 @@ void ReloadLibraryDependencies::run()
     // find relevant databases and packages
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Finding relevant databases/packages ...\n");
     m_relevantPackagesByDatabase.reserve(m_destinationDbs.empty() ? m_setup.config.databases.size() : m_destinationDbs.size());
-    std::unordered_set<LibPkg::Database *> relevantDbs;
-    std::unordered_set<LibPkg::Package *> relevantPkgs;
-    LibPkg::DependencySet missingDeps;
+    auto relevantDbs = std::unordered_set<LibPkg::Database *>();
+    auto relevantPkgs = std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>>();
+    auto missingDeps = LibPkg::DependencySet();
+    auto visitedPackages = std::unordered_set<LibPkg::StorageID>();
     if (m_destinationDbs.empty()) {
         for (auto &db : m_setup.config.databases) {
             relevantDbs.emplace(&db);
@@ -74,7 +75,7 @@ void ReloadLibraryDependencies::run()
                 continue;
             }
             const auto databaseDependencyOrderRes = m_setup.config.computeDatabaseDependencyOrder(*destinationDb);
-            if (holds_alternative<string>(databaseDependencyOrderRes)) {
+            if (std::holds_alternative<string>(databaseDependencyOrderRes)) {
                 m_messages.errors.emplace_back(
                     destinationDb->name % ": unable to consider dependencies: " + std::get<std::string>(databaseDependencyOrderRes));
             }
@@ -84,13 +85,15 @@ void ReloadLibraryDependencies::run()
             }
         }
         for (auto *const destinationDb : m_destinationDbs) {
-            for (const auto &[packageName, package] : destinationDb->packages) {
-                m_setup.config.pullDependentPackages(package, relevantDbs, relevantPkgs, missingDeps);
-            }
+            destinationDb->allPackages([&, this](LibPkg::StorageID, LibPkg::Package &&package) {
+                m_setup.config.pullDependentPackages(
+                    std::make_shared<LibPkg::Package>(std::move(package)), relevantDbs, relevantPkgs, missingDeps, visitedPackages);
+                return false;
+            });
         }
     }
     for (const auto &[dependencyName, dependencyDetail] : missingDeps) {
-        std::vector<std::string_view> packageNames;
+        auto packageNames = std::vector<std::string_view>();
         packageNames.reserve(dependencyDetail.relevantPackages.size());
         for (const auto &package : dependencyDetail.relevantPackages) {
             packageNames.emplace_back(package->name);
@@ -101,30 +104,29 @@ void ReloadLibraryDependencies::run()
     for (auto *const db : relevantDbs) {
         const auto isDestinationDb = m_destinationDbs.empty() || m_destinationDbs.find(db) != m_destinationDbs.end();
         auto &relevantDbInfo = m_relevantPackagesByDatabase.emplace_back(DatabaseToConsider{ .name = db->name, .arch = db->arch });
-        relevantDbInfo.packages.reserve(db->packages.size());
-        for (const auto &[packageName, package] : db->packages) {
+        db->allPackages([&](LibPkg::StorageID packageID, LibPkg::Package &&package) {
             // allow aborting the build action
             if (reportAbortedIfAborted()) {
-                return;
+                return true;
             }
             // skip if package should be excluded
-            if (!packageExcludeRegexValue.empty() && std::regex_match(package->name, packageExcludeRegex)) {
-                m_messages.notes.emplace_back(db->name % '/' % packageName + ": matches exclude regex");
-                continue;
+            if (!packageExcludeRegexValue.empty() && std::regex_match(package.name, packageExcludeRegex)) {
+                m_messages.notes.emplace_back(db->name % '/' % package.name + ": matches exclude regex");
+                return false;
             }
             // skip if the package info is missing (we need the binary package's file name here)
-            const auto &packageInfo = package->packageInfo;
+            const auto &packageInfo = package.packageInfo;
             if (!packageInfo) {
-                m_messages.errors.emplace_back(db->name % '/' % packageName + ": no package info");
-                continue;
+                m_messages.errors.emplace_back(db->name % '/' % package.name + ": no package info");
+                return false;
             }
             // skip the package if it is not part of the destination DB or required by a package of the destination DB
-            if (!isDestinationDb && relevantPkgs.find(package.get()) == relevantPkgs.end()) {
+            if (!isDestinationDb && relevantPkgs.find(packageID) == relevantPkgs.end()) {
                 if (m_skippingNote.tellp()) {
                     m_skippingNote << ", ";
                 }
-                m_skippingNote << db->name << '/' << packageName;
-                continue;
+                m_skippingNote << db->name << '/' << package.name;
+                return false;
             }
             // find the package on disk; otherwise add an URL to download it from the configured mirror
             std::string path, url, cachePath;
@@ -160,32 +162,36 @@ void ReloadLibraryDependencies::run()
                 }
             }
             if (path.empty()) {
-                m_messages.errors.emplace_back(db->name % '/' % packageName + ": binary package not found and no mirror configured");
-                continue;
+                m_messages.errors.emplace_back(db->name % '/' % package.name + ": binary package not found and no mirror configured");
+                return false;
             }
             // skip if the package info has already been loaded from package contents and the present binary package is not newer
             auto lastModified = DateTime();
             if (url.empty()) {
                 lastModified = LibPkg::lastModified(path);
-                if (!force && package->origin == LibPkg::PackageOrigin::PackageContents && package->timestamp >= lastModified) {
-                    m_messages.notes.emplace_back(db->name % '/' % packageName % ": skipping because \"" % path % "\" is newer ("
-                            % package->timestamp.toString() % " >= " % lastModified.toString()
+                if (!force && package.origin == LibPkg::PackageOrigin::PackageContents && package.timestamp >= lastModified) {
+                    m_messages.notes.emplace_back(db->name % '/' % package.name % ": skipping because \"" % path % "\" is newer ("
+                            % package.timestamp.toString() % " >= " % lastModified.toString()
                         + ")\n");
-                    continue;
+                    return false;
                 }
             }
             // add the full path to the binary package to relevant packages
             auto &relevantPkg = relevantDbInfo.packages.emplace_back(
                 PackageToConsider{ .path = std::move(path), .url = std::move(url), .lastModified = lastModified });
             // create a temporary package object to hold the info parsed from the .PKGINFO file
-            relevantPkg.info.name = package->name;
+            relevantPkg.info.name = package.name;
             // -> assign certain fields which are used by addDepsAndProvidesFromOtherPackage() to check whether the packages are matching
-            relevantPkg.info.version = package->version;
+            relevantPkg.info.version = package.version;
             relevantPkg.info.packageInfo = std::make_unique<LibPkg::PackageInfo>();
-            relevantPkg.info.packageInfo->buildDate = package->packageInfo->buildDate;
+            relevantPkg.info.packageInfo->buildDate = package.packageInfo->buildDate;
             // -> gather source info such as make and check dependencies as well
             relevantPkg.info.sourceInfo = std::make_shared<LibPkg::SourceInfo>();
             ++m_remainingPackages;
+            return false;
+        });
+        if (reportAbortedIfAborted()) {
+            return;
         }
     }
     configReadLock = std::monostate{};
@@ -344,14 +350,11 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
                 continue;
             }
             // find the package in the database again
-            const auto packageIterator = db->packages.find(package.info.name);
-            if (packageIterator == db->packages.end()) {
+            const auto [packageID, existingPackage] = db->findPackageWithID(package.info.name);
+            if (!existingPackage) {
                 continue; // the package has been removed while we were loading package contents
             }
-            // remove the current dependencies on database level
-            db->removePackageDependencies(packageIterator);
             // add the dependencies/provides to the existing package
-            const auto &existingPackage = packageIterator->second;
             if (!existingPackage->addDepsAndProvidesFromOtherPackage(package.info)) {
                 continue; // the package does no longer match what's in the database
             }
@@ -360,7 +363,7 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
                 existingPackage->timestamp = package.lastModified;
             }
             // add the new dependencies on database-level
-            db->addPackageDependencies(existingPackage);
+            db->forceUpdatePackage(existingPackage);
             ++counter;
         }
     }

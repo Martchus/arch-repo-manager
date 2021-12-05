@@ -36,7 +36,7 @@ struct TopoSortItem {
  * \return Returns true if \a dependency could be added to \a finishedItems, has already been present or has been ignored. Returns false if a cycle has been detected.
  * \deprecated This function can likely be removed. The build preparation task has its own implementation (to compute batches) which is more useful.
  */
-bool Config::addDepsRecursivelyInTopoOrder(vector<unique_ptr<TopoSortItem>> &allItems, vector<TopoSortItem *> &finishedItems,
+bool Config::addDepsRecursivelyInTopoOrder(std::vector<std::unique_ptr<TopoSortItem>> &allItems, std::vector<TopoSortItem *> &finishedItems,
     std::vector<std::string> &ignored, std::vector<PackageSearchResult> &cycleTracking, const Dependency &dependency, BuildOrderOptions options,
     bool onlyDependency)
 {
@@ -62,8 +62,9 @@ bool Config::addDepsRecursivelyInTopoOrder(vector<unique_ptr<TopoSortItem>> &all
     }
 
     // check whether a topo sort item for the current dependency is already pending to detect cycles
-    for (auto &item : allItems) {
-        if (pkg != item->package.pkg) {
+    for (const auto &item : allItems) {
+        const auto &itemPackage = item->package;
+        if (std::get<Database *>(packageSearchResult.db) != std::get<Database *>(itemPackage.db) || packageSearchResult.id != itemPackage.id) {
             continue;
         }
 
@@ -72,9 +73,10 @@ bool Config::addDepsRecursivelyInTopoOrder(vector<unique_ptr<TopoSortItem>> &all
             return true;
         }
 
-        // report error: remove so far "healy" path in the current chain so it contains only the cyclic path anymore
+        // report error: remove so far "healthy" path in the current chain so it contains only the cyclic path anymore
         for (auto i = cycleTracking.begin(), end = cycleTracking.end(); i != end; ++i) {
-            if (pkg == i->pkg) {
+            if (const auto &visited = *i;
+                std::get<Database *>(packageSearchResult.db) == std::get<Database *>(visited.db) && packageSearchResult.id == visited.id) {
                 cycleTracking.erase(cycleTracking.begin(), i);
                 break;
             }
@@ -119,19 +121,19 @@ bool Config::addDepsRecursivelyInTopoOrder(vector<unique_ptr<TopoSortItem>> &all
     return currentItem->finished = true;
 }
 
-BuildOrderResult Config::computeBuildOrder(const std::vector<string> &dependencyDenotations, BuildOrderOptions options)
+BuildOrderResult Config::computeBuildOrder(const std::vector<std::string> &dependencyDenotations, BuildOrderOptions options)
 {
     // setup variables to store results
-    BuildOrderResult result;
-    vector<unique_ptr<TopoSortItem>> allTopoSortItems;
-    vector<TopoSortItem *> finishedTopoSortItems;
+    auto result = BuildOrderResult();
+    auto allTopoSortItems = std::vector<std::unique_ptr<TopoSortItem>>();
+    auto finishedTopoSortItems = std::vector<TopoSortItem *>();
     allTopoSortItems.reserve(dependencyDenotations.size());
 
     // add dependencies
     for (const auto &dependency : dependencyDenotations) {
         // continue adding dependencies as long as no cycles have been detected
-        if (addDepsRecursivelyInTopoOrder(allTopoSortItems, finishedTopoSortItems, result.ignored, result.cycle,
-                Dependency(dependency.data(), dependency.size()), options, false)) {
+        if (addDepsRecursivelyInTopoOrder(
+                allTopoSortItems, finishedTopoSortItems, result.ignored, result.cycle, Dependency(std::string_view(dependency)), options, false)) {
             result.cycle.clear();
             continue;
         }

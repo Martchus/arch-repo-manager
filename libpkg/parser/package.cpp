@@ -290,7 +290,7 @@ void addPackageInfo(
     }
 }
 
-void addPackageDescription(Package &package, const char *field, size_t fieldSize, const char *value, size_t valueSize)
+static void addPackageDescription(Package &package, const char *field, size_t fieldSize, const char *value, size_t valueSize)
 {
     if_field("BASE")
     {
@@ -423,7 +423,7 @@ void addPackageDescription(Package &package, const char *field, size_t fieldSize
 #undef valueString
 #undef ensure_pkg_info
 
-void addVersionInfo(Package &package, PackageVersion &version, bool isPackageInfo)
+static void addVersionInfo(Package &package, PackageVersion &version, bool isPackageInfo)
 {
     if (isPackageInfo) {
         // when parsing .PKGINFO pkgver specifies the complete version which is
@@ -443,7 +443,7 @@ void addVersionInfo(Package &package, PackageVersion &version, bool isPackageInf
     }
 }
 
-void parsePkgInfo(const std::string &info, const std::function<Package *(Package &)> &nextPackage, bool isPackageInfo)
+static void parsePkgInfo(const std::string &info, const std::function<Package *(Package &)> &nextPackage, bool isPackageInfo)
 {
     // define variables to store intermediate results while still parsing package base
     PackageVersion version;
@@ -599,21 +599,29 @@ void parsePkgInfo(const std::string &info, const std::function<Package *(Package
     }
 }
 
-std::vector<std::shared_ptr<Package>> Package::fromInfo(const std::string &info, bool isPackageInfo)
+/*!
+ * \brief Parses the specified \a info and returns the results as one or more (in case of split packages) packages.
+ * \remarks The returned storage ID is always zero as the returned packages are not part of a database yet. One might
+ *          set the ID later when placing the package into a database.
+ */
+std::vector<PackageSpec> Package::fromInfo(const std::string &info, bool isPackageInfo)
 {
-    vector<shared_ptr<Package>> packages;
-    const auto nextPackage = [&](Package &basePackage) { return packages.emplace_back(make_shared<Package>(basePackage)).get(); };
+    auto packages = std::vector<PackageSpec>();
+    const auto nextPackage = [&](Package &basePackage) { return packages.emplace_back(0, std::make_shared<Package>(basePackage)).pkg.get(); };
     parsePkgInfo(info, nextPackage, isPackageInfo);
     return packages;
 }
 
-shared_ptr<Package> Package::fromDescription(const std::vector<string> &descriptionParts)
+/*!
+ * \brief Parses the specified \a descriptionParts and returns the results as package.
+ */
+std::shared_ptr<Package> Package::fromDescription(const std::vector<std::string> &descriptionParts)
 {
-    auto package = make_shared<Package>();
+    auto package = std::make_shared<Package>();
     package->origin = PackageOrigin::Database;
     package->sourceInfo = make_shared<SourceInfo>();
     package->packageInfo = make_unique<PackageInfo>();
-    for (const string &desc : descriptionParts) {
+    for (const auto &desc : descriptionParts) {
         // states
         enum {
             FieldName, // reading field name
@@ -625,9 +633,9 @@ shared_ptr<Package> Package::fromDescription(const std::vector<string> &descript
 
         // variables for current field
         const char *currentFieldName = nullptr;
-        size_t currentFieldNameSize = 0;
+        std::size_t currentFieldNameSize = 0;
         const char *currentFieldValue = nullptr;
-        size_t currentFieldValueSize = 0;
+        std::size_t currentFieldValueSize = 0;
 
         // do actual parsing via state machine
         for (const char *i = desc.data(); *i; ++i) {
@@ -834,7 +842,7 @@ std::shared_ptr<Package> Package::fromPkgFile(const string &path)
                 }
                 auto packages = fromInfo(file.content, true);
                 if (!packages.empty()) {
-                    package = std::move(packages.front());
+                    package = std::move(packages.front().pkg);
                 }
                 return;
             }
@@ -899,24 +907,24 @@ std::shared_ptr<Package> Package::fromPkgFileName(std::string_view fileName)
     return pkg;
 }
 
-std::vector<std::shared_ptr<Package>> Package::fromAurRpcJson(const char *jsonData, std::size_t jsonSize, PackageOrigin origin)
+std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size_t jsonSize, PackageOrigin origin)
 {
-    ReflectiveRapidJSON::JsonDeserializationErrors errors;
+    auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
     auto rpcMultiInfo = AurRpcMultiInfo::fromJson(jsonData, jsonSize, &errors);
 
-    std::vector<std::shared_ptr<Package>> packages;
+    auto packages = std::vector<PackageSpec>();
     packages.reserve(rpcMultiInfo.results.size());
 
     for (auto &result : rpcMultiInfo.results) {
-        auto package = make_shared<Package>();
-        auto sourceInfo = make_shared<SourceInfo>();
+        auto package = std::make_shared<Package>();
+        auto sourceInfo = std::make_shared<SourceInfo>();
         package->origin = origin;
-        package->name = move(result.Name);
-        package->version = move(result.Version);
-        package->description = move(result.Description);
-        package->upstreamUrl = move(result.URL);
-        package->licenses = move(result.License);
-        package->groups = move(result.Groups);
+        package->name = std::move(result.Name);
+        package->version = std::move(result.Version);
+        package->description = std::move(result.Description);
+        package->upstreamUrl = std::move(result.URL);
+        package->licenses = std::move(result.License);
+        package->groups = std::move(result.Groups);
         for (auto &dependencyName : result.Depends) {
             package->dependencies.emplace_back(dependencyName.data(), dependencyName.size());
         }
@@ -929,18 +937,18 @@ std::vector<std::shared_ptr<Package>> Package::fromAurRpcJson(const char *jsonDa
         for (auto &dependencyName : result.CheckDepends) {
             sourceInfo->checkDependencies.emplace_back(dependencyName.data(), dependencyName.size());
         }
-        sourceInfo->name = move(result.PackageBase);
-        sourceInfo->maintainer = move(result.Maintainer);
-        sourceInfo->id = move(result.ID);
-        sourceInfo->votes = move(result.NumVotes);
+        sourceInfo->name = std::move(result.PackageBase);
+        sourceInfo->maintainer = std::move(result.Maintainer);
+        sourceInfo->id = std::move(result.ID);
+        sourceInfo->votes = std::move(result.NumVotes);
         if (result.OutOfDate) {
             sourceInfo->outOfDate = DateTime::fromTimeStampGmt(*result.OutOfDate);
         }
         sourceInfo->firstSubmitted = DateTime::fromTimeStampGmt(result.FirstSubmitted);
         sourceInfo->lastModified = DateTime::fromTimeStampGmt(result.LastModified);
-        sourceInfo->url = move(result.URLPath);
-        package->sourceInfo = move(sourceInfo);
-        packages.emplace_back(move(package));
+        sourceInfo->url = std::move(result.URLPath);
+        package->sourceInfo = std::move(sourceInfo);
+        packages.emplace_back(0, std::move(package));
     }
     return packages;
 }

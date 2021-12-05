@@ -136,8 +136,8 @@ void getUnresolved(const Params &params, ResponseHandler &&handler)
             const auto unresolvedPackages = db.detectUnresolvedPackages(params.setup.config, newPackages, removedPackages);
             auto value = RAPIDJSON_NAMESPACE::Value(RAPIDJSON_NAMESPACE::Type::kObjectType);
             auto obj = value.GetObject();
-            for (const auto &[package, unresolvedDependencies] : unresolvedPackages) {
-                JR::push(unresolvedDependencies, package->name.data(), obj, document.GetAllocator());
+            for (const auto &[packageSpec, unresolvedDependencies] : unresolvedPackages) {
+                JR::push(unresolvedDependencies, packageSpec.pkg->name.data(), obj, document.GetAllocator());
             }
             obj.AddMember(RAPIDJSON_NAMESPACE::StringRef(db.name.data(), JR::rapidJsonSize(db.name.size())), value, document.GetAllocator());
         }
@@ -242,9 +242,9 @@ void getPackages(const Params &params, ResponseHandler &&handler)
             const auto isDbAur = dbName == "aur";
             if (fromAur && (dbName.empty() || isDbAur)) {
                 auto packageNameStr = std::string(packageName);
-                if (auto i = aurDb.packages.find(packageNameStr), end = aurDb.packages.end();
-                    i != end && (!details || i->second->origin != PackageOrigin::AurRpcSearch)) {
-                    aurPackages.emplace_back(PackageSearchResult{ aurDb, i->second });
+                if (const auto [aurPackageID, aurPackage] = aurDb.findPackageWithID(packageNameStr);
+                    aurPackage && (!details || aurPackage->origin != PackageOrigin::AurRpcSearch)) {
+                    aurPackages.emplace_back(aurDb, aurPackage, aurPackageID);
                 } else {
                     neededAurPackages.emplace_back(std::move(packageNameStr));
                 }
@@ -325,9 +325,9 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                       ReflectiveRapidJSON::JsonReflector::push(std::move(package), documentArray, document->GetAllocator());
                   }
               } else if (!queriedAurPackages.empty()) {
-                  for (auto &package : queriedAurPackages) {
+                  for (auto &[packageID, package] : queriedAurPackages) {
                       ReflectiveRapidJSON::JsonReflector::push(
-                          PackageSearchResult{ params.setup.config.aur, std::move(package) }, documentArray, document->GetAllocator());
+                          PackageSearchResult{ params.setup.config.aur, std::move(package), packageID }, documentArray, document->GetAllocator());
                   }
               }
               configLock.unlock();

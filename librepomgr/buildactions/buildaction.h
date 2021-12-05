@@ -56,7 +56,7 @@ struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSeri
     std::string sourceDirectory;
     std::string originalSourceDirectory;
     std::shared_ptr<LibPkg::SourceInfo> sourceInfo;
-    std::vector<std::shared_ptr<LibPkg::Package>> packages;
+    std::vector<LibPkg::PackageSpec> packages;
     std::vector<std::string> warnings;
     std::string error;
     std::size_t specifiedIndex = std::numeric_limits<std::size_t>::max();

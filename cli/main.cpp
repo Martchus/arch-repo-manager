@@ -95,7 +95,7 @@ static void printPackageSearchResults(const LibRepoMgr::WebClient::Response::bod
     tabulate::Table t;
     t.format().hide_border();
     t.add_row({ "Arch", "Repo", "Name", "Version", "Description", "Build date" });
-    for (const auto &[db, package] : packages) {
+    for (const auto &[db, package, packageID] : packages) {
         const auto &dbInfo = std::get<LibPkg::DatabaseInfo>(db);
         t.add_row(
             { package->packageInfo ? package->packageInfo->arch : dbInfo.arch, dbInfo.name, package->name, package->version, package->description,

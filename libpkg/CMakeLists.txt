@@ -7,19 +7,20 @@ set(HEADER_FILES
     data/config.h
     data/lockable.h
     data/siglevel.h
+    data/storagefwd.h
     parser/aur.h
     parser/package.h
     parser/database.h
     parser/config.h
     parser/utils.h
-    parser/binary.h
-    lmdb-safe/lmdb-safe.hh
-    lmdb-safe/lmdb-typed.hh)
+    parser/binary.h)
 set(SRC_FILES
     data/package.cpp
     data/database.cpp
     data/config.cpp
     data/lockable.cpp
+    data/storageprivate.h
+    data/storage.cpp
     algo/search.cpp
     algo/buildorder.cpp
     algo/licenses.cpp
@@ -30,6 +31,8 @@ set(SRC_FILES
     parser/utils.cpp
     parser/binary.cpp
     parser/siglevel.cpp
+    lmdb-safe/lmdb-safe.hh
+    lmdb-safe/lmdb-typed.hh
     lmdb-safe/lmdb-safe.cc
     lmdb-safe/lmdb-typed.cc)
 set(TEST_HEADER_FILES tests/parser_helper.h)
@@ -51,7 +54,7 @@ set(META_TIDY_EXCLUDE_REGEX "lmdb-safe/.*")
 set(CONFIGURATION_PACKAGE_SUFFIX
     ""
     CACHE STRING "sets the suffix for find_package() calls to packages configured via c++utilities")
-find_package(c++utilities${CONFIGURATION_PACKAGE_SUFFIX} 5.2.0 REQUIRED)
+find_package(c++utilities${CONFIGURATION_PACKAGE_SUFFIX} 5.12.0 REQUIRED)
 use_cpp_utilities(VISIBILITY PUBLIC)
 
 # use std::filesystem
@@ -65,9 +68,6 @@ use_reflective_rapidjson(VISIBILITY PUBLIC)
 # find lmdb
 use_pkg_config_module(PKG_CONFIG_MODULES "lmdb" VISIBILITY PUBLIC)
 
-# configure lmdb-safe
-set_source_files_properties(lmdb-safe/lmdb-safe.cc lmdb-safe/lmdb-typed.cc PROPERTIES COMPILE_FLAGS "-Wno-error")
-
 # find 3rd party libraries zlib
 use_zlib()
 # libarchive
@@ -79,6 +79,15 @@ add_library(libarchive UNKNOWN IMPORTED)
 set_property(TARGET libarchive PROPERTY IMPORTED_LOCATION "${LibArchive_LIBRARIES}")
 set_property(TARGET libarchive PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${LibArchive_INCLUDE_DIRS}")
 use_target(TARGET_NAME libarchive)
+
+# find boost libraries (required by lmdb-safe)
+option(BOOST_STATIC_LINKAGE "${STATIC_LINKAGE}" "link statically against Boost (instead of dynamically)")
+set(Boost_USE_MULTITHREADED ON)
+if (BOOST_STATIC_LINKAGE)
+    set(Boost_USE_STATIC_LIBS ON)
+endif ()
+set(BOOST_ARGS "REQUIRED;COMPONENTS;iostreams")
+use_package(TARGET_NAME Boost::iostreams PACKAGE_NAME Boost PACKAGE_ARGS "${BOOST_ARGS}")
 
 # apply basic configuration
 include(BasicConfig)
