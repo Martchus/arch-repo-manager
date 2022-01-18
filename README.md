@@ -298,7 +298,7 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
         1. All sources of all packages are downloaded. The build is stopped when not all sources
            can be downloaded.
         2. Packages will now be built in the same order as computed when preparing. Building of
-           the next batch is stopped when a failure happend within the previous batch.
+           the next batch is stopped when a failure happened within the previous batch.
     * When using "Build as far as possible" the build is not stopped as previously explained.
     * When using "Save chroot of failures" the chroot directory is renamed when a build failure
       happens and therefore not overridden by the next build. This is useful to investigate the
