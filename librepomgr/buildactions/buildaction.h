@@ -50,7 +50,7 @@ struct InternalBuildAction;
 using AssociatedLocks = std::vector<std::variant<SharedLoggingLock, UniqueLoggingLock>>;
 
 struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSerializable<PackageBuildData>,
-                                            public ReflectiveRapidJSON::BinarySerializable<PackageBuildData> {
+                                            public ReflectiveRapidJSON::BinarySerializable<PackageBuildData, 1> {
     std::string existingVersion;
     std::vector<std::shared_ptr<LibPkg::Package>> existingPackages;
     std::string sourceDirectory;
@@ -64,7 +64,7 @@ struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSeri
 };
 
 struct LIBREPOMGR_EXPORT BuildPreparation : public ReflectiveRapidJSON::JsonSerializable<BuildPreparation>,
-                                            public ReflectiveRapidJSON::BinarySerializable<BuildPreparation> {
+                                            public ReflectiveRapidJSON::BinarySerializable<BuildPreparation, 1> {
     std::unordered_map<std::string, PackageBuildData> buildData;
     std::vector<std::pair<std::string, std::multimap<std::string, std::string>>> dbConfig, stagingDbConfig;
     std::string targetDb, targetArch, stagingDb;
@@ -82,7 +82,7 @@ enum class PackageStagingNeeded {
 };
 
 struct LIBREPOMGR_EXPORT PackageBuildProgress : public ReflectiveRapidJSON::JsonSerializable<PackageBuildProgress>,
-                                                public ReflectiveRapidJSON::BinarySerializable<PackageBuildProgress> {
+                                                public ReflectiveRapidJSON::BinarySerializable<PackageBuildProgress, 1> {
     bool hasBeenAnyProgressMade() const;
     void resetProgress();
     void resetChrootSettings();
@@ -108,7 +108,7 @@ struct LIBREPOMGR_EXPORT PackageBuildProgress : public ReflectiveRapidJSON::Json
 };
 
 struct LIBREPOMGR_EXPORT RebuildInfo : public ReflectiveRapidJSON::JsonSerializable<RebuildInfo>,
-                                       public ReflectiveRapidJSON::BinarySerializable<RebuildInfo> {
+                                       public ReflectiveRapidJSON::BinarySerializable<RebuildInfo, 1> {
     std::vector<LibPkg::Dependency> provides;
     std::vector<std::string> libprovides;
 
@@ -120,7 +120,7 @@ using RebuildInfoByPackage = std::unordered_map<std::string, RebuildInfo>;
 using RebuildInfoByDatabase = std::unordered_map<std::string, RebuildInfoByPackage>;
 
 struct LIBREPOMGR_EXPORT BuildProgress : public ReflectiveRapidJSON::JsonSerializable<BuildProgress>,
-                                         public ReflectiveRapidJSON::BinarySerializable<BuildProgress> {
+                                         public ReflectiveRapidJSON::BinarySerializable<BuildProgress, 1> {
     std::unordered_map<std::string, PackageBuildProgress> progressByPackage;
     std::string targetDbFilePath;
     std::string targetRepoPath;
@@ -131,21 +131,21 @@ struct LIBREPOMGR_EXPORT BuildProgress : public ReflectiveRapidJSON::JsonSeriali
 };
 
 struct LIBREPOMGR_EXPORT PackageMovementResult : public ReflectiveRapidJSON::JsonSerializable<PackageMovementResult>,
-                                                 public ReflectiveRapidJSON::BinarySerializable<PackageMovementResult> {
+                                                 public ReflectiveRapidJSON::BinarySerializable<PackageMovementResult, 1> {
     std::vector<std::pair<std::string, std::string>> failedPackages;
     std::vector<std::string> processedPackages;
     std::string errorMessage;
 };
 
 struct LIBREPOMGR_EXPORT RepositoryProblem : public ReflectiveRapidJSON::JsonSerializable<RepositoryProblem>,
-                                             public ReflectiveRapidJSON::BinarySerializable<RepositoryProblem> {
+                                             public ReflectiveRapidJSON::BinarySerializable<RepositoryProblem, 1> {
     std::variant<std::string, LibPkg::UnresolvedDependencies> desc;
     std::string pkg;
     bool critical = true;
 };
 
 struct LIBREPOMGR_EXPORT BuildActionMessages : public ReflectiveRapidJSON::JsonSerializable<BuildActionMessages>,
-                                               public ReflectiveRapidJSON::BinarySerializable<BuildActionMessages> {
+                                               public ReflectiveRapidJSON::BinarySerializable<BuildActionMessages, 1> {
     std::vector<std::string> notes;
     std::vector<std::string> warnings;
     std::vector<std::string> errors;
@@ -157,7 +157,7 @@ struct ServiceSetup;
 
 struct LIBREPOMGR_EXPORT BuildAction : public std::enable_shared_from_this<BuildAction>,
                                        public ReflectiveRapidJSON::JsonSerializable<BuildAction>,
-                                       public ReflectiveRapidJSON::BinarySerializable<BuildAction> {
+                                       public ReflectiveRapidJSON::BinarySerializable<BuildAction, 1> {
     friend InternalBuildAction;
     friend ServiceSetup;
     friend BuildProcessSession;

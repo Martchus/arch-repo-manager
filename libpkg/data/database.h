@@ -76,7 +76,7 @@ struct LIBPKG_EXPORT PackageUpdate : public ReflectiveRapidJSON::JsonSerializabl
 };
 
 struct LIBPKG_EXPORT PackageUpdates : public ReflectiveRapidJSON::JsonSerializable<PackageUpdates>,
-                                      public ReflectiveRapidJSON::BinarySerializable<PackageUpdates> {
+                                      public ReflectiveRapidJSON::BinarySerializable<PackageUpdates, 1> {
     std::vector<PackageUpdate> versionUpdates;
     std::vector<PackageUpdate> packageUpdates;
     std::vector<PackageUpdate> downgrades;
@@ -91,7 +91,7 @@ struct LIBPKG_EXPORT PackageLocation {
 };
 
 struct LIBPKG_EXPORT UnresolvedDependencies : public ReflectiveRapidJSON::JsonSerializable<UnresolvedDependencies>,
-                                              public ReflectiveRapidJSON::BinarySerializable<UnresolvedDependencies> {
+                                              public ReflectiveRapidJSON::BinarySerializable<UnresolvedDependencies, 1> {
     std::vector<Dependency> deps;
     std::vector<std::string> libs;
 };

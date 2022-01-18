@@ -83,7 +83,7 @@ struct LIBPKG_EXPORT CommonLicense : public ReflectiveRapidJSON::JsonSerializabl
 };
 
 struct LIBPKG_EXPORT LicenseResult : public ReflectiveRapidJSON::JsonSerializable<LicenseResult>,
-                                     public ReflectiveRapidJSON::BinarySerializable<LicenseResult> {
+                                     public ReflectiveRapidJSON::BinarySerializable<LicenseResult, 1> {
     std::map<std::string, CommonLicense> commonLicenses;
     std::map<std::string, std::vector<LicenseFile>> customLicences;
     std::vector<std::string> consideredPackages;

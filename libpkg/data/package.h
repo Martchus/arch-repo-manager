@@ -146,7 +146,7 @@ inline Dependency Dependency::fromString(std::string_view dependency)
 
 struct LIBPKG_EXPORT DatabaseDependency : public Dependency,
                                           public ReflectiveRapidJSON::JsonSerializable<DatabaseDependency>,
-                                          public ReflectiveRapidJSON::BinarySerializable<DatabaseDependency> {
+                                          public ReflectiveRapidJSON::BinarySerializable<DatabaseDependency, 1> {
     explicit DatabaseDependency() = default;
     explicit DatabaseDependency(const std::string &name, const std::string &version, DependencyMode mode);
     explicit DatabaseDependency(std::string &&name, std::string &&version, DependencyMode mode);
@@ -164,7 +164,7 @@ inline DatabaseDependency::DatabaseDependency(const std::string &name, const std
 }
 
 struct LIBPKG_EXPORT DatabaseLibraryDependency : public ReflectiveRapidJSON::JsonSerializable<DatabaseLibraryDependency>,
-                                                 public ReflectiveRapidJSON::BinarySerializable<DatabaseLibraryDependency> {
+                                                 public ReflectiveRapidJSON::BinarySerializable<DatabaseLibraryDependency, 1> {
     explicit DatabaseLibraryDependency() = default;
     explicit DatabaseLibraryDependency(const std::string &name);
     std::string name;
@@ -369,7 +369,7 @@ template <> struct hash<LibPkg::PackageSpec> {
 
 namespace LibPkg {
 
-struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Package>, public ReflectiveRapidJSON::BinarySerializable<Package> {
+struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Package>, public ReflectiveRapidJSON::BinarySerializable<Package, 1> {
     Package() = default;
     Package(const Package &other);
     Package(Package &&other) = default;
