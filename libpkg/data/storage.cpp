@@ -8,7 +8,7 @@ namespace LibPkg {
 
 StorageDistribution::StorageDistribution(const char *path, std::uint32_t maxDbs)
 {
-    m_env = getMDBEnv(path, MDB_NOSUBDIR, 0600, maxDbs);
+    m_env = LMDBSafe::getMDBEnv(path, MDB_NOSUBDIR, 0600, maxDbs);
 }
 
 PackageSpec PackageCache::retrieve(DatabaseStorage &databaseStorage, const std::string &packageName)
@@ -135,7 +135,7 @@ void PackageCache::clearCacheOnly(DatabaseStorage &databaseStorage)
     m_packages.clear(databaseStorage);
 }
 
-DatabaseStorage::DatabaseStorage(const std::shared_ptr<MDBEnv> &env, PackageCache &packageCache, std::string_view uniqueDatabaseName)
+DatabaseStorage::DatabaseStorage(const std::shared_ptr<LMDBSafe::MDBEnv> &env, PackageCache &packageCache, std::string_view uniqueDatabaseName)
     : packageCache(packageCache)
     , packages(env, argsToString(uniqueDatabaseName, "_packages"))
     , providedDeps(env, argsToString(uniqueDatabaseName, "_provides"))

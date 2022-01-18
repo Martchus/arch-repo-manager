@@ -3,6 +3,7 @@
 
 #include "./package.h"
 
+#include "../lmdb-safe/lmdb-reflective.hh"
 #include "../lmdb-safe/lmdb-safe.hh"
 #include "../lmdb-safe/lmdb-typed.hh"
 
@@ -17,15 +18,15 @@
 namespace LibPkg {
 
 using StorageID = std::uint32_t;
-using PackageStorage = TypedDBI<Package, index_on<Package, std::string, &Package::name>>;
-using DependencyStorage = TypedDBI<DatabaseDependency, index_on<Dependency, std::string, &DatabaseDependency::name>>;
+using PackageStorage = LMDBSafe::TypedDBI<Package, LMDBSafe::index_on<Package, std::string, &Package::name>>;
+using DependencyStorage = LMDBSafe::TypedDBI<DatabaseDependency, LMDBSafe::index_on<Dependency, std::string, &DatabaseDependency::name>>;
 using LibraryDependencyStorage
-    = TypedDBI<DatabaseLibraryDependency, index_on<DatabaseLibraryDependency, std::string, &DatabaseLibraryDependency::name>>;
+    = LMDBSafe::TypedDBI<DatabaseLibraryDependency, LMDBSafe::index_on<DatabaseLibraryDependency, std::string, &DatabaseLibraryDependency::name>>;
 
 struct PackageCache;
 
 struct DatabaseStorage {
-    explicit DatabaseStorage(const std::shared_ptr<MDBEnv> &env, PackageCache &packageCache, std::string_view uniqueDatabaseName);
+    explicit DatabaseStorage(const std::shared_ptr<LMDBSafe::MDBEnv> &env, PackageCache &packageCache, std::string_view uniqueDatabaseName);
     PackageCache &packageCache;
     PackageStorage packages;
     DependencyStorage providedDeps;
@@ -34,7 +35,7 @@ struct DatabaseStorage {
     LibraryDependencyStorage requiredLibs;
 
 private:
-    std::shared_ptr<MDBEnv> m_env;
+    std::shared_ptr<LMDBSafe::MDBEnv> m_env;
 };
 
 struct PackageCacheRef {
@@ -149,7 +150,7 @@ struct StorageDistribution {
     std::unique_ptr<DatabaseStorage> forDatabase(std::string_view uniqueDatabaseName);
 
 private:
-    std::shared_ptr<MDBEnv> m_env;
+    std::shared_ptr<LMDBSafe::MDBEnv> m_env;
     PackageCache m_packageCache;
 };
 

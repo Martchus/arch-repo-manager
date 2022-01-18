@@ -33,6 +33,7 @@ set(SRC_FILES
     parser/siglevel.cpp
     lmdb-safe/lmdb-safe.hh
     lmdb-safe/lmdb-typed.hh
+    lmdb-safe/lmdb-reflective.hh
     lmdb-safe/lmdb-safe.cc
     lmdb-safe/lmdb-typed.cc)
 set(TEST_HEADER_FILES tests/parser_helper.h)
