@@ -18,131 +18,140 @@
 namespace LibPkg {
 
 using StorageID = std::uint32_t;
-using PackageStorage = LMDBSafe::TypedDBI<Package, LMDBSafe::index_on<Package, std::string, &Package::name>>;
-using DependencyStorage = LMDBSafe::TypedDBI<DatabaseDependency, LMDBSafe::index_on<Dependency, std::string, &DatabaseDependency::name>>;
-using LibraryDependencyStorage
-    = LMDBSafe::TypedDBI<DatabaseLibraryDependency, LMDBSafe::index_on<DatabaseLibraryDependency, std::string, &DatabaseLibraryDependency::name>>;
 
-struct PackageCache;
-
-struct DatabaseStorage {
-    explicit DatabaseStorage(const std::shared_ptr<LMDBSafe::MDBEnv> &env, PackageCache &packageCache, std::string_view uniqueDatabaseName);
-    PackageCache &packageCache;
-    PackageStorage packages;
-    DependencyStorage providedDeps;
-    DependencyStorage requiredDeps;
-    LibraryDependencyStorage providedLibs;
-    LibraryDependencyStorage requiredLibs;
-
-private:
-    std::shared_ptr<LMDBSafe::MDBEnv> m_env;
+template <typename StorageType, typename EntryType> struct StorageCacheRef {
+    using Storage = StorageType;
+    explicit StorageCacheRef(const StorageType &relatedStorage, const std::shared_ptr<EntryType> &entry);
+    explicit StorageCacheRef(const StorageType &relatedStorage, const std::string &entryName);
+    bool operator==(const StorageCacheRef &other) const;
+    const StorageType *relatedStorage = nullptr;
+    const std::string *entryName;
 };
 
-struct PackageCacheRef {
-    explicit PackageCacheRef(const DatabaseStorage &databaseStorage, const std::shared_ptr<Package> &package);
-    explicit PackageCacheRef(const DatabaseStorage &databaseStorage, const std::string &packageName);
-    bool operator==(const PackageCacheRef &other) const;
-    const DatabaseStorage *databaseStorage = nullptr;
-    const std::string *packageName;
-};
-
-inline PackageCacheRef::PackageCacheRef(const DatabaseStorage &databaseStorage, const std::shared_ptr<Package> &package)
-    : databaseStorage(&databaseStorage)
-    , packageName(&package->name)
+template <typename StorageType, typename EntryType>
+inline StorageCacheRef<StorageType, EntryType>::StorageCacheRef(const StorageType &relatedStorage, const std::shared_ptr<EntryType> &entry)
+    : relatedStorage(&relatedStorage)
+    , entryName(&entry->name)
 {
 }
 
-inline PackageCacheRef::PackageCacheRef(const DatabaseStorage &databaseStorage, const std::string &packageName)
-    : databaseStorage(&databaseStorage)
-    , packageName(&packageName)
+template <typename StorageType, typename EntryType>
+inline StorageCacheRef<StorageType, EntryType>::StorageCacheRef(const StorageType &relatedStorage, const std::string &entryName)
+    : relatedStorage(&relatedStorage)
+    , entryName(&entryName)
 {
 }
 
-inline bool PackageCacheRef::operator==(const PackageCacheRef &other) const
+template <typename StorageType, typename EntryType>
+inline bool StorageCacheRef<StorageType, EntryType>::operator==(const StorageCacheRef<StorageType, EntryType> &other) const
 {
-    return databaseStorage == other.databaseStorage && *packageName == *other.packageName;
+    return relatedStorage == other.relatedStorage && *entryName == *other.entryName;
 }
 
-std::size_t hash_value(const PackageCacheRef &ref);
-
-struct PackageCacheEntry {
-    explicit PackageCacheEntry(const PackageCacheRef &ref);
-    PackageCacheRef ref;
+template <typename StorageRefType, typename EntryType> struct StorageCacheEntry {
+    using Ref = StorageRefType;
+    using Entry = EntryType;
+    using Storage = typename Ref::Storage;
+    explicit StorageCacheEntry(const StorageRefType &ref);
+    StorageRefType ref;
     StorageID id;
-    std::shared_ptr<Package> package;
+    std::shared_ptr<EntryType> entry;
 };
 
-inline PackageCacheEntry::PackageCacheEntry(const PackageCacheRef &ref)
+template <typename StorageRefType, typename EntryType>
+inline StorageCacheEntry<StorageRefType, EntryType>::StorageCacheEntry(const StorageRefType &ref)
     : ref(ref)
     , id(0)
 {
 }
 
-class RecentlyUsedPackages {
-    using PackageList = boost::multi_index::multi_index_container<PackageCacheEntry,
-        boost::multi_index::indexed_by<boost::multi_index::sequenced<>,
-            boost::multi_index::hashed_unique<boost::multi_index::tag<PackageCacheRef>,
-                BOOST_MULTI_INDEX_MEMBER(PackageCacheEntry, PackageCacheRef, ref)>>>;
-    using iterator = PackageList::iterator;
-
+template <typename StorageEntryType> class StorageCacheEntries {
 public:
-    explicit RecentlyUsedPackages(std::size_t limit = 1000);
+    using Ref = typename StorageEntryType::Ref;
+    using Entry = typename StorageEntryType::Entry;
+    using Storage = typename StorageEntryType::Storage;
+    using StorageEntry = StorageEntryType;
+    using EntryList = boost::multi_index::multi_index_container<StorageEntry,
+        boost::multi_index::indexed_by<boost::multi_index::sequenced<>,
+            boost::multi_index::hashed_unique<boost::multi_index::tag<Ref>, BOOST_MULTI_INDEX_MEMBER(StorageEntryType, Ref, ref)>>>;
+    using iterator = typename EntryList::iterator;
 
-    PackageCacheEntry &findOrCreate(const PackageCacheRef &ref);
+    explicit StorageCacheEntries(std::size_t limit = 1000);
+
+    StorageEntry &findOrCreate(const Ref &ref);
     void undo();
-    std::size_t erase(const PackageCacheRef &ref);
-    std::size_t clear(const DatabaseStorage &databaseStorage);
+    std::size_t erase(const Ref &ref);
+    std::size_t clear(const Storage &storage);
     iterator begin();
     iterator end();
 
 private:
-    PackageList m_packages;
+    EntryList m_entries;
     std::size_t m_limit;
 };
 
-inline RecentlyUsedPackages::RecentlyUsedPackages(std::size_t limit)
+template <typename StorageEntryType>
+inline StorageCacheEntries<StorageEntryType>::StorageCacheEntries(std::size_t limit)
     : m_limit(limit)
 {
 }
 
-inline void RecentlyUsedPackages::undo()
+template <typename StorageEntryType> inline void StorageCacheEntries<StorageEntryType>::undo()
 {
-    m_packages.pop_front();
+    m_entries.pop_front();
 }
 
-inline std::size_t RecentlyUsedPackages::erase(const PackageCacheRef &ref)
+template <typename StorageEntryType> inline std::size_t StorageCacheEntries<StorageEntryType>::erase(const Ref &ref)
 {
-    return m_packages.get<PackageCacheRef>().erase(ref);
+    return m_entries.template get<typename StorageEntryType::Ref>().erase(ref);
 }
 
-inline RecentlyUsedPackages::iterator RecentlyUsedPackages::begin()
+template <typename StorageEntryType> inline auto StorageCacheEntries<StorageEntryType>::begin() -> iterator
 {
-    return m_packages.begin();
+    return m_entries.begin();
 }
 
-inline RecentlyUsedPackages::iterator RecentlyUsedPackages::end()
+template <typename StorageEntryType> inline auto StorageCacheEntries<StorageEntryType>::end() -> iterator
 {
-    return m_packages.end();
+    return m_entries.end();
 }
 
-struct PackageCache {
+template <typename StorageEntriesType, typename TransactionType, typename SpecType> struct StorageCache {
+    using Entries = StorageEntriesType;
+    using Entry = typename Entries::Entry;
+    using Txn = TransactionType;
+    using Storage = typename Entries::Storage;
     struct StoreResult {
         StorageID id = 0;
         bool updated = false;
-        std::shared_ptr<Package> oldPackage;
+        std::shared_ptr<typename Entries::Entry> oldEntry;
     };
 
-    PackageSpec retrieve(DatabaseStorage &databaseStorage, const std::string &packageName);
-    StoreResult store(DatabaseStorage &databaseStorage, const std::shared_ptr<Package> &package, bool force);
-    StoreResult store(DatabaseStorage &databaseStorage, PackageStorage::RWTransaction &txn, const std::shared_ptr<Package> &package);
-    bool invalidate(DatabaseStorage &databaseStorage, const std::string &packageName);
-    void clear(DatabaseStorage &databaseStorage);
-    void clearCacheOnly(DatabaseStorage &databaseStorage);
+    SpecType retrieve(Storage &storage, const std::string &entryName);
+    StoreResult store(Storage &storage, const std::shared_ptr<Entry> &entry, bool force);
+    StoreResult store(Storage &storage, Txn &txn, const std::shared_ptr<Entry> &entry);
+    bool invalidate(Storage &storage, const std::string &entryName);
+    void clear(Storage &storage);
+    void clearCacheOnly(Storage &storage);
 
 private:
-    RecentlyUsedPackages m_packages;
+    Entries m_entries;
     std::mutex m_mutex;
 };
+
+using PackageStorage = LMDBSafe::TypedDBI<Package, LMDBSafe::index_on<Package, std::string, &Package::name>>;
+using DependencyStorage = LMDBSafe::TypedDBI<DatabaseDependency, LMDBSafe::index_on<Dependency, std::string, &DatabaseDependency::name>>;
+using LibraryDependencyStorage
+    = LMDBSafe::TypedDBI<DatabaseLibraryDependency, LMDBSafe::index_on<DatabaseLibraryDependency, std::string, &DatabaseLibraryDependency::name>>;
+using PackageCacheRef = StorageCacheRef<DatabaseStorage, Package>;
+using PackageCacheEntry = StorageCacheEntry<PackageCacheRef, Package>;
+using PackageCacheEntries = StorageCacheEntries<PackageCacheEntry>;
+using PackageCache = StorageCache<PackageCacheEntries, PackageStorage::RWTransaction, PackageSpec>;
+
+extern template struct StorageCacheRef<DatabaseStorage, Package>;
+extern template struct StorageCacheEntry<PackageCacheRef, Package>;
+extern template class StorageCacheEntries<PackageCacheEntry>;
+extern template struct StorageCache<PackageCacheEntries, PackageStorage::RWTransaction, PackageSpec>;
 
 struct StorageDistribution {
     explicit StorageDistribution(const char *path, std::uint32_t maxDbs);
@@ -158,6 +167,21 @@ inline std::unique_ptr<DatabaseStorage> StorageDistribution::forDatabase(std::st
 {
     return std::make_unique<DatabaseStorage>(m_env, m_packageCache, uniqueDatabaseName);
 }
+
+struct DatabaseStorage {
+    explicit DatabaseStorage(const std::shared_ptr<LMDBSafe::MDBEnv> &env, PackageCache &packageCache, std::string_view uniqueDatabaseName);
+    PackageCache &packageCache;
+    PackageStorage packages;
+    DependencyStorage providedDeps;
+    DependencyStorage requiredDeps;
+    LibraryDependencyStorage providedLibs;
+    LibraryDependencyStorage requiredLibs;
+
+private:
+    std::shared_ptr<LMDBSafe::MDBEnv> m_env;
+};
+
+std::size_t hash_value(const PackageCacheRef &ref);
 
 } // namespace LibPkg
 

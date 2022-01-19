@@ -365,8 +365,8 @@ StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
     if (!res.updated) {
         return res.id;
     }
-    if (res.oldPackage) {
-        removePackageDependencies(res.id, res.oldPackage);
+    if (res.oldEntry) {
+        removePackageDependencies(res.id, res.oldEntry);
     }
     addPackageDependencies(res.id, package);
     return res.id;
@@ -375,8 +375,8 @@ StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
 StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
 {
     const auto res = m_storage->packageCache.store(*m_storage, package, true);
-    if (res.oldPackage) {
-        removePackageDependencies(res.id, res.oldPackage);
+    if (res.oldEntry) {
+        removePackageDependencies(res.id, res.oldEntry);
     }
     addPackageDependencies(res.id, package);
     return res.id;
@@ -628,8 +628,8 @@ PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage)
 void PackageUpdaterPrivate::update(const PackageCache::StoreResult &res, const std::shared_ptr<Package> &package)
 {
     update(res.id, false, package);
-    if (res.oldPackage) {
-        update(res.id, true, res.oldPackage);
+    if (res.oldEntry) {
+        update(res.id, true, res.oldEntry);
     }
 }
 
