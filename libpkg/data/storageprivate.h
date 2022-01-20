@@ -52,18 +52,35 @@ template <typename StorageRefType, typename EntryType> struct StorageCacheEntry 
     using Ref = StorageRefType;
     using Entry = EntryType;
     using Storage = typename Ref::Storage;
-    explicit StorageCacheEntry(const StorageRefType &ref);
+    explicit StorageCacheEntry(const StorageRefType &ref, StorageID id);
     StorageRefType ref;
     StorageID id;
     std::shared_ptr<EntryType> entry;
 };
 
 template <typename StorageRefType, typename EntryType>
-inline StorageCacheEntry<StorageRefType, EntryType>::StorageCacheEntry(const StorageRefType &ref)
+inline StorageCacheEntry<StorageRefType, EntryType>::StorageCacheEntry(const StorageRefType &ref, StorageID id)
     : ref(ref)
-    , id(0)
+    , id(id)
 {
 }
+
+template <typename StorageEntryType> struct StorageEntryByID {
+    struct result_type {
+        StorageID id = 0;
+        const typename StorageEntryType::Storage *storage = nullptr;
+
+        bool operator==(const result_type &other) const
+        {
+            return id == other.id && storage == other.storage;
+        }
+    };
+
+    result_type operator()(const StorageEntryType &storageEntry) const
+    {
+        return result_type{ storageEntry.id, storageEntry.ref.relatedStorage };
+    }
+};
 
 template <typename StorageEntryType> class StorageCacheEntries {
 public:
@@ -71,14 +88,17 @@ public:
     using Entry = typename StorageEntryType::Entry;
     using Storage = typename StorageEntryType::Storage;
     using StorageEntry = StorageEntryType;
+    using ByID = StorageEntryByID<StorageEntry>;
     using EntryList = boost::multi_index::multi_index_container<StorageEntry,
         boost::multi_index::indexed_by<boost::multi_index::sequenced<>,
+            boost::multi_index::hashed_unique<boost::multi_index::tag<typename ByID::result_type>, ByID>,
             boost::multi_index::hashed_unique<boost::multi_index::tag<Ref>, BOOST_MULTI_INDEX_MEMBER(StorageEntryType, Ref, ref)>>>;
     using iterator = typename EntryList::iterator;
 
     explicit StorageCacheEntries(std::size_t limit = 1000);
 
-    StorageEntry &findOrCreate(const Ref &ref);
+    template <typename IndexType> StorageEntry *find(const IndexType &ref);
+    StorageEntry &insert(StorageEntry &&entry);
     void undo();
     std::size_t erase(const Ref &ref);
     std::size_t clear(const Storage &storage);
@@ -127,6 +147,7 @@ template <typename StorageEntriesType, typename TransactionType, typename SpecTy
         std::shared_ptr<typename Entries::Entry> oldEntry;
     };
 
+    SpecType retrieve(Storage &storage, StorageID storageID);
     SpecType retrieve(Storage &storage, const std::string &entryName);
     StoreResult store(Storage &storage, const std::shared_ptr<Entry> &entry, bool force);
     StoreResult store(Storage &storage, Txn &txn, const std::shared_ptr<Entry> &entry);
@@ -146,6 +167,7 @@ using LibraryDependencyStorage
 using PackageCacheRef = StorageCacheRef<DatabaseStorage, Package>;
 using PackageCacheEntry = StorageCacheEntry<PackageCacheRef, Package>;
 using PackageCacheEntries = StorageCacheEntries<PackageCacheEntry>;
+using PackageCacheEntryByID = typename PackageCacheEntries::ByID::result_type;
 using PackageCache = StorageCache<PackageCacheEntries, PackageStorage::RWTransaction, PackageSpec>;
 
 extern template struct StorageCacheRef<DatabaseStorage, Package>;
@@ -182,6 +204,7 @@ private:
 };
 
 std::size_t hash_value(const PackageCacheRef &ref);
+std::size_t hash_value(const PackageCacheEntryByID &entryByID);
 
 } // namespace LibPkg
 

@@ -334,10 +334,7 @@ bool Database::provides(const std::string &libraryName, bool reverse) const
 
 std::shared_ptr<Package> Database::findPackage(StorageID packageID)
 {
-    // TODO: use cache here
-    auto package = std::make_shared<Package>();
-    auto txn = m_storage->packages.getROTransaction();
-    return txn.get(packageID, *package) ? package : std::shared_ptr<Package>();
+    return m_storage->packageCache.retrieve(*m_storage, packageID).pkg;
 }
 
 std::shared_ptr<Package> Database::findPackage(const std::string &packageName)

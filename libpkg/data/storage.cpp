@@ -6,14 +6,21 @@ using namespace CppUtilities;
 
 namespace LibPkg {
 
-template <typename StorageEntryType> auto StorageCacheEntries<StorageEntryType>::findOrCreate(const Ref &ref) -> StorageEntry &
+template <typename StorageEntryType>
+template <typename IndexType>
+auto StorageCacheEntries<StorageEntryType>::find(const IndexType &ref) -> StorageEntry *
 {
-    const auto &index = m_entries.template get<Ref>();
+    const auto &index = m_entries.template get<IndexType>();
     if (auto i = index.find(ref); i != index.end()) {
         m_entries.relocate(m_entries.begin(), m_entries.template project<0>(i));
-        return i.get_node()->value();
+        return &i.get_node()->value();
     }
-    const auto [i, newItem] = m_entries.emplace_front(ref);
+    return nullptr;
+}
+
+template <typename StorageEntryType> auto StorageCacheEntries<StorageEntryType>::insert(StorageEntry &&entry) -> StorageEntry &
+{
+    const auto [i, newItem] = m_entries.emplace_front(entry);
     if (!newItem) {
         m_entries.relocate(m_entries.begin(), i);
     } else if (m_entries.size() > m_limit) {
@@ -37,24 +44,55 @@ template <typename StorageEntryType> std::size_t StorageCacheEntries<StorageEntr
 }
 
 template <typename StorageEntriesType, typename TransactionType, typename SpecType>
+auto StorageCache<StorageEntriesType, TransactionType, SpecType>::retrieve(Storage &storage, StorageID storageID) -> SpecType
+{
+    // check for package in cache
+    const auto ref = typename StorageEntryByID<typename Entries::StorageEntry>::result_type{ storageID, &storage };
+    auto lock = std::unique_lock(m_mutex);
+    if (auto *const existingCacheEntry = m_entries.find(ref)) {
+        return SpecType(existingCacheEntry->id, existingCacheEntry->entry);
+    }
+    // check for package in storage, populate cache entry
+    lock.unlock();
+    auto entry = std::make_shared<Entry>();
+    auto txn = storage.packages.getROTransaction();
+    if (auto id = txn.get(storageID, *entry)) {
+        using CacheEntry = typename Entries::StorageEntry;
+        using CacheRef = typename Entries::Ref;
+        auto newCacheEntry = CacheEntry(CacheRef(storage, entry), id);
+        newCacheEntry.entry = entry;
+        lock = std::unique_lock(m_mutex);
+        m_entries.insert(std::move(newCacheEntry));
+        lock.unlock();
+        return SpecType(id, entry);
+    }
+    return SpecType(0, std::shared_ptr<Entry>());
+}
+
+template <typename StorageEntriesType, typename TransactionType, typename SpecType>
 auto StorageCache<StorageEntriesType, TransactionType, SpecType>::retrieve(Storage &storage, const std::string &entryName) -> SpecType
 {
     // check for package in cache
-    const auto ref = typename Entries::Ref(storage, entryName);
-    const auto lock = std::unique_lock(m_mutex);
-    auto &cacheEntry = m_entries.findOrCreate(ref);
-    if (cacheEntry.entry) {
-        return PackageSpec(cacheEntry.id, cacheEntry.entry);
+    using CacheRef = typename Entries::Ref;
+    const auto ref = CacheRef(storage, entryName);
+    auto lock = std::unique_lock(m_mutex);
+    if (auto *const existingCacheEntry = m_entries.find(ref)) {
+        return SpecType(existingCacheEntry->id, existingCacheEntry->entry);
     }
+    lock.unlock();
     // check for package in storage, populate cache entry
-    cacheEntry.entry = std::make_shared<Entry>();
+    auto entry = std::make_shared<Entry>();
     auto txn = storage.packages.getROTransaction();
-    if ((cacheEntry.id = txn.template get<0>(entryName, *cacheEntry.entry))) {
-        cacheEntry.ref.entryName = &cacheEntry.entry->name;
-        return PackageSpec(cacheEntry.id, cacheEntry.entry);
+    if (auto id = txn.template get<0>(entryName, *entry)) {
+        using CacheEntry = typename Entries::StorageEntry;
+        auto newCacheEntry = CacheEntry(ref, id);
+        newCacheEntry.entry = entry;
+        lock = std::unique_lock(m_mutex);
+        m_entries.insert(std::move(newCacheEntry));
+        lock.unlock();
+        return SpecType(id, entry);
     }
-    m_entries.undo();
-    return PackageSpec(0, std::shared_ptr<Entry>());
+    return SpecType(0, std::shared_ptr<Entry>());
 }
 
 template <typename StorageEntriesType, typename TransactionType, typename SpecType>
@@ -62,32 +100,46 @@ auto StorageCache<StorageEntriesType, TransactionType, SpecType>::store(Storage 
     -> StoreResult
 {
     // check for package in cache
-    const auto ref = typename Entries::Ref(storage, entry->name);
+    using CacheEntry = typename Entries::StorageEntry;
+    using CacheRef = typename Entries::Ref;
+    const auto ref = CacheRef(storage, entry->name);
     auto res = StorageCache::StoreResult();
     auto lock = std::unique_lock(m_mutex);
-    auto &cacheEntry = m_entries.findOrCreate(ref);
-    if (cacheEntry.entry == entry && !force) {
-        // do nothing if cached package is the same as specified one
-        res.id = cacheEntry.id;
-        return res;
-    } else if (cacheEntry.entry) {
-        // retain certain information obtained from package contents if this is actually the same package as before
-        entry->addDepsAndProvidesFromOtherPackage(*(res.oldEntry = cacheEntry.entry));
-    } else {
-        cacheEntry.entry = std::make_shared<Entry>();
+    auto *cacheEntry = m_entries.find(ref);
+    if (cacheEntry) {
+        res.id = cacheEntry->id;
+        res.oldEntry = cacheEntry->entry;
+        if (cacheEntry->entry == entry && !force) {
+            // do nothing if cached package is the same as specified one
+            return res;
+        } else {
+            // retain certain information obtained from package contents if this is actually the same package as before
+            entry->addDepsAndProvidesFromOtherPackage(*cacheEntry->entry);
+        }
     }
+    lock.unlock();
     // check for package in storage
     auto txn = storage.packages.getRWTransaction();
-    if (!res.oldEntry && (cacheEntry.id = txn.template get<0>(entry->name, *cacheEntry.entry))) {
-        entry->addDepsAndProvidesFromOtherPackage(*(res.oldEntry = cacheEntry.entry));
+    if (!res.oldEntry) {
+        res.oldEntry = std::make_shared<Entry>();
+        if (txn.template get<0>(entry->name, *res.oldEntry)) {
+            entry->addDepsAndProvidesFromOtherPackage(*res.oldEntry);
+        } else {
+            res.oldEntry.reset();
+        }
     }
-    // update cache entry
-    cacheEntry.ref.entryName = &entry->name;
-    cacheEntry.entry = entry;
     // update package in storage
-    cacheEntry.id = txn.put(*entry, cacheEntry.id);
+    res.id = txn.put(*entry, res.id);
+    // update cache entry
+    lock = std::unique_lock(m_mutex);
+    if (cacheEntry) {
+        cacheEntry->ref.entryName = &entry->name;
+    } else {
+        cacheEntry = &m_entries.insert(CacheEntry(ref, res.id));
+    }
+    cacheEntry->entry = entry;
+    lock.unlock();
     txn.commit();
-    res.id = cacheEntry.id;
     res.updated = true;
     return res;
 }
@@ -97,26 +149,38 @@ auto StorageCache<StorageEntriesType, TransactionType, SpecType>::store(Storage 
     -> StoreResult
 {
     // check for package in cache
-    const auto ref = typename Entries::Ref(storage, entry->name);
+    using CacheEntry = typename Entries::StorageEntry;
+    using CacheRef = typename Entries::Ref;
+    const auto ref = CacheRef(storage, entry->name);
     auto res = StorageCache::StoreResult();
     auto lock = std::unique_lock(m_mutex);
-    auto &cacheEntry = m_entries.findOrCreate(ref);
-    if (cacheEntry.entry) {
+    auto *cacheEntry = m_entries.find(ref);
+    if (cacheEntry) {
         // retain certain information obtained from package contents if this is actually the same package as before
-        res.id = cacheEntry.id;
-        entry->addDepsAndProvidesFromOtherPackage(*(res.oldEntry = cacheEntry.entry));
-    } else {
-        // check for package in storage
-        cacheEntry.entry = std::make_shared<Entry>();
-        if ((cacheEntry.id = txn.template get<0>(entry->name, *cacheEntry.entry))) {
-            entry->addDepsAndProvidesFromOtherPackage(*(res.oldEntry = cacheEntry.entry));
+        res.id = cacheEntry->id;
+        entry->addDepsAndProvidesFromOtherPackage(*(res.oldEntry = cacheEntry->entry));
+    }
+    lock.unlock();
+    // check for package in storage
+    if (!res.oldEntry) {
+        res.oldEntry = std::make_shared<Entry>();
+        if (txn.template get<0>(entry->name, *res.oldEntry)) {
+            entry->addDepsAndProvidesFromOtherPackage(*res.oldEntry);
+        } else {
+            res.oldEntry.reset();
         }
     }
-    // update cache entry
-    cacheEntry.ref.entryName = &entry->name;
-    cacheEntry.entry = entry;
     // update package in storage
-    res.id = cacheEntry.id = txn.put(*entry, cacheEntry.id);
+    res.id = txn.put(*entry, res.id);
+    // update cache entry
+    lock = std::unique_lock(m_mutex);
+    if (cacheEntry) {
+        cacheEntry->ref.entryName = &entry->name;
+    } else {
+        cacheEntry = &m_entries.insert(CacheEntry(ref, res.id));
+    }
+    cacheEntry->entry = entry;
+    lock.unlock();
     res.updated = true;
     return res;
 }
@@ -193,6 +257,13 @@ std::size_t hash_value(const PackageCacheRef &ref)
     const auto hasher1 = boost::hash<const LibPkg::DatabaseStorage *>();
     const auto hasher2 = boost::hash<std::string>();
     return ((hasher1(ref.relatedStorage) ^ (hasher2(*ref.entryName) << 1)) >> 1);
+}
+
+std::size_t hash_value(const PackageCacheEntryByID &entryByID)
+{
+    const auto hasher1 = boost::hash<StorageID>();
+    const auto hasher2 = boost::hash<const LibPkg::DatabaseStorage *>();
+    return ((hasher1(entryByID.id) ^ (hasher2(entryByID.storage) << 1)) >> 1);
 }
 
 } // namespace LibPkg
