@@ -43,8 +43,8 @@ template <typename StorageEntryType> std::size_t StorageCacheEntries<StorageEntr
     return count;
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType>
-auto StorageCache<StorageEntriesType, TransactionType, SpecType>::retrieve(Storage &storage, StorageID storageID) -> SpecType
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, ROTxn *txn, StorageID storageID) -> SpecType
 {
     // check for package in cache
     const auto ref = typename StorageEntryByID<typename Entries::StorageEntry>::result_type{ storageID, &storage };
@@ -55,8 +55,7 @@ auto StorageCache<StorageEntriesType, TransactionType, SpecType>::retrieve(Stora
     // check for package in storage, populate cache entry
     lock.unlock();
     auto entry = std::make_shared<Entry>();
-    auto txn = storage.packages.getROTransaction();
-    if (auto id = txn.get(storageID, *entry)) {
+    if (auto id = txn ? txn->get(storageID, *entry) : storage.packages.getROTransaction().get(storageID, *entry)) {
         using CacheEntry = typename Entries::StorageEntry;
         using CacheRef = typename Entries::Ref;
         auto newCacheEntry = CacheEntry(CacheRef(storage, entry), id);
@@ -69,8 +68,14 @@ auto StorageCache<StorageEntriesType, TransactionType, SpecType>::retrieve(Stora
     return SpecType(0, std::shared_ptr<Entry>());
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType>
-auto StorageCache<StorageEntriesType, TransactionType, SpecType>::retrieve(Storage &storage, const std::string &entryName) -> SpecType
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, StorageID storageID) -> SpecType
+{
+    return retrieve(storage, nullptr, storageID);
+}
+
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, const std::string &entryName) -> SpecType
 {
     // check for package in cache
     using CacheRef = typename Entries::Ref;
@@ -95,9 +100,8 @@ auto StorageCache<StorageEntriesType, TransactionType, SpecType>::retrieve(Stora
     return SpecType(0, std::shared_ptr<Entry>());
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType>
-auto StorageCache<StorageEntriesType, TransactionType, SpecType>::store(Storage &storage, const std::shared_ptr<Entry> &entry, bool force)
-    -> StoreResult
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &storage, const std::shared_ptr<Entry> &entry, bool force) -> StoreResult
 {
     // check for package in cache
     using CacheEntry = typename Entries::StorageEntry;
@@ -144,9 +148,8 @@ auto StorageCache<StorageEntriesType, TransactionType, SpecType>::store(Storage 
     return res;
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType>
-auto StorageCache<StorageEntriesType, TransactionType, SpecType>::store(Storage &storage, Txn &txn, const std::shared_ptr<Entry> &entry)
-    -> StoreResult
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &storage, RWTxn &txn, const std::shared_ptr<Entry> &entry) -> StoreResult
 {
     // check for package in cache
     using CacheEntry = typename Entries::StorageEntry;
@@ -185,8 +188,8 @@ auto StorageCache<StorageEntriesType, TransactionType, SpecType>::store(Storage 
     return res;
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType>
-bool StorageCache<StorageEntriesType, TransactionType, SpecType>::invalidate(Storage &storage, const std::string &entryName)
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+bool StorageCache<StorageEntriesType, StorageType, SpecType>::invalidate(Storage &storage, const std::string &entryName)
 {
     // remove package from cache
     const auto ref = typename Entries::Ref(storage, entryName);
@@ -203,8 +206,8 @@ bool StorageCache<StorageEntriesType, TransactionType, SpecType>::invalidate(Sto
     return false;
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType>
-void StorageCache<StorageEntriesType, TransactionType, SpecType>::clear(Storage &storage)
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+void StorageCache<StorageEntriesType, StorageType, SpecType>::clear(Storage &storage)
 {
     clearCacheOnly(storage);
     auto packagesTxn = storage.packages.getRWTransaction();
@@ -224,8 +227,8 @@ void StorageCache<StorageEntriesType, TransactionType, SpecType>::clear(Storage 
     requiredLibsTxn.commit();
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType>
-void StorageCache<StorageEntriesType, TransactionType, SpecType>::clearCacheOnly(Storage &storage)
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+void StorageCache<StorageEntriesType, StorageType, SpecType>::clearCacheOnly(Storage &storage)
 {
     const auto lock = std::unique_lock(m_mutex);
     m_entries.clear(storage);
@@ -234,7 +237,7 @@ void StorageCache<StorageEntriesType, TransactionType, SpecType>::clearCacheOnly
 template struct StorageCacheRef<DatabaseStorage, Package>;
 template struct StorageCacheEntry<PackageCacheRef, Package>;
 template class StorageCacheEntries<PackageCacheEntry>;
-template struct StorageCache<PackageCacheEntries, PackageStorage::RWTransaction, PackageSpec>;
+template struct StorageCache<PackageCacheEntries, PackageStorage, PackageSpec>;
 
 StorageDistribution::StorageDistribution(const char *path, std::uint32_t maxDbs)
 {

@@ -265,11 +265,10 @@ void Database::addPackageDependencies(StorageID packageID, const std::shared_ptr
 
 void Database::allPackages(const PackageVisitor &visitor)
 {
-    // TODO: use cache here
-    //auto &cachedPackages = m_storage->packageCache;
+    // TODO: use cache here, e.g. implement a "lazy" iterator for LMDB that also directly yields a std::shared_ptr
     auto txn = m_storage->packages.getROTransaction();
     for (auto i = txn.begin(); i != txn.end(); ++i) {
-        if (visitor(i.getID(), std::move(i.value()))) {
+        if (visitor(i.getID(), std::make_shared<Package>(std::move(i.value())))) {
             return;
         }
     }
@@ -282,8 +281,6 @@ std::size_t Database::packageCount() const
 
 void Database::providingPackages(const Dependency &dependency, bool reverse, const PackageVisitor &visitor)
 {
-    // TODO: use cache here
-    auto package = Package();
     auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
     auto packagesTxn = m_storage->packages.getROTransaction();
     for (auto [i, end] = providesTxn.equal_range<0>(dependency.name); i != end; ++i) {
@@ -292,7 +289,8 @@ void Database::providingPackages(const Dependency &dependency, bool reverse, con
             continue;
         }
         for (const auto packageID : i->relevantPackages) {
-            if (packagesTxn.get(packageID, package) && visitor(packageID, std::move(package))) {
+            const auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
+            if (res.pkg && visitor(packageID, res.pkg)) {
                 return;
             }
         }
@@ -301,13 +299,12 @@ void Database::providingPackages(const Dependency &dependency, bool reverse, con
 
 void Database::providingPackages(const std::string &libraryName, bool reverse, const PackageVisitor &visitor)
 {
-    // TODO: use cache here
-    auto package = Package();
     auto providesTxn = (reverse ? m_storage->requiredLibs : m_storage->providedLibs).getROTransaction();
     auto packagesTxn = m_storage->packages.getROTransaction();
     for (auto [i, end] = providesTxn.equal_range<0>(libraryName); i != end; ++i) {
         for (const auto packageID : i->relevantPackages) {
-            if (packagesTxn.get(packageID, package) && visitor(packageID, std::move(package))) {
+            const auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
+            if (res.pkg && visitor(packageID, res.pkg)) {
                 return;
             }
         }
@@ -506,23 +503,22 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
 LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPkg::Database *> &updateSources, UpdateCheckOptions options)
 {
     auto results = PackageUpdates();
-    allPackages([&](StorageID myPackageID, Package &&package) {
-        auto myPackage = std::make_shared<Package>(std::move(package));
+    allPackages([&](StorageID myPackageID, const std::shared_ptr<Package> &package) {
         auto regularName = std::string();
         if (options & UpdateCheckOptions::ConsiderRegularPackage) {
-            const auto decomposedName = myPackage->decomposeName();
+            const auto decomposedName = package->decomposeName();
             if ((!decomposedName.targetPrefix.empty() || !decomposedName.vcsSuffix.empty()) && !decomposedName.isVcsPackage()) {
                 regularName = decomposedName.actualName;
             }
         }
         auto foundPackage = false;
         for (auto *const updateSource : updateSources) {
-            const auto [updatePackageID, updatePackage] = updateSource->findPackageWithID(myPackage->name);
+            const auto [updatePackageID, updatePackage] = updateSource->findPackageWithID(package->name);
             if (!updatePackage) {
                 continue;
             }
             foundPackage = true;
-            const auto versionDiff = myPackage->compareVersion(*updatePackage);
+            const auto versionDiff = package->compareVersion(*updatePackage);
             std::vector<PackageUpdate> *list = nullptr;
             switch (versionDiff) {
             case PackageVersionComparison::SoftwareUpgrade:
@@ -538,11 +534,11 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
             }
             if (list) {
                 list->emplace_back(
-                    PackageSearchResult(*this, myPackage, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
+                    PackageSearchResult(*this, package, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
             }
         }
         if (!foundPackage) {
-            results.orphans.emplace_back(PackageSearchResult(*this, myPackage, myPackageID));
+            results.orphans.emplace_back(PackageSearchResult(*this, package, myPackageID));
         }
         if (regularName.empty()) {
             return false;
@@ -552,7 +548,7 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
             if (!updatePackage) {
                 continue;
             }
-            const auto versionDiff = myPackage->compareVersion(*updatePackage);
+            const auto versionDiff = package->compareVersion(*updatePackage);
             std::vector<PackageUpdate> *list = nullptr;
             switch (versionDiff) {
             case PackageVersionComparison::SoftwareUpgrade:
@@ -568,7 +564,7 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
             }
             if (list) {
                 list->emplace_back(
-                    PackageSearchResult(*this, myPackage, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
+                    PackageSearchResult(*this, package, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
             }
         }
         return false;

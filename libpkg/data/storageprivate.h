@@ -136,10 +136,11 @@ template <typename StorageEntryType> inline auto StorageCacheEntries<StorageEntr
     return m_entries.end();
 }
 
-template <typename StorageEntriesType, typename TransactionType, typename SpecType> struct StorageCache {
+template <typename StorageEntriesType, typename StorageType, typename SpecType> struct StorageCache {
     using Entries = StorageEntriesType;
     using Entry = typename Entries::Entry;
-    using Txn = TransactionType;
+    using ROTxn = typename StorageType::ROTransaction;
+    using RWTxn = typename StorageType::RWTransaction;
     using Storage = typename Entries::Storage;
     struct StoreResult {
         StorageID id = 0;
@@ -147,10 +148,11 @@ template <typename StorageEntriesType, typename TransactionType, typename SpecTy
         std::shared_ptr<typename Entries::Entry> oldEntry;
     };
 
+    SpecType retrieve(Storage &storage, ROTxn *, StorageID storageID);
     SpecType retrieve(Storage &storage, StorageID storageID);
     SpecType retrieve(Storage &storage, const std::string &entryName);
     StoreResult store(Storage &storage, const std::shared_ptr<Entry> &entry, bool force);
-    StoreResult store(Storage &storage, Txn &txn, const std::shared_ptr<Entry> &entry);
+    StoreResult store(Storage &storage, RWTxn &txn, const std::shared_ptr<Entry> &entry);
     bool invalidate(Storage &storage, const std::string &entryName);
     void clear(Storage &storage);
     void clearCacheOnly(Storage &storage);
@@ -168,12 +170,12 @@ using PackageCacheRef = StorageCacheRef<DatabaseStorage, Package>;
 using PackageCacheEntry = StorageCacheEntry<PackageCacheRef, Package>;
 using PackageCacheEntries = StorageCacheEntries<PackageCacheEntry>;
 using PackageCacheEntryByID = typename PackageCacheEntries::ByID::result_type;
-using PackageCache = StorageCache<PackageCacheEntries, PackageStorage::RWTransaction, PackageSpec>;
+using PackageCache = StorageCache<PackageCacheEntries, PackageStorage, PackageSpec>;
 
 extern template struct StorageCacheRef<DatabaseStorage, Package>;
 extern template struct StorageCacheEntry<PackageCacheRef, Package>;
 extern template class StorageCacheEntries<PackageCacheEntry>;
-extern template struct StorageCache<PackageCacheEntries, PackageStorage::RWTransaction, PackageSpec>;
+extern template struct StorageCache<PackageCacheEntries, PackageStorage, PackageSpec>;
 
 struct StorageDistribution {
     explicit StorageDistribution(const char *path, std::uint32_t maxDbs);

@@ -131,8 +131,8 @@ int main(int argc, const char *argv[])
         }
     }
     for (auto &db : cfg.databases) {
-        db.allPackages([&](LibPkg::StorageID, LibPkg::Package &&package) {
-            const auto &pkgInfo = package.packageInfo;
+        db.allPackages([&](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &package) {
+            const auto &pkgInfo = package->packageInfo;
             if (!pkgInfo) {
                 return false;
             }
@@ -154,7 +154,7 @@ int main(int argc, const char *argv[])
                     if (!db.name.empty()) {
                         std::cout << db.name << '/';
                     }
-                    std::cout << package.name << '\n';
+                    std::cout << package->name << '\n';
                     foundOne = true;
                 }
                 std::cout << " - " << file << '\n';
@@ -163,7 +163,7 @@ int main(int argc, const char *argv[])
                 if (!db.name.empty()) {
                     std::cout << db.name << '/';
                 }
-                std::cout << package.name << '\n';
+                std::cout << package->name << '\n';
             }
             return false;
         });

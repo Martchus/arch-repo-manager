@@ -149,8 +149,8 @@ void BuildActionsTests::logTestSetup()
 {
     for (auto &db : m_setup.config.databases) {
         cout << EscapeCodes::Phrases::Info << "Packages of " << db.name << ':' << EscapeCodes::Phrases::End;
-        db.allPackages([](LibPkg::StorageID, LibPkg::Package &&package) {
-            cout << " - " << package.name << '\n';
+        db.allPackages([](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &package) {
+            cout << " - " << package->name << '\n';
             return false;
         });
     }

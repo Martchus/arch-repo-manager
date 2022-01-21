@@ -128,11 +128,10 @@ PackageSearchResult Config::findPackage(const Dependency &dependency)
     auto result = PackageSearchResult();
     auto exactMatch = false;
     for (auto &db : databases) {
-        db.providingPackages(dependency, false, [&](StorageID id, Package &&package) {
-            // FIXME: avoid copy
-            exactMatch = dependency.name == package.name;
+        db.providingPackages(dependency, false, [&](StorageID id, const std::shared_ptr<Package> &package) {
+            exactMatch = dependency.name == package->name;
             result.db = &db;
-            result.pkg = std::make_shared<Package>(std::move(package));
+            result.pkg = package;
             result.id = id;
             // prefer package where the name matches exactly; so if we found one no need to look further
             return exactMatch;
@@ -152,10 +151,9 @@ std::vector<PackageSearchResult> Config::findPackages(const Dependency &dependen
     auto results = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
         auto visited = std::unordered_set<StorageID>();
-        db.providingPackages(dependency, reverse, [&](StorageID packageID, Package &&package) {
-            // FIXME: avoid copy
+        db.providingPackages(dependency, reverse, [&](StorageID packageID, const std::shared_ptr<Package> &package) {
             if (visited.emplace(packageID).second) {
-                results.emplace_back(db, std::make_shared<Package>(std::move(package)), packageID);
+                results.emplace_back(db, package, packageID);
             }
             return false;
         });
@@ -171,10 +169,9 @@ std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const std:
     auto results = std::vector<PackageSearchResult>();
     auto visited = std::unordered_set<StorageID>();
     for (auto &db : databases) {
-        db.providingPackages(library, reverse, [&](StorageID packageID, Package &&package) {
-            // FIXME: avoid copy
+        db.providingPackages(library, reverse, [&](StorageID packageID, const std::shared_ptr<Package> &package) {
             if (visited.emplace(packageID).second) {
-                results.emplace_back(db, std::make_shared<Package>(std::move(package)), packageID);
+                results.emplace_back(db, package, packageID);
             }
             return false;
         });
@@ -189,10 +186,9 @@ std::vector<PackageSearchResult> Config::findPackages(const std::regex &regex)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        db.allPackages([&](StorageID packageID, Package &&package) {
-            if (std::regex_match(package.name, regex)) {
-                // FIXME: avoid copy
-                pkgs.emplace_back(db, std::make_shared<Package>(std::move(package)), packageID);
+        db.allPackages([&](StorageID packageID, const std::shared_ptr<Package> &package) {
+            if (std::regex_match(package->name, regex)) {
+                pkgs.emplace_back(db, package, packageID);
             }
             return false;
         });
@@ -226,10 +222,9 @@ std::vector<PackageSearchResult> Config::findPackages(
         if (!databasePred(db)) {
             continue;
         }
-        db.allPackages([&](StorageID packageID, const Package &package) {
-            if (packagePred(db, package)) {
-                // FIXME: avoid copy
-                pkgs.emplace_back(db, std::make_shared<Package>(package), packageID);
+        db.allPackages([&](StorageID packageID, const std::shared_ptr<Package> &package) {
+            if (packagePred(db, *package)) {
+                pkgs.emplace_back(db, package, packageID);
             }
             return false;
         });
@@ -244,10 +239,9 @@ std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(c
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        db.allPackages([&](StorageID packageID, const Package &package) {
-            if (pred(db, package)) {
-                // FIXME: avoid copy
-                pkgs.emplace_back(db, std::make_shared<Package>(package), packageID);
+        db.allPackages([&](StorageID packageID, const std::shared_ptr<Package> &package) {
+            if (pred(db, *package)) {
+                pkgs.emplace_back(db, package, packageID);
             }
             return false;
         });

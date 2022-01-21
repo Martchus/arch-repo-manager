@@ -1520,31 +1520,31 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
             const auto &removedDependencyName = removedDependency.first;
             const auto &removedDependencyDetail = removedDependency.second;
             db->providingPackages(LibPkg::Dependency(removedDependencyName, removedDependencyDetail.version, removedDependencyDetail.mode), true,
-                [&](LibPkg::StorageID, LibPkg::Package &&affectedPackage) {
-                    if (isDestinationDb && isPackageWeWantToUpdateItself(affectedPackage)) {
+                [&](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &affectedPackage) {
+                    if (isDestinationDb && isPackageWeWantToUpdateItself(*affectedPackage)) {
                         return false; // skip if that's just the package we want to update itself
                     }
                     if (!rebuildInfoForDb) {
                         rebuildInfoForDb = &m_buildProgress.rebuildList[db->name];
                     }
                     needsStaging = true;
-                    (*rebuildInfoForDb)[affectedPackage.name].provides.emplace_back(
+                    (*rebuildInfoForDb)[affectedPackage->name].provides.emplace_back(
                         removedDependencyName, removedDependencyDetail.version, removedDependencyDetail.mode);
-                    listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage.name);
+                    listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage->name);
                     return false;
                 });
         }
         for (const auto &removedLibProvide : removedLibProvides) {
-            db->providingPackages(removedLibProvide, true, [&](LibPkg::StorageID, LibPkg::Package &&affectedPackage) {
-                if (isDestinationDb && isPackageWeWantToUpdateItself(affectedPackage)) {
+            db->providingPackages(removedLibProvide, true, [&](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &affectedPackage) {
+                if (isDestinationDb && isPackageWeWantToUpdateItself(*affectedPackage)) {
                     return false; // skip if that's just the package we want to update itself
                 }
                 if (!rebuildInfoForDb) {
                     rebuildInfoForDb = &m_buildProgress.rebuildList[db->name];
                 }
                 needsStaging = true;
-                (*rebuildInfoForDb)[affectedPackage.name].libprovides.emplace_back(removedLibProvide);
-                listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage.name);
+                (*rebuildInfoForDb)[affectedPackage->name].libprovides.emplace_back(removedLibProvide);
+                listOfAffectedPackages.emplace_back(db->name % '/' + affectedPackage->name);
                 return false;
             });
         }

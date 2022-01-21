@@ -111,7 +111,7 @@ private:
 };
 
 struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Database>, public ReflectiveRapidJSON::BinarySerializable<Database> {
-    using PackageVisitor = std::function<bool(StorageID, Package &&)>;
+    using PackageVisitor = std::function<bool(StorageID, const std::shared_ptr<Package> &)>;
 
     friend struct PackageUpdater;
 

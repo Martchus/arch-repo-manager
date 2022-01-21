@@ -151,13 +151,12 @@ void Config::pullDependentPackages(const std::vector<Dependency> &dependencies, 
             if (relevantDbs.find(&db) == relevantDbs.end()) {
                 continue;
             }
-            db.providingPackages(dependency, false, [&](StorageID packageID, Package &&package) {
+            db.providingPackages(dependency, false, [&](StorageID packageID, const std::shared_ptr<Package> &package) {
                 found = true;
-                // FIXME: avoid copy
                 if (visited.emplace(packageID).second) {
                     const auto &[i, inserted] = runtimeDependencies.try_emplace(packageID);
                     if (inserted) {
-                        i->second = std::make_shared<Package>(std::move(package));
+                        i->second = package;
                     }
                     pullDependentPackages(i->second, relevantDbs, runtimeDependencies, missingDependencies, visited);
                 }

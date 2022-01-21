@@ -444,21 +444,21 @@ void CheckForProblems::run()
                 problems.emplace_back(
                     RepositoryProblem{ .desc = "configured local package directory \"" % db->localPkgDir + "\" is not a directory" });
             }
-            db->allPackages([&](LibPkg::StorageID, LibPkg::Package &&package) {
-                if (!package.packageInfo) {
-                    problems.emplace_back(RepositoryProblem{ .desc = "no package info present", .pkg = package.name });
+            db->allPackages([&](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &package) {
+                if (!package->packageInfo) {
+                    problems.emplace_back(RepositoryProblem{ .desc = "no package info present", .pkg = package->name });
                     return false;
                 }
-                const auto packageLocation = db->locatePackage(package.packageInfo->fileName);
+                const auto packageLocation = db->locatePackage(package->packageInfo->fileName);
                 if (!packageLocation.exists) {
                     problems.emplace_back(
-                        RepositoryProblem{ .desc = "binary package \"" % package.packageInfo->fileName + "\" not present", .pkg = package.name });
+                        RepositoryProblem{ .desc = "binary package \"" % package->packageInfo->fileName + "\" not present", .pkg = package->name });
                 }
                 if (m_requirePackageSignatures) {
-                    const auto signatureLocation = db->locatePackage(package.packageInfo->fileName + ".sig");
+                    const auto signatureLocation = db->locatePackage(package->packageInfo->fileName + ".sig");
                     if (!signatureLocation.exists) {
                         problems.emplace_back(RepositoryProblem{
-                            .desc = "signature file for package \"" % package.packageInfo->fileName + "\" not present", .pkg = package.name });
+                            .desc = "signature file for package \"" % package->packageInfo->fileName + "\" not present", .pkg = package->name });
                     }
                 }
                 return false;

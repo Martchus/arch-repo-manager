@@ -169,9 +169,9 @@ std::shared_ptr<AurQuerySession> queryAurPackagesForDatabase(LogContext &log, Se
         configReadLock = &ownConfigReadLock;
     }
     auto &aurDb = setup.config.aur;
-    database.allPackages([&aurDb, &missingPackages](StorageID, Package &&package) {
-        if (const auto aurPackage = aurDb.findPackage(package.name); !aurPackage) {
-            missingPackages.emplace_back(package.name);
+    database.allPackages([&aurDb, &missingPackages](StorageID, const std::shared_ptr<Package> &package) {
+        if (const auto aurPackage = aurDb.findPackage(package->name); !aurPackage) {
+            missingPackages.emplace_back(package->name);
         }
         return false;
     });

@@ -399,13 +399,13 @@ RAPIDJSON_NAMESPACE::Document ServiceSetup::libraryDependenciesToJson()
     auto &alloc = document.GetAllocator();
     for (auto &db : config.databases) {
         auto dbValue = RAPIDJSON_NAMESPACE::Value(RAPIDJSON_NAMESPACE::Type::kObjectType);
-        db.allPackages([&](StorageID, Package &&package) {
-            if (!package.packageInfo) {
+        db.allPackages([&](StorageID, const std::shared_ptr<Package> &package) {
+            if (!package->packageInfo) {
                 return false;
             }
-            if (package.libdepends.empty() && package.libprovides.empty()) {
+            if (package->libdepends.empty() && package->libprovides.empty()) {
                 auto hasVersionedPythonOrPerlDep = false;
-                for (const auto &dependency : package.dependencies) {
+                for (const auto &dependency : package->dependencies) {
                     if (dependency.mode == DependencyMode::Any || dependency.version.empty()
                         || (dependency.name != "python" && dependency.name != "python2" && dependency.name != "perl")) {
                         return false;
@@ -419,12 +419,12 @@ RAPIDJSON_NAMESPACE::Document ServiceSetup::libraryDependenciesToJson()
             }
             auto pkgValue = RAPIDJSON_NAMESPACE::Value(RAPIDJSON_NAMESPACE::Type::kObjectType);
             auto pkgObj = pkgValue.GetObject();
-            JR::push(package.version, "v", pkgObj, alloc);
-            JR::push(package.packageInfo->buildDate, "t", pkgObj, alloc);
-            JR::push(package.dependencies, "d", pkgObj, alloc); // for versioned Python/Perl deps
-            JR::push(package.libdepends, "ld", pkgObj, alloc);
-            JR::push(package.libprovides, "lp", pkgObj, alloc);
-            dbValue.AddMember(RAPIDJSON_NAMESPACE::StringRef(package.name.data(), JR::rapidJsonSize(package.name.size())), pkgValue, alloc);
+            JR::push(package->version, "v", pkgObj, alloc);
+            JR::push(package->packageInfo->buildDate, "t", pkgObj, alloc);
+            JR::push(package->dependencies, "d", pkgObj, alloc); // for versioned Python/Perl deps
+            JR::push(package->libdepends, "ld", pkgObj, alloc);
+            JR::push(package->libprovides, "lp", pkgObj, alloc);
+            dbValue.AddMember(RAPIDJSON_NAMESPACE::StringRef(package->name.data(), JR::rapidJsonSize(package->name.size())), pkgValue, alloc);
             return false;
         });
         document.AddMember(RAPIDJSON_NAMESPACE::Value(db.name % '@' + db.arch, alloc), dbValue, alloc);
