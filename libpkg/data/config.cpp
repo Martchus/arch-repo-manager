@@ -55,7 +55,7 @@ Config::~Config()
 void Config::initStorage(const char *path, std::uint32_t maxDbs)
 {
     assert(m_storage == nullptr); // only allow initializing storage once
-    m_storage = std::make_unique<StorageDistribution>(path, maxDbs ? maxDbs : std::max<std::uint32_t>(databases.size() * 10u + 15u, 60u));
+    m_storage = std::make_unique<StorageDistribution>(path, maxDbs ? maxDbs : std::max<std::size_t>(databases.size() * 10u + 15u, 60u));
     for (auto &db : databases) {
         db.initStorage(*m_storage);
     }
