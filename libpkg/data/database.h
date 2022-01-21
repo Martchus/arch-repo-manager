@@ -111,7 +111,6 @@ private:
 };
 
 struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Database>, public ReflectiveRapidJSON::BinarySerializable<Database> {
-    using PackageMap = std::unordered_map<std::string, std::shared_ptr<Package>>;
     using PackageVisitor = std::function<bool(StorageID, Package &&)>;
 
     friend struct PackageUpdater;
@@ -143,7 +142,6 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     std::shared_ptr<Package> findPackage(const std::string &packageName);
     PackageSpec findPackageWithID(const std::string &packageName);
     void removePackage(const std::string &packageName);
-    void removePackage(typename PackageMap::const_iterator packageIterator);
     StorageID updatePackage(const std::shared_ptr<Package> &package);
     StorageID forceUpdatePackage(const std::shared_ptr<Package> &package);
     void replacePackages(const std::vector<std::shared_ptr<Package>> &newPackages, CppUtilities::DateTime lastModified);
