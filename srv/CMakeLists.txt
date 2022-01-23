@@ -19,7 +19,7 @@ set(JAVA_SCRIPT_FILES
     static/js/terminal.js
     static/js/utils.js
     static/node_modules/xterm/lib/xterm.js
-    static/node_modules/xterm-addon-search/out/SearchAddon.js)
+    static/node_modules/xterm-addon-search/lib/xterm-addon-search.js)
 set(CSS_FILES static/css/basics.css static/css/genericrendering.css static/css/layout.css static/css/log.css
               static/css/specifics.css static/node_modules/xterm/css/xterm.css)
 set(IMG_FILES

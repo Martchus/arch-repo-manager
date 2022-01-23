@@ -8,16 +8,17 @@
     <meta name="author" content="Martchus" />
     <meta name="keywords" content="pacman, Arch Linux, build, service" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <!-- include xterm.js -->
+    <link rel="stylesheet" type="text/css" href="node_modules/xterm/css/xterm.css" />
+    <script type="text/javascript">window.exports = {} // hack for xtermjs exports as it does not support ES6 modules yet</script>
+    <script src="node_modules/xterm/lib/xterm.js"></script>
+    <script src="node_modules/xterm-addon-search/lib/xterm-addon-search.js"></script>
     <!-- include custom styles and scripts -->
     <link rel="stylesheet" type="text/css" href="css/basics.css" />
     <link rel="stylesheet" type="text/css" href="css/layout.css" />
     <link rel="stylesheet" type="text/css" href="css/genericrendering.css" />
     <link rel="stylesheet" type="text/css" href="css/specifics.css" />
     <script type="module" src="js/main.js"></script>
-    <!-- include xterm.js -->
-    <link rel="stylesheet" type="text/css" href="node_modules/xterm/css/xterm.css" />
-    <script src="node_modules/xterm/lib/xterm.js"></script>
-    <script src="node_modules/xterm-addon-search/out/SearchAddon.js"></script>
   </head>
   <body>
     <header>

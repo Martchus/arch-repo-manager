@@ -1,5 +1,9 @@
 import * as AjaxHelper from './ajaxhelper.js';
 
+// workaround xtermjs not supporting ES6 modules yet (see https://github.com/xtermjs/xterm.js/issues/2878)
+const Terminal = exports.Terminal;
+const SearchAddon = exports.SearchAddon.SearchAddon;
+
 /// \brief Returns a new terminal created via xterm.js.
 export function makeTerminal()
 {
@@ -16,11 +20,6 @@ export function makeTerminal()
 export function addSearchToTerminal(terminal, targetElement)
 {
     const searchAddon = new SearchAddon();
-    // FIXME: import the search addon correctly
-    //import('../node_modules/xterm-addon-search/lib/xterm-addon-search.js').then(function(module) {
-    //    const searchAddon = new module.SearchAddon();
-    //    terminal.loadAddon(searchAddon);
-    //});
     terminal.loadAddon(searchAddon);
 
     const searchInput = document.createElement('input');
