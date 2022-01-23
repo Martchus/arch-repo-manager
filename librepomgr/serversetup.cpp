@@ -218,7 +218,7 @@ std::vector<std::shared_ptr<BuildAction>> ServiceSetup::BuildSetup::getBuildActi
     return buildActions;
 }
 
-void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
+void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
 {
     // read config file
     cout << Phrases::InfoMessage << "Reading config file: " << configFilePath << Phrases::EndFlush;
@@ -264,11 +264,9 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
             }
         }
         // restore state/cache and discard databases
-        if (restoreStateAndDiscardDatabases) {
-            restoreState();
-            config.initStorage(dbPath.data(), maxDbs);
-            config.markAllDatabasesToBeDiscarded();
-            restoreStateAndDiscardDatabases = false;
+        if (doFirstTimeSetup) {
+            initStorage();
+            doFirstTimeSetup = false;
         }
         // read webserver, build and user configuration (partially cached so read it after the cache has been restored to override cached values)
         for (const auto &iniEntry : configIni.data()) {
@@ -288,9 +286,8 @@ void ServiceSetup::loadConfigFiles(bool restoreStateAndDiscardDatabases)
     }
 
     // restore state/cache and discard databases if not done yet
-    if (restoreStateAndDiscardDatabases) {
-        restoreState();
-        config.markAllDatabasesToBeDiscarded();
+    if (doFirstTimeSetup) {
+        initStorage();
     }
 
     // read pacman config
@@ -620,6 +617,14 @@ std::size_t ServiceSetup::saveState()
     }
 
     return size;
+}
+
+void ServiceSetup::initStorage()
+{
+    cout << Phrases::InfoMessage << "Opening LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
+    config.initStorage(dbPath.data(), maxDbs);
+    restoreState();
+    config.markAllDatabasesToBeDiscarded();
 }
 
 void ServiceSetup::run()

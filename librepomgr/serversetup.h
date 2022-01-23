@@ -144,13 +144,14 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         LockTable m_locksByName;
     } locks;
 
-    void loadConfigFiles(bool restoreStateAndDiscardDatabases);
+    void loadConfigFiles(bool doFirstTimeSetup);
     void printDatabases();
     std::string_view cacheFilePath() const;
     RAPIDJSON_NAMESPACE::Document libraryDependenciesToJson();
     void restoreLibraryDependenciesFromJson(const std::string &json, ReflectiveRapidJSON::JsonDeserializationErrors *errors);
     std::size_t restoreState();
     std::size_t saveState();
+    void  initStorage();
     void run();
     ServiceStatus computeStatus() const;
 };
