@@ -1,8 +1,8 @@
-const apiPrefix = 'api/v0';
+export const apiPrefix = 'api/v0';
 let authError = false;
 
 /// \brief Makes an AJAX query with basic error handling.
-function queryRoute(method, path, callback)
+export function queryRoute(method, path, callback)
 {
     const ajaxRequest = new XMLHttpRequest();
     ajaxRequest.onreadystatechange = function() {
@@ -34,13 +34,13 @@ function queryRoute(method, path, callback)
 }
 
 /// \brief Makes an AJAX query for the specified form.
-function startFormQuery(formId, handler)
+export function startFormQuery(formId, handler)
 {
     return startFormQueryEx(formId, handler).ajaxRequest;
 }
 
 /// \brief Makes an AJAX query for the specified form.
-function startFormQueryEx(formId, handler)
+export function startFormQueryEx(formId, handler)
 {
     const form = document.getElementById(formId);
     const params = makeFormQueryParameter(form);
@@ -105,7 +105,7 @@ function makeFormQueryParameter(form)
     return "?" + params.join("&");
 }
 
-function makeIdParams(ids)
+export function makeIdParams(ids)
 {
     if (!Array.isArray(ids)) {
         ids = [ids];
@@ -114,7 +114,7 @@ function makeIdParams(ids)
 }
 
 /// \brief Shows an alert for the specified AJAX request.
-function showAjaxError(xhr, action)
+export function showAjaxError(xhr, action)
 {
     let errorMessage;
     try {
@@ -129,7 +129,7 @@ function showAjaxError(xhr, action)
 }
 
 /// \brief Returns whether the specified AJAX request failed and shows an alert it it did.
-function checkForAjaxError(xhr, action)
+export function checkForAjaxError(xhr, action)
 {
     if (xhr.status === 200) {
         return false;

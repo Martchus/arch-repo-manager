@@ -1,9 +1,31 @@
-function initBuildActionsForm()
+import * as AjaxHelper from './ajaxhelper.js';
+import * as CustomRendering from './customrendering.js';
+import * as GenericRendering from './genericrendering.js';
+import * as SinglePageHelper from './singlepage.js';
+import * as Terminal from './terminal.js';
+import * as Utils from './utils.js';
+
+export function initBuildActionsForm()
 {
     const buildActionsForm = document.getElementById('build-action-form');
     if (buildActionsForm.dataset.initialized) {
         return true;
     }
+    buildActionsForm.onsubmit = submitBuildAction;
+    buildActionsForm.task.onchange = handleBuildActionPresetChange;
+    buildActionsForm.type.onchange = handleBuildActionTypeChange;
+    Array.from(document.getElementById('build-action-toolbar').getElementsByTagName('a')).forEach(a => {
+        a.onclick = triggerToolbarAction;
+    });
+    const listFormElements = document.getElementById('build-actions-list-form').elements;
+    listFormElements.selectall.onclick = function () {
+        Utils.alterFormSelection(this.form, 'check-all');
+    };
+    listFormElements.unselectall.onclick = function () {
+        Utils.alterFormSelection(this.form, 'uncheck-all');
+    };
+    listFormElements.showselected.onclick = showSelectedActions;
+    listFormElements.deleteselected.onclick = deleteSelectedActions;
     queryBuildActions();
     handleBuildActionTypeChange();
     buildActionsForm.dataset.initialized = true;
@@ -12,21 +34,21 @@ function initBuildActionsForm()
 
 function queryBuildActions()
 {
-    queryRoute('GET', '/build-action', showBuildActions);
+    AjaxHelper.queryRoute('GET', '/build-action', showBuildActions);
     return true;
 }
 
 function queryBuildActionDetails(ids)
 {
-    queryRoute('GET', '/build-action/details?' + makeIdParams(ids), showBuildActionDetails);
+    AjaxHelper.queryRoute('GET', '/build-action/details?' + AjaxHelper.makeIdParams(ids), showBuildActionDetails);
     return true;
 }
 
 function cloneBuildAction(ids)
 {
-    queryRoute('POST', '/build-action/clone?' + makeIdParams(ids), function (xhr, success) {
+    AjaxHelper.queryRoute('POST', '/build-action/clone?' + AjaxHelper.makeIdParams(ids), function (xhr, success) {
         if (!success) {
-            return showAjaxError(xhr, 'clone build action');
+            return AjaxHelper.showAjaxError(xhr, 'clone build action');
         }
         const cloneIDs = JSON.parse(xhr.responseText);
         if (cloneIDs.length === 1 && typeof cloneIDs[0] === 'number') {
@@ -42,24 +64,24 @@ function cloneBuildAction(ids)
 
 function deleteBuildAction(ids)
 {
-    queryRoute('DELETE', '/build-action?' + makeIdParams(ids), function (xhr, success) {
-        success ? window.alert('Build action has been deleted.') : showAjaxError(xhr, 'delete build action');
+    AjaxHelper.queryRoute('DELETE', '/build-action?' + AjaxHelper.makeIdParams(ids), function (xhr, success) {
+        success ? window.alert('Build action has been deleted.') : AjaxHelper.showAjaxError(xhr, 'delete build action');
     });
     return true;
 }
 
 function stopBuildAction(ids)
 {
-    queryRoute('POST', '/build-action/stop?' + makeIdParams(ids), function (xhr, success) {
-        success ? window.alert('Build action has been stopped.') : showAjaxError(xhr, 'stop build action');
+    AjaxHelper.queryRoute('POST', '/build-action/stop?' + AjaxHelper.makeIdParams(ids), function (xhr, success) {
+        success ? window.alert('Build action has been stopped.') : AjaxHelper.showAjaxError(xhr, 'stop build action');
     });
     return true;
 }
 
 function startBuildAction(ids)
 {
-    queryRoute('POST', '/build-action/start?' + makeIdParams(ids), function (xhr, success) {
-        success ? window.alert('Build action has been started.') : showAjaxError(xhr, 'start build action');
+    AjaxHelper.queryRoute('POST', '/build-action/start?' + AjaxHelper.makeIdParams(ids), function (xhr, success) {
+        success ? window.alert('Build action has been started.') : AjaxHelper.showAjaxError(xhr, 'start build action');
     });
     return true;
 }
@@ -98,7 +120,7 @@ function prepareBuildActionBasedOnExistingOne(existingBuildAction)
     });
 }
 
-function handleBuildActionTypeChange()
+export function handleBuildActionTypeChange()
 {
     if (!globalInfo) {
         return;
@@ -129,14 +151,14 @@ function handleBuildActionTypeChange()
     });
 }
 
-function handleBuildActionPresetChange()
+export function handleBuildActionPresetChange()
 {
     if (!globalInfo) {
         return;
     }
     const task = document.getElementById('build-action-task').value;
     const taskInfo = globalInfo.presets.tasks[task];
-    const taskInfoElement = getAndEmptyElement('build-action-task-info');
+    const taskInfoElement = Utils.getAndEmptyElement('build-action-task-info');
     const actionSelect = document.getElementById('build-action-type');
     if (!taskInfo) {
         actionSelect.disabled = false;
@@ -170,33 +192,33 @@ function renderBuildActionActions(actionValue, buildAction, refresh)
         container.className = 'table-row-actions';
     }
     const id = buildAction.id;
-    container.appendChild(renderIconLink(refresh ? 'table-refresh' : 'magnify', buildAction, function() {
+    container.appendChild(CustomRendering.renderIconLink(refresh ? 'table-refresh' : 'magnify', buildAction, function() {
         queryBuildActionDetails(id);
         return false;
     }, refresh ? 'Refresh details table' : 'Show details', undefined, '#build-action-details-section?' + id));
-    container.appendChild(renderIconLink('restart', buildAction, function() {
+    container.appendChild(CustomRendering.renderIconLink('restart', buildAction, function() {
         if (window.confirm('Do you really want to clone/restart action ' + id + '?')) {
             cloneBuildAction(id);
         }
     }, 'Clone ' + id));
-    container.appendChild(renderIconLink('plus', buildAction, function() {
+    container.appendChild(CustomRendering.renderIconLink('plus', buildAction, function() {
         prepareBuildActionBasedOnExistingOne(buildAction);
         switchToBuildActions();
     }, 'Create new build action based on ' + id));
-    container.appendChild(renderIconLink('delete', buildAction, function() {
+    container.appendChild(CustomRendering.renderIconLink('delete', buildAction, function() {
         if (window.confirm('Do you really want to delete action ' + id + '?')) {
             deleteBuildAction(id);
         }
     }, 'Delete ' + id));
     if (buildAction.status !== 0 && buildAction.status !== 4) {
-        container.appendChild(renderIconLink('stop', buildAction, function() {
+        container.appendChild(CustomRendering.renderIconLink('stop', buildAction, function() {
             if (window.confirm('Do you really want to stop/decline action ' + id + '?')) {
                 stopBuildAction(id);
             }
         }, 'Stop/decline ' + id));
     }
     if (buildAction.status === 0) {
-        container.appendChild(renderIconLink('play', buildAction, function() {
+        container.appendChild(CustomRendering.renderIconLink('play', buildAction, function() {
             if (window.confirm('Do you really want to start action ' + id + '?')) {
                 startBuildAction(id);
             }
@@ -211,16 +233,16 @@ function showBuildActions(ajaxRequest)
         window.functionsPostponedUntilGlobalInfo.push(showBuildActions.bind(this, ...arguments));
         return;
     }
-    const buildActionsList = getAndEmptyElement('build-actions-list');
+    const buildActionsList = Utils.getAndEmptyElement('build-actions-list');
     if (ajaxRequest.status !== 200) {
         buildActionsList.appendChild(document.createTextNode('Unable to load build actions: ' + ajaxRequest.responseText));
-        buildActionsList.appendChild(renderReloadButton(queryBuildActions));
+        buildActionsList.appendChild(CustomRendering.renderReloadButton(queryBuildActions));
         return;
     }
     const responseJson = JSON.parse(ajaxRequest.responseText);
     if (!Array.isArray(responseJson)) {
         buildActionsList.appendChild(document.createTextNode('Unable to load build actions: response is no array'));
-        buildActionsList.appendChild(renderReloadButton(queryBuildActions));
+        buildActionsList.appendChild(CustomRendering.renderReloadButton(queryBuildActions));
         return;
     }
 
@@ -285,7 +307,7 @@ function showBuildActions(ajaxRequest)
     };
 
     // render the table
-    const container = renderTableFromJsonArray({
+    const container = GenericRendering.renderTableFromJsonArray({
         rows: responseJson,
         rowsPerPage: 10,
         columnHeaders: ['', 'ID', 'Task', 'Type', 'Status', 'Result', 'Created', 'Started', 'Runtime', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Actions'],
@@ -293,46 +315,46 @@ function showBuildActions(ajaxRequest)
         columnSortAccessors: [null, null, null, null, null, null, '_cc'],
         customRenderer: {
             checkbox: function(value, row) {
-                return renderCheckBoxForTableRow(value, row, function(row) {
+                return GenericRendering.renderCheckBoxForTableRow(value, row, function(row) {
                     return row.name;
                 });
             },
             actions: renderBuildActionActions,
             id: function(value, row) {
-                return renderLink(value, row, function() {
+                return GenericRendering.renderLink(value, row, function() {
                     queryBuildActionDetails(row.id);
                     return false;
                 }, 'Show details', undefined, '#build-action-details-section?' + row.id);
             },
             taskName: function (value) {
                 if (!value) {
-                    return renderNoneInGrey();
+                    return GenericRendering.renderNoneInGrey();
                 }
-                return document.createTextNode(getProperty(globalInfo.presets.tasks[value], 'name', value));
+                return document.createTextNode(Utils.getProperty(globalInfo.presets.tasks[value], 'name', value));
             },
             status: function(value) {
-                return document.createTextNode(getProperty(globalInfo.buildActionStates[value], 'name', 'Invalid/unknown'));
+                return document.createTextNode(Utils.getProperty(globalInfo.buildActionStates[value], 'name', 'Invalid/unknown'));
             },
             result: function(value) {
-                return renderNoneInGrey(getProperty(globalInfo.buildActionResults[value], 'name', 'Invalid/unknown'));
+                return GenericRendering.renderNoneInGrey(Utils.getProperty(globalInfo.buildActionResults[value], 'name', 'Invalid/unknown'));
             },
             type: function(value) {
-                return document.createTextNode(getProperty(globalInfo.buildActionTypes[value], 'name', 'Invalid/debugging'));
+                return document.createTextNode(Utils.getProperty(globalInfo.buildActionTypes[value], 'name', 'Invalid/debugging'));
             },
-            created: renderShortTimeStamp,
-            started: renderShortTimeStamp,
+            created: GenericRendering.renderShortTimeStamp,
+            started: GenericRendering.renderShortTimeStamp,
             finished: function (value, row) {
-                return renderTimeSpan(row.started, value);
+                return GenericRendering.renderTimeSpan(row.started, value);
             },
-            sourceDbs: renderArrayElidedAsCommaSeparatedString,
-            destinationDbs: renderArrayElidedAsCommaSeparatedString,
+            sourceDbs: GenericRendering.renderArrayElidedAsCommaSeparatedString,
+            destinationDbs: GenericRendering.renderArrayElidedAsCommaSeparatedString,
             packageNames: function(value) {
-                return renderNoneInGrey(!Array.isArray(value) || value.length <= 0 ? 'none' : value.length);
+                return GenericRendering.renderNoneInGrey(!Array.isArray(value) || value.length <= 0 ? 'none' : value.length);
             },
             note: function(rows) {
                 const note = document.createElement('p');
                 note.appendChild(document.createTextNode(rows.length + ' build actions present '));
-                note.appendChild(renderReloadButton(queryBuildActions));
+                note.appendChild(CustomRendering.renderReloadButton(queryBuildActions));
                 return note;
             },
         },
@@ -396,15 +418,15 @@ function showBuildActions(ajaxRequest)
 
 function switchToBuildActionDetails(buildActionIds)
 {
-    sections['build-action-details'].state.ids = buildActionIds;
-    updateHashPreventingSectionInitializer(!Array.isArray(buildActionIds) || buildActionIds.length === 0
+    SinglePageHelper.sections['build-action-details'].state.ids = buildActionIds;
+    SinglePageHelper.updateHashPreventingSectionInitializer(!Array.isArray(buildActionIds) || buildActionIds.length === 0
         ? '#build-action-details-section'
         : '#build-action-details-section?' + encodeURIComponent(buildActionIds.join(',')));
 }
 
 function switchToBuildActions()
 {
-    updateHashPreventingSectionInitializer('#build-action-section');
+    SinglePageHelper.updateHashPreventingSectionInitializer('#build-action-section');
 }
 
 function showBuildActionDetails(ajaxRequest)
@@ -413,7 +435,7 @@ function showBuildActionDetails(ajaxRequest)
         window.functionsPostponedUntilGlobalInfo.push(showBuildActionDetails.bind(this, ...arguments));
         return;
     }
-    if (checkForAjaxError(ajaxRequest, 'show build action')) {
+    if (AjaxHelper.checkForAjaxError(ajaxRequest, 'show build action')) {
         return;
     }
     const responseJSON = JSON.parse(ajaxRequest.responseText);
@@ -422,8 +444,8 @@ function showBuildActionDetails(ajaxRequest)
 
 function showBuildActionDetails2(buildActions)
 {
-    const buildActionResults = getAndEmptyElement('build-action-results');
-    let buildActionActions = getAndEmptyElement('build-action-details-actions');
+    const buildActionResults = Utils.getAndEmptyElement('build-action-results');
+    let buildActionActions = Utils.getAndEmptyElement('build-action-details-actions');
     buildActions.forEach(function (buildActionDetails) {
         if (!buildActionActions) {
             buildActionActions = document.createElement('span');
@@ -439,33 +461,33 @@ function showBuildActionDetails2(buildActions)
 
 function renderBuildActionDetailsTable(buildActionDetails)
 {
-    return renderTableFromJsonObject({
+    return GenericRendering.renderTableFromJsonObject({
         data: buildActionDetails,
         displayLabels: ['ID', 'Task', 'Type', 'Status', 'Result', 'Result data', 'Created', 'Started', 'Finished', 'Start after', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Flags', 'Settings', 'Log files', 'Artefacts', 'Output'],
         fieldAccessors: ['id', 'taskName', 'type', 'status', 'result', 'resultData', 'created', 'started', 'finished', 'startAfter', 'directory', 'sourceDbs', 'destinationDbs', 'packageNames', 'flags', 'settings', 'logfiles', 'artefacts', 'output'],
         customRenderer: {
             taskName: function (value) {
                 if (!value) {
-                    return renderNoneInGrey();
+                    return GenericRendering.renderNoneInGrey();
                 }
-                return document.createTextNode(getProperty(globalInfo.presets.tasks[value], 'name', value));
+                return document.createTextNode(Utils.getProperty(globalInfo.presets.tasks[value], 'name', value));
             },
             status: function(value) {
-                return document.createTextNode(getProperty(globalInfo.buildActionStates[value], 'name', 'Invalid/unknown'));
+                return document.createTextNode(Utils.getProperty(globalInfo.buildActionStates[value], 'name', 'Invalid/unknown'));
             },
             result: function(value) {
-                return renderNoneInGrey(getProperty(globalInfo.buildActionResults[value], 'name', 'Invalid/unknown'));
+                return GenericRendering.renderNoneInGrey(Utils.getProperty(globalInfo.buildActionResults[value], 'name', 'Invalid/unknown'));
             },
             type: function(value) {
-                return document.createTextNode(getProperty(globalInfo.buildActionTypes[value], 'name', 'Invalid/debugging'));
+                return document.createTextNode(Utils.getProperty(globalInfo.buildActionTypes[value], 'name', 'Invalid/debugging'));
             },
-            created: renderTimeStamp,
-            started: renderTimeStamp,
-            finished: renderTimeStamp,
-            startAfter: renderArrayAsCommaSeparatedString,
-            sourceDbs: renderArrayAsCommaSeparatedString,
-            destinationDbs: renderArrayAsCommaSeparatedString,
-            packageNames: renderArrayAsCommaSeparatedString,
+            created: GenericRendering.renderTimeStamp,
+            started: GenericRendering.renderTimeStamp,
+            finished: GenericRendering.renderTimeStamp,
+            startAfter: GenericRendering.renderArrayAsCommaSeparatedString,
+            sourceDbs: GenericRendering.renderArrayAsCommaSeparatedString,
+            destinationDbs: GenericRendering.renderArrayAsCommaSeparatedString,
+            packageNames: GenericRendering.renderArrayAsCommaSeparatedString,
             flags: function(value, row) {
                 const flagNames = [];
                 const typeInfo = globalInfo.buildActionTypes[row.type];
@@ -474,19 +496,19 @@ function renderBuildActionDetailsTable(buildActionDetails)
                         flagNames.push(flag.name);
                     }
                 });
-                return renderArrayAsCommaSeparatedString(flagNames);
+                return GenericRendering.renderArrayAsCommaSeparatedString(flagNames);
             },
             settings: function(value, row) {
                 const typeInfo = globalInfo.buildActionTypes[row.type];
                 if (typeInfo.settingNames.length === 0) {
-                    return renderNoneInGrey();
+                    return GenericRendering.renderNoneInGrey();
                 }
-                return renderTableFromJsonObject({
+                return GenericRendering.renderTableFromJsonObject({
                     data: value,
                     displayLabels: typeInfo.settingNames,
                     fieldAccessors: typeInfo.settingParams,
                     defaultRenderer: function (arg1, arg2, arg3) {
-                        return renderNoneInGrey(arg1, arg2, arg3, 'default/none');
+                        return GenericRendering.renderNoneInGrey(arg1, arg2, arg3, 'default/none');
                     },
                 });
             },
@@ -495,7 +517,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                 case 3: { // update info
                     const formElement = document.createElement('form');
                     formElement.className = 'update-info-form';
-                    formElement.appendChild(renderTableFromJsonObject({
+                    formElement.appendChild(GenericRendering.renderTableFromJsonObject({
                         data: value.data,
                         relatedRow: row,
                         displayLabels: ['Version updates', 'Package updates', 'Downgrades', 'Orphans'],
@@ -530,15 +552,15 @@ function renderBuildActionDetailsTable(buildActionDetails)
                     return formElement;
                 }
                 case 4: // build preparation info
-                    return renderTableFromJsonObject({
+                    return GenericRendering.renderTableFromJsonObject({
                         data: value.data,
                         displayLabels: ['Error', 'Warnings', 'Database config', 'Batches', 'Cyclic leftovers', 'Build data'],
                         fieldAccessors: ['error', 'warnings', 'dbConfig', 'batches', 'cyclicLeftovers', 'buildData'],
                         customRenderer: {
                             buildData: renderBuildPreparationResultData,
-                            cyclicLeftovers: renderArrayAsCommaSeparatedString,
+                            cyclicLeftovers: GenericRendering.renderArrayAsCommaSeparatedString,
                             batches: function(batch) {
-                                return renderCustomList(batch, renderArrayAsCommaSeparatedString);
+                                return GenericRendering.renderCustomList(batch, GenericRendering.renderArrayAsCommaSeparatedString);
                             },
                         },
                     });
@@ -546,7 +568,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                     const container = document.createElement('div');
                     container.className = 'repo-problems';
                     for (const [database, problems] of Object.entries(value.data)) {
-                        const table = renderTableFromJsonArray({
+                        const table = GenericRendering.renderTableFromJsonArray({
                             rows: problems,
                             columnHeaders: ['Related package', 'Problem description'],
                             columnAccessors: ['pkg', 'desc'],
@@ -555,16 +577,16 @@ function renderBuildActionDetailsTable(buildActionDetails)
                                 desc: function(value) {
                                     switch(value.index) {
                                     case 1:
-                                        return renderTableFromJsonObject({
+                                        return GenericRendering.renderTableFromJsonObject({
                                             data: value.data,
                                             displayLabels: ['Missing dependencies', 'Missing libraries'],
                                             fieldAccessors: ['deps', 'libs'],
                                             customRenderer: {
-                                                deps: renderDependency,
+                                                deps: CustomRendering.renderDependency,
                                             },
                                         });
                                      default:
-                                        return renderStandardTableCell(value.data);
+                                        return GenericRendering.renderStandardTableCell(value.data);
                                      }
                                 },
                             },
@@ -575,7 +597,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                     return container;
                 }
                 default:
-                    return renderStandardTableCell(value.data);
+                    return GenericRendering.renderStandardTableCell(value.data);
                 }
             },
             logfiles: renderBuildActionLogFiles,
@@ -583,12 +605,12 @@ function renderBuildActionDetailsTable(buildActionDetails)
             output: function(value, row) {
                 const isFinished = row.status === 4;
                 if (!value && isFinished) {
-                    return renderNoneInGrey();
+                    return GenericRendering.renderNoneInGrey();
                 }
                 const targetElement = document.createElement('div');
                 if (isFinished) {
-                    const terminal = makeTerminal();
-                    setupTerminalLater(terminal, targetElement, value);
+                    const terminal = Terminal.makeTerminal();
+                    Terminal.setupTerminalLater(terminal, targetElement, value);
                     return targetElement;
                 }
                 const streamingSetup = setupTerminalForStreaming({
@@ -610,15 +632,15 @@ function setupTerminalForStreaming(args)
 {
     const id = args.id; // a page-unique ID to make up DOM element IDs as needed
     const targetElement = args.targetElement; // the DOM element to stream contents into
-    const path = args.path; // the path to GET contents from via streamRouteIntoTerminal()
+    const path = args.path; // the path to GET contents from via Terminal.streamRouteIntoTerminal()
     let terminal;
     let ajaxRequest;
     return {
         elements: [targetElement],
         startStreaming: function () {
-            terminal = makeTerminal();
-            ajaxRequest = streamRouteIntoTerminal('GET', path, terminal);
-            setupTerminalLater(terminal, targetElement);
+            terminal = Terminal.makeTerminal();
+            ajaxRequest = Terminal.streamRouteIntoTerminal('GET', path, terminal);
+            Terminal.setupTerminalLater(terminal, targetElement);
         },
         stopStreaming: function () {
             ajaxRequest.abort();
@@ -635,25 +657,15 @@ function setupTerminalForStreaming(args)
     };
 }
 
-function fillBuildActionFromPackageSearch()
-{
-    const packageNamesTextArea = document.getElementById('build-action-form')['package-names'];
-    const data = getFormTableData('package-results-form');
-    if (data === undefined) {
-        return;
-    }
-    packageNamesTextArea.value = getSelectedRowProperties(data, 'name').join(' ');
-    location.hash = '#build-action-section';
-}
-
 function submitBuildAction()
 {
-    startFormQuery('build-action-form', handleBuildActionResponse);
+    AjaxHelper.startFormQuery('build-action-form', handleBuildActionResponse);
+    return false;
 }
 
 function handleBuildActionResponse(ajaxRequest)
 {
-    const results = getAndEmptyElement('build-action-results');
+    const results = Utils.getAndEmptyElement('build-action-results');
     if (ajaxRequest.status !== 200) {
         results.appendChild(document.createTextNode('unable to create build action: ' + ajaxRequest.responseText));
         switchToBuildActionDetails();
@@ -664,7 +676,7 @@ function handleBuildActionResponse(ajaxRequest)
 
 function renderBuildActionLogFiles(array, obj)
 {
-    return renderCustomList(array, function(arrayElement) {
+    return GenericRendering.renderCustomList(array, function(arrayElement) {
         const params = 'id=' + encodeURIComponent(obj.id) + '&name=' + encodeURIComponent(arrayElement);
         const logFilePath = '/build-action/logfile?' + params;
         const newWindowPath = 'log.html#' + params;
@@ -675,25 +687,25 @@ function renderBuildActionLogFiles(array, obj)
             path: logFilePath,
         });
         const basicElements = streamingSetup.elements;
-        const openInNewWindowLinkElement = renderIconLink('dock-window', obj, function() { window.open(newWindowPath); }, 'Open in new window');
-        const downloadLinkElement = renderIconLink('download', obj, function() { window.open(apiPrefix + logFilePath); }, 'Download log');
-        const stopStreamingLinkElement = renderIconLink('stop', obj, function() {
+        const openInNewWindowLinkElement = CustomRendering.renderIconLink('dock-window', obj, function() { window.open(newWindowPath); }, 'Open in new window');
+        const downloadLinkElement = CustomRendering.renderIconLink('download', obj, function() { window.open(AjaxHelper.apiPrefix + logFilePath); }, 'Download log');
+        const stopStreamingLinkElement = CustomRendering.renderIconLink('stop', obj, function() {
             if (!streamingSetup.isStreaming()) {
                 return;
             }
             streamingSetup.stopStreaming();
             targetElement.style.display = stopStreamingLinkElement.style.display = 'none';
-            emptyDomElement(targetElement);
+            Utils.emptyDomElement(targetElement);
         }, 'Close log');
-        const startStreamingLinkElement = renderLink(arrayElement, obj, function() {
+        const startStreamingLinkElement = GenericRendering.renderLink(arrayElement, obj, function() {
             if (streamingSetup.isStreaming()) {
                 return;
             }
-            emptyDomElement(targetElement);
+            Utils.emptyDomElement(targetElement);
             streamingSetup.startStreaming();
             targetElement.style.display = 'block';
             stopStreamingLinkElement.style.display = 'inline-block';
-        }, 'Show log file', apiPrefix + logFilePath);
+        }, 'Show log file', AjaxHelper.apiPrefix + logFilePath);
         targetElement.style.display = stopStreamingLinkElement.style.display = 'none';
         [downloadLinkElement, stopStreamingLinkElement].forEach(function(element) {
             element.classList.add('streaming-link');
@@ -704,9 +716,9 @@ function renderBuildActionLogFiles(array, obj)
 
 function renderBuildActionArtefacts(array, obj)
 {
-    return renderCustomList(array, function(arrayElement) {
-        const path = apiPrefix + '/build-action/artefact?id=' + encodeURIComponent(obj.id) + '&name=' + encodeURIComponent(arrayElement);
-        return renderLink(arrayElement, obj, function() {
+    return GenericRendering.renderCustomList(array, function(arrayElement) {
+        const path = AjaxHelper.apiPrefix + '/build-action/artefact?id=' + encodeURIComponent(obj.id) + '&name=' + encodeURIComponent(arrayElement);
+        return GenericRendering.renderLink(arrayElement, obj, function() {
             window.open(path);
         }, 'Download artefact', path);
     });
@@ -751,12 +763,12 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
 
 function renderPackageList(packageList)
 {
-    return renderCustomList(packageList, renderPackage);
+    return GenericRendering.renderCustomList(packageList, CustomRendering.renderPackage);
 }
 
 function renderBuildPreparationBuildData(buildDataForPackage)
 {
-    return renderTableFromJsonObject({
+    return GenericRendering.renderTableFromJsonObject({
         data: buildDataForPackage,
         displayLabels: ['Error', 'Warnings', 'Has source', 'Source directory', 'Original/local source directory', 'New packages', 'Existing packages', 'Specified index'],
         fieldAccessors: ['error', 'warnings', 'hasSource', 'sourceDirectory', 'originalSourceDirectory', 'packages', 'existingPackages', 'specifiedIndex'],
@@ -769,7 +781,7 @@ function renderBuildPreparationBuildData(buildDataForPackage)
 
 function makeVersionsString(packages)
 {
-    const versions = packages.map(package => package.version);
+    const versions = packages.map(packageObj => packageObj.version);
     if (versions.length === 0) {
         return '?';
     } else if (versions.length === 1) {
@@ -786,7 +798,7 @@ function renderBuildPreparationResultData(buildPreparationData)
         const heading = document.createElement('h4');
         let table;
         heading.className = 'compact-heading';
-        heading.appendChild(renderLink(packageName, undefined, function() {
+        heading.appendChild(GenericRendering.renderLink(packageName, undefined, function() {
             if (table === undefined) {
                 table = renderBuildPreparationBuildData(buildDataForPackage);
                 heading.insertAdjacentElement('afterEnd', table);
@@ -808,13 +820,13 @@ function renderBuildPreparationResultData(buildPreparationData)
 
 function renderOrphanPackage(value, obj, level, row)
 {
-    return renderCustomList(value, function(package) {
-        const packageName = package.name;
+    return GenericRendering.renderCustomList(value, function(packageObj) {
+        const packageName = packageObj.name;
         return renderUpdateInfoWithCheckbox(
-            'update-info-checkbox-' + packageName + '-' + package.version,
+            'update-info-checkbox-' + packageName + '-' + packageObj.version,
             packageName,
             undefined,
-            package.version,
+            packageObj.version,
             row.sourceDbs,
         );
     }, function(package1, package2) {
@@ -824,7 +836,7 @@ function renderOrphanPackage(value, obj, level, row)
 
 function renderUpdateOrDowngrade(value, obj, level, row)
 {
-    return renderCustomList(value, function(updateInfo) {
+    return GenericRendering.renderCustomList(value, function(updateInfo) {
         const oldVersion = updateInfo.oldVersion;
         const newVersion = updateInfo.newVersion;
         const packageName = oldVersion.name;
@@ -843,12 +855,15 @@ function renderUpdateOrDowngrade(value, obj, level, row)
 
 function triggerToolbarAction(toolbarElement)
 {
+    if (!toolbarElement || toolbarElement instanceof PointerEvent) {
+        toolbarElement = this;
+    }
     const confirmQuestion = toolbarElement.dataset.confirmation;
     if (confirmQuestion !== undefined && !window.confirm(confirmQuestion)) {
         return false;
     }
     toolbarElement.disabled = true;
-    queryRoute(toolbarElement.dataset.method, toolbarElement.dataset.action, function(ajaxRequest) {
+    AjaxHelper.queryRoute(toolbarElement.dataset.method, toolbarElement.dataset.action, function(ajaxRequest) {
         window.alert(ajaxRequest.responseText);
         toolbarElement.disabled = false;
     });
@@ -857,11 +872,11 @@ function triggerToolbarAction(toolbarElement)
 
 function deleteSelectedActions()
 {
-    const data = getFormTableData('build-actions-list');
+    const data = Utils.getFormTableData('build-actions-list');
     if (data === undefined) {
         return;
     }
-    const ids = getSelectedRowProperties(data, 'id');
+    const ids = Utils.getSelectedRowProperties(data, 'id');
     if (ids.length && window.confirm('Do you really want to delete the build action(s) ' + ids.join(', ') + '?')) {
         deleteBuildAction(ids);
     }
@@ -869,23 +884,23 @@ function deleteSelectedActions()
 
 function showSelectedActions()
 {
-    const data = getFormTableData('build-actions-list');
+    const data = Utils.getFormTableData('build-actions-list');
     if (data === undefined) {
         return;
     }
-    const ids = getSelectedRowProperties(data, 'id');
+    const ids = Utils.getSelectedRowProperties(data, 'id');
     if (ids.length) {
         queryBuildActionDetails(ids);
     }
 }
 
-function initBuildActionDetails(sectionElement, sectionData, newHashParts)
+export function initBuildActionDetails(sectionElement, sectionData, newHashParts)
 {
     const currentBuildActionIds = sectionData.state.ids;
     const hasCurrentlyBuildActions = Array.isArray(currentBuildActionIds) && currentBuildActionIds.length !== 0;
     if (!newHashParts.length) {
         if (hasCurrentlyBuildActions) {
-            updateHashPreventingChangeHandler('#build-action-details-section?' + encodeURIComponent(currentBuildActionIds.join(',')));
+            SinglePageHelper.updateHashPreventingChangeHandler('#build-action-details-section?' + encodeURIComponent(currentBuildActionIds.join(',')));
         }
         return true;
     }

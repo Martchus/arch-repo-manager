@@ -1,10 +1,16 @@
-function initPackageDetails(sectionElement, sectionData, newPackages)
+import * as AjaxHelper from './ajaxhelper.js';
+import * as CustomRendering from './customrendering.js';
+import * as GenericRendering from './genericrendering.js';
+import * as SinglePageHelper from './singlepage.js';
+import * as Utils from './utils.js';
+
+export function initPackageDetails(sectionElement, sectionData, newPackages)
 {
     const currentPackage = sectionData.state.package;
     const hasNewPackages = newPackages.length >= 1;
     if (!hasNewPackages) {
         if (currentPackage !== undefined) {
-            updateHashPreventingChangeHandler('#package-details-section?' + encodeURIComponent(currentPackage));
+            SinglePageHelper.updateHashPreventingChangeHandler('#package-details-section?' + encodeURIComponent(currentPackage));
         }
         return true;
     }
@@ -13,12 +19,12 @@ function initPackageDetails(sectionElement, sectionData, newPackages)
         return true;
     }
     const packageParts = packageStr.split('/');
-    const package = {
+    const packageObj = {
         db: packageParts[0],
         name: packageParts[1]
     };
-    queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(packageStr), function(ajaxRequest) {
-        showPackageDetails(ajaxRequest, package);
+    AjaxHelper.queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(packageStr), function(ajaxRequest) {
+        showPackageDetails(ajaxRequest, packageObj);
     });
     return true;
 }
@@ -30,21 +36,21 @@ function makePackageID(row)
 
 function queryPackageDetails(value, row)
 {
-    queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(makePackageID(row)), function(ajaxRequest) {
+    AjaxHelper.queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(makePackageID(row)), function(ajaxRequest) {
         showPackageDetails(ajaxRequest, row);
     });
 }
 
 function switchToPackageDetails(packageID)
 {
-    sections['package-details'].state.package = packageID;
-    updateHashPreventingSectionInitializer('#package-details-section?' + encodeURIComponent(packageID));
+    SinglePageHelper.sections['package-details'].state.package = packageID;
+    SinglePageHelper.updateHashPreventingSectionInitializer('#package-details-section?' + encodeURIComponent(packageID));
 }
 
 function showPackageDetails(ajaxRequest, row)
 {
     const packageID = makePackageID(row);
-    const packageDetailsContainer = getAndEmptyElement('package-details-container');
+    const packageDetailsContainer = Utils.getAndEmptyElement('package-details-container');
     if (ajaxRequest.status !== 200) {
         packageDetailsContainer.appendChild(document.createTextNode('unable query package details: ' + ajaxRequest.responseText));
         return;
@@ -55,62 +61,14 @@ function showPackageDetails(ajaxRequest, row)
         packageDetailsContainer.appendChild(document.createTextNode('unable query package details: package not present'));
         return;
     }
-    const package = responseJson[0];
+    const packageObj = responseJson[0];
     const heading = document.createElement('h3');
-    heading.appendChild(document.createTextNode(package.name));
-    heading.appendChild(document.createTextNode(' ' + package.version));
+    heading.appendChild(document.createTextNode(packageObj.name));
+    heading.appendChild(document.createTextNode(' ' + packageObj.version));
     packageDetailsContainer.appendChild(heading);
-    package.db = row.db;
-    package.dbArch = row.dbArch;
-    packageDetailsContainer.appendChild(renderPackage(package, true));
+    packageObj.db = row.db;
+    packageObj.dbArch = row.dbArch;
+    packageDetailsContainer.appendChild(CustomRendering.renderPackage(packageObj, true));
 
     switchToPackageDetails(packageID);
-}
-
-const labelsWithoutBasics = ['Architecture', 'Repository', 'Description', 'Upstream URL', 'License(s)', 'Groups', 'Package size', 'Installed size', 'Packager', 'Build date', 'Dependencies', 'Optional dependencies', 'Make dependencies', 'Check dependencies', 'Provides', 'Replaces', 'Conflicts', 'Contained libraries', 'Needed libraries', 'Files'];
-const fieldsWithoutBasics = ['packageInfo.arch', 'db', 'description', 'upstreamUrl', 'licenses', 'groups', 'packageInfo.size', 'installInfo.installedSize', 'packageInfo.packager', 'packageInfo.buildDate', 'dependencies', 'optionalDependencies', 'sourceInfo.makeDependencies', 'sourceInfo.checkDependencies', 'provides', 'replaces', 'conflicts', 'libprovides', 'libdepends', 'packageInfo.files'];
-const labelsWithBasics = ['Name', 'Version', ...labelsWithoutBasics];
-const fieldsWithBasics = ['name', 'version', ...fieldsWithoutBasics];
-
-function renderPackage(package, withoutBasics)
-{
-    const table = renderTableFromJsonObject({
-        data: package,
-        displayLabels: withoutBasics ? labelsWithoutBasics : labelsWithBasics,
-        fieldAccessors: withoutBasics ? fieldsWithoutBasics : fieldsWithBasics,
-        customRenderer: {
-            db: function(value, row) {
-                return document.createTextNode(makeRepoName(value, row.dbArch));
-            },
-            upstreamUrl: function(value, row) {
-                return renderLink(value, row, function(value) {
-                    window.open(value);
-                });
-            },
-            licenses: renderArrayAsCommaSeparatedString,
-            groups: renderArrayAsCommaSeparatedString,
-            dependencies: renderDependency,
-            optionalDependencies: renderDependency,
-            provides: renderDependency,
-            replaces: renderDependency,
-            conflicts: renderDependency,
-            libprovides: renderArrayAsCommaSeparatedString,
-            libdepends: renderArrayAsCommaSeparatedString,
-            'sourceInfo.makeDependencies': renderDependency,
-            'sourceInfo.checkDependencies': renderDependency,
-            'packageInfo.arch': function(value, row) {
-                const sourceInfo = row.sourceInfo;
-                const sourceArchs = sourceInfo !== undefined ? sourceInfo.archs : undefined;
-                if (Array.isArray(sourceArchs) && sourceArchs.length) {
-                    return renderArrayAsCommaSeparatedString(sourceArchs);
-                } else {
-                    return renderNoneInGrey(value);
-                }
-            },
-            'packageInfo.size': renderDataSize,
-            'installInfo.installedSize': renderDataSize,
-        },
-    });
-    table.className = 'package-details-table';
-    return table;
 }

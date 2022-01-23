@@ -1,5 +1,7 @@
+import * as AjaxHelper from './ajaxhelper.js';
+
 /// \brief Returns a new terminal created via xterm.js.
-function makeTerminal()
+export function makeTerminal()
 {
     const terminal = new Terminal({
         disableStdin: true,
@@ -11,7 +13,7 @@ function makeTerminal()
 }
 
 /// \brief Adds a search for the specified \a terminal to the specified \a targetElement.
-function addSearchToTerminal(terminal, targetElement)
+export function addSearchToTerminal(terminal, targetElement)
 {
     const searchAddon = new SearchAddon();
     // FIXME: import the search addon correctly
@@ -41,7 +43,7 @@ function addSearchToTerminal(terminal, targetElement)
 ///        to the terminal.
 /// \remarks This initialization only works if \a targetElement is already part of the rendered HTML page. Hence this function
 ///          uses window.setTimeout to ensure \a targetElement is rendered.
-function setupTerminalLater(terminal, targetElement, value)
+export function setupTerminalLater(terminal, targetElement, value)
 {
     window.setTimeout(function() {
         terminal.open(targetElement);
@@ -56,7 +58,7 @@ function setupTerminalLater(terminal, targetElement, value)
 
 /// \brief Makes an AJAX query and writes the received data to the specified \a terminal.
 /// \remarks If the server responds in chunks, each chunk is written as soon as it arrives.
-function streamRouteIntoTerminal(method, path, terminal)
+export function streamRouteIntoTerminal(method, path, terminal)
 {
     const ajaxRequest = new XMLHttpRequest();
     let responseWritten = 0;
@@ -72,7 +74,7 @@ function streamRouteIntoTerminal(method, path, terminal)
             }
         }
     };
-    ajaxRequest.open(method, apiPrefix + path, true);
+    ajaxRequest.open(method, AjaxHelper.apiPrefix + path, true);
     ajaxRequest.send();
     return ajaxRequest;
 }

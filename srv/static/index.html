@@ -13,26 +13,17 @@
     <link rel="stylesheet" type="text/css" href="css/layout.css" />
     <link rel="stylesheet" type="text/css" href="css/genericrendering.css" />
     <link rel="stylesheet" type="text/css" href="css/specifics.css" />
-    <script src="js/ajaxhelper.js"></script>
-    <script src="js/terminal.js"></script>
-    <script src="js/genericrendering.js"></script>
-    <script src="js/customrendering.js"></script>
-    <script src="js/globalstatuspage.js"></script>
-    <script src="js/packagesearchpage.js"></script>
-    <script src="js/packagedetailspage.js"></script>
-    <script src="js/buildactionspage.js"></script>
-    <script src="js/singlepage.js"></script>
-    <script src="js/utils.js"></script>
+    <script type="module" src="js/main.js"></script>
     <!-- include xterm.js -->
     <link rel="stylesheet" type="text/css" href="node_modules/xterm/css/xterm.css" />
     <script src="node_modules/xterm/lib/xterm.js"></script>
     <script src="node_modules/xterm-addon-search/out/SearchAddon.js"></script>
   </head>
-  <body onload="initPage();" onhashchange="handleHashChange();">
+  <body>
     <header>
         <nav>
           <div>
-              <a href="#" onclick="document.getElementById('about-dialog').style.display = 'block'; return false;">
+              <a href="#" id="logo-link">
                 <img src="img/logo.svg" alt="Logo" />
               </a>
               Repository Manager for Arch Linux<br />
@@ -65,7 +56,7 @@
       </section>
       <section id="package-search-section">
         <h2>Package search</h2>
-        <form id="package-search-form" onsubmit="searchForPackages(); return false;" action="/packages" method="GET">
+        <form id="package-search-form" action="/packages" method="GET">
           <table class="form-row">
             <tr>
               <th>Package name:</th>
@@ -109,13 +100,13 @@
           <fieldset>
             <legend>Actions</legend>
             <div>
-              <button type="button" style="background-image: url(img/icon/select-all.svg)" onclick="alterFormSelection(this.form, 'check-all');" class="icon-button">
+              <button type="button" name="selectall" style="background-image: url(img/icon/select-all.svg)" class="icon-button">
                 Select all packages
               </button>
-              <button type="button" style="background-image: url(img/icon/select-off.svg)" onclick="alterFormSelection(this.form, 'uncheck-all');" class="icon-button">
+              <button type="button" name="unselectall" style="background-image: url(img/icon/select-off.svg)" class="icon-button">
                 Unselect all package
               </button>
-              <button type="button" style="background-image: url(img/icon/plus.svg)" onclick="fillBuildActionFromPackageSearch();" class="icon-button">
+              <button type="button" name="startselected" style="background-image: url(img/icon/plus.svg)" class="icon-button">
                 Start build action from selection
               </button>
             </div>
@@ -131,15 +122,13 @@
       <section id="build-action-section">
         <h2>
             Build actions
-            <span class="heading-actions">
+            <span class="heading-actions" id="build-action-toolbar">
                 <a href="#" title="Save state manually"
                    class="icon-link"
-                   onclick="return triggerToolbarAction(this);"
                    data-action="/dump/cache-file"
                    data-method="POST"><img src="img/icon/content-save.svg" alt="Save state manually" class="icon" /></a>
                 <a href="#" title="Stop service"
                    class="icon-link"
-                   onclick="return triggerToolbarAction(this);"
                    data-action="/quit"
                    data-method="POST"
                    data-confirmation="Do you really want to stop the service?"><img src="img/icon/power.svg" alt="Save state manually" class="icon" /></a>
@@ -152,22 +141,22 @@
           <fieldset>
             <legend>Modify selected actions</legend>
             <div>
-              <button type="button" style="background-image: url(img/icon/select-all.svg)" onclick="alterFormSelection(this.form, 'check-all');" class="icon-button">
+              <button type="button" name="selectall" style="background-image: url(img/icon/select-all.svg)" class="icon-button">
                 Select all actions
               </button>
-              <button type="button" style="background-image: url(img/icon/select-off.svg)" onclick="alterFormSelection(this.form, 'uncheck-all');" class="icon-button">
+              <button type="button" name="unselectall" style="background-image: url(img/icon/select-off.svg)" class="icon-button">
                 Unselect all actions
               </button>
-              <button type="button" style="background-image: url(img/icon/magnify.svg)" onclick="showSelectedActions();" class="icon-button">
+              <button type="button" name="showselected" style="background-image: url(img/icon/magnify.svg)" class="icon-button">
                 Show selected actions
               </button>
-              <button type="button" style="background-image: url(img/icon/delete.svg)" onclick="deleteSelectedActions();" class="icon-button">
+              <button type="button" name="deleteselected" style="background-image: url(img/icon/delete.svg)" class="icon-button">
                 Delete selected actions
               </button>
             </div>
           </fieldset>
         </form>
-        <form id ="build-action-form" onsubmit="submitBuildAction(); return false;" action="/build-action" method="POST">
+        <form id ="build-action-form" action="/build-action" method="POST">
           <fieldset>
           <legend>Start new build action</legend>
           <div>
@@ -175,7 +164,7 @@
               <div class="form-split-50">
                 <label for="build-action-task">Predefined task:</label>
                 <br />
-                <select name="task" id="build-action-task" onchange="handleBuildActionPresetChange();">
+                <select name="task" id="build-action-task">
                   <option id="build-action-task-none" data-ignore="1" style="font-style: italic;">None</option>
                 </select>
               </div>
@@ -186,7 +175,7 @@
               <div class="form-split-50">
                 <label for="build-action-type">Action:</label>
                 <br />
-                <select name="type" id="build-action-type" onchange="handleBuildActionTypeChange();"></select>
+                <select name="type" id="build-action-type"></select>
               </div>
               <div class="form-split-50">
                 <label for="build-action-directory">Directory:</label>
@@ -262,7 +251,7 @@
       </section>
     </main>
     <div id="about-dialog" style="display: none;">
-      <a href="#" onclick="document.getElementById('about-dialog').style.display = 'none'; return false;" class="close-button">×</a>
+      <a href="#" onclick="this.parentNode.style.display = 'none'; return false;" class="close-button">×</a>
       <div id="about-text">
         <h1>Repository Manager for Arch Linux</h1>
         <p><img src="img/logo.svg" alt="Logo" /></p>

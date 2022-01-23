@@ -1,18 +1,34 @@
+import * as GlobalStatusPage from './globalstatuspage.js';
+import * as Utils from './utils.js';
+
+export let sections = {};
+export let sectionNames = [];
+
 /// \brief 'main()' function which initializes the single page app.
-function initPage()
+export function initPage(pageSections)
 {
+    sections = pageSections;
+    sectionNames = Object.keys(sections);
     handleHashChange();
-    queryGlobalStatus();
+    document.body.onhashchange = handleHashChange;
+    document.getElementById('logo-link').onclick = function () {
+        document.getElementById('about-dialog').style.display = 'block';
+        return false;
+    };
+    GlobalStatusPage.queryGlobalStatus();
 }
+
+let preventHandlingHashChange = false;
+let preventSectionInitializer = false;
 
 /// \brief Shows the current section and hides other sections.
 function handleHashChange()
 {
-    if (window.preventHandlingHashChange) {
+    if (preventHandlingHashChange) {
         return;
     }
 
-    const hashParts = splitHashParts();
+    const hashParts = Utils.splitHashParts();
     const currentSectionName = hashParts.shift() || 'global-section';
     if (!currentSectionName.endsWith('-section')) {
         return;
@@ -23,7 +39,7 @@ function handleHashChange()
         const sectionElement = document.getElementById(sectionName + '-section');
         if (sectionElement.id === currentSectionName) {
             const sectionInitializer = sectionData.initializer;
-            if (sectionInitializer === undefined || window.preventSectionInitializer || sectionInitializer(sectionElement, sectionData, hashParts)) {
+            if (sectionInitializer === undefined || preventSectionInitializer || sectionInitializer(sectionElement, sectionData, hashParts)) {
                 sectionElement.style.display = 'block';
             }
         } else {
@@ -42,39 +58,17 @@ function handleHashChange()
 }
 
 /// \brief Updates the #hash without triggering the handler.
-function updateHashPreventingChangeHandler(newHash)
+export function updateHashPreventingChangeHandler(newHash)
 {
-    window.preventHandlingHashChange = true;
+    preventHandlingHashChange = true;
     window.location.hash = newHash;
-    window.preventHandlingHashChange = false;
+    preventHandlingHashChange = false;
 }
 
 /// \brief Updates the #hash without triggering the section initializer.
-function updateHashPreventingSectionInitializer(newHash)
+export function updateHashPreventingSectionInitializer(newHash)
 {
-    window.preventSectionInitializer = true;
+    preventSectionInitializer = true;
     window.location.hash = newHash;
-    window.preventSectionInitializer = false;
+    preventSectionInitializer = false;
 }
-
-const sections = {
-    'global': {
-    },
-    'package-search': {
-        initializer: initPackageSearch,
-        state: {params: undefined},
-    },
-    'package-details': {
-        initializer: initPackageDetails,
-        state: {package: undefined},
-    },
-    'build-action': {
-        initializer: initBuildActionsForm,
-    },
-    'build-action-details': {
-        initializer: initBuildActionDetails,
-        state: {id: undefined},
-    },
-};
-const sectionNames = Object.keys(sections);
-const status = {repoNames: undefined};

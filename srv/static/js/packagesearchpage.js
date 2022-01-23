@@ -1,14 +1,38 @@
-function initPackageSearch(sectionElement, sectionData, newParams)
+import * as AjaxHelper from './ajaxhelper.js';
+import * as GenericRendering from './genericrendering.js';
+import * as SinglePageHelper from './singlepage.js';
+import * as PackageDetailsPage from './packagedetailspage.js';
+import * as Utils from './utils.js';
+
+export function initPackageSearch(sectionElement, sectionData, newParams)
 {
+    const searchForm = document.getElementById('package-search-form');
+    if (!searchForm.dataset.initialized) {
+        searchForm.onsubmit = function() {
+            searchForPackages();
+            return false;
+        };
+        const packageResultsFormElements = document.getElementById('package-results-form').elements;
+        packageResultsFormElements.selectall.onclick = function () {
+            Utils.alterFormSelection(this.form, 'check-all');
+        };
+        packageResultsFormElements.unselectall.onclick = function () {
+            Utils.alterFormSelection(this.form, 'uncheck-all');
+        };
+        packageResultsFormElements.startselected.onclick = function () {
+            fillBuildActionFromPackageSearch();
+        };
+        searchForm.dataset.initialized = true;
+    }
     const currentParams = sectionData.state.params;
     const hasNewParams = newParams.length >= 1;
     if (!hasNewParams) {
         if (currentParams !== undefined) {
-            updateHashPreventingChangeHandler('#package-search-section?' + encodeURIComponent(currentParams));
+            SinglePageHelper.updateHashPreventingChangeHandler('#package-search-section?' + encodeURIComponent(currentParams));
         }
         return true;
     }
-    const searchParams = sections['package-search'].state.params = newParams[0];
+    const searchParams = SinglePageHelper.sections['package-search'].state.params = newParams[0];
     if (currentParams === searchParams) {
         return true;
     }
@@ -18,6 +42,17 @@ function initPackageSearch(sectionElement, sectionData, newParams)
         searchForPackagesFromParams(searchParams);
     }
     return true;
+}
+
+function fillBuildActionFromPackageSearch()
+{
+    const packageNamesTextArea = document.getElementById('build-action-form')['package-names'];
+    const data = Utils.getFormTableData('package-results-form');
+    if (data === undefined) {
+        return;
+    }
+    packageNamesTextArea.value = Utils.getSelectedRowProperties(data, 'name').join(' ');
+    location.hash = '#build-action-section';
 }
 
 function searchForPackagesFromParams(searchParams)
@@ -41,39 +76,39 @@ function searchForPackagesFromParams(searchParams)
             formElement.value = value;
         }
     });
-    const res = startFormQueryEx('package-search-form', showPackageSearchResults);
-    sections['package-search'].state.params = res.params;
+    const res = AjaxHelper.startFormQueryEx('package-search-form', showPackageSearchResults);
+    SinglePageHelper.sections['package-search'].state.params = res.params;
     return res;
 }
 
 function searchForPackages()
 {
-    const res = startFormQueryEx('package-search-form', showPackageSearchResults);
-    const params = sections['package-search'].state.params = res.params.substr(1);
-    updateHashPreventingSectionInitializer('#package-search-section?' + encodeURIComponent(params));
+    const res = AjaxHelper.startFormQueryEx('package-search-form', showPackageSearchResults);
+    const params = SinglePageHelper.sections['package-search'].state.params = res.params.substr(1);
+    SinglePageHelper.updateHashPreventingSectionInitializer('#package-search-section?' + encodeURIComponent(params));
     return res.ajaxRequest;
 }
 
 function showPackageSearchResults(ajaxRequest)
 {
-    const packageSearchResults = getAndEmptyElement('package-search-results');
+    const packageSearchResults = Utils.getAndEmptyElement('package-search-results');
     if (ajaxRequest.status !== 200) {
         packageSearchResults.appendChild(document.createTextNode('unable search for packages: ' + ajaxRequest.responseText));
         return;
     }
     const responseJson = JSON.parse(ajaxRequest.responseText);
-    const table = renderTableFromJsonArray({
+    const table = GenericRendering.renderTableFromJsonArray({
         rows: responseJson,
         columnHeaders: ['', 'Arch', 'Repo', 'Name', 'Version', 'Description', 'Build date'],
         columnAccessors: ['checkbox', 'arch', 'db', 'name', 'version', 'description', 'buildDate'],
         rowsPerPage: 40,
         customRenderer: {
             name: function (value, row) {
-                return renderLink(value, row, queryPackageDetails, 'Show package details', undefined,
+                return GenericRendering.renderLink(value, row, PackageDetailsPage.queryPackageDetails, 'Show package details', undefined,
                     '#package-details-section?' + encodeURIComponent(row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + value));
             },
             checkbox: function(value, row) {
-                return renderCheckBoxForTableRow(value, row, function(row) {
+                return GenericRendering.renderCheckBoxForTableRow(value, row, function(row) {
                     return [row.db, row.name].join('/');
                 });
             },

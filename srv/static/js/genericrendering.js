@@ -1,5 +1,5 @@
 /// \brief Renders the specified \a value as text or a grey 'none' if the value is 'none' or empty.
-function renderNoneInGrey(value, row, elementName, noneText)
+export function renderNoneInGrey(value, row, elementName, noneText)
 {
     const noValue = value === undefined || value === null || value === 'none' || value === 'None' ||
                     value === '' || value === 18446744073709552000;
@@ -18,7 +18,7 @@ function renderNoneInGrey(value, row, elementName, noneText)
 
 /// \brief Renders a standard table cell.
 /// \remarks This is the default renderer used by renderTableFromJsonArray() and renderTableFromJsonObject().
-function renderStandardTableCell(data, allData, level)
+export function renderStandardTableCell(data, allData, level)
 {
     const dataType = typeof data;
     if (dataType !== 'object') {
@@ -43,7 +43,7 @@ function renderStandardTableCell(data, allData, level)
 }
 
 /// \brief Renders a custom list.
-function renderCustomList(array, customRenderer, compareFunction)
+export function renderCustomList(array, customRenderer, compareFunction)
 {
     if (!Array.isArray(array) || array.length < 1) {
         return renderNoneInGrey();
@@ -68,7 +68,7 @@ function renderCustomList(array, customRenderer, compareFunction)
 }
 
 /// \brief Renders a list of links.
-function renderLinkList(array, obj, handler)
+export function renderLinkList(array, obj, handler)
 {
     return renderCustomList(array, function(arrayElement) {
         return renderLink(array, obj, function() {
@@ -78,7 +78,7 @@ function renderLinkList(array, obj, handler)
 }
 
 /// \brief Returns a 'time ago' string used by the time stamp rendering functions.
-function formatTimeAgoString(date)
+export function formatTimeAgoString(date)
 {
     const seconds = Math.floor((new Date() - date) / 1000);
     let interval = Math.floor(seconds / 31536000);
@@ -105,13 +105,13 @@ function formatTimeAgoString(date)
 }
 
 /// \brief Returns a Date object from the specified time stamp.
-function dateFromTimeStamp(timeStamp)
+export function dateFromTimeStamp(timeStamp)
 {
     return new Date(timeStamp + 'Z');
 }
 
 /// \brief Renders a short time stamp, e.g. "12 hours ago" with the exact date as tooltip.
-function renderShortTimeStamp(timeStamp)
+export function renderShortTimeStamp(timeStamp)
 {
     const date = dateFromTimeStamp(timeStamp);
     if (date.getFullYear() === 1) {
@@ -124,7 +124,7 @@ function renderShortTimeStamp(timeStamp)
 }
 
 /// \brief Renders a time stamp, e.g. "12 hours ago" with the exact date in brackets.
-function renderTimeStamp(timeStamp)
+export function renderTimeStamp(timeStamp)
 {
     const date = dateFromTimeStamp(timeStamp);
     if (date.getFullYear() === 1) {
@@ -134,7 +134,7 @@ function renderTimeStamp(timeStamp)
 }
 
 /// \brief Renders a time delta from 2 time stamps.
-function renderTimeSpan(startTimeStamp, endTimeStamp)
+export function renderTimeSpan(startTimeStamp, endTimeStamp)
 {
     const startDate = dateFromTimeStamp(startTimeStamp);
     if (startDate.getFullYear() === 1) {
@@ -159,7 +159,7 @@ function renderTimeSpan(startTimeStamp, endTimeStamp)
 }
 
 /// \brief Renders a link which will invoke the specified \a handler when clicked.
-function renderLink(value, row, handler, tooltip, href, middleClickHref)
+export function renderLink(value, row, handler, tooltip, href, middleClickHref)
 {
     const linkElement = document.createElement('a');
     const linkText = typeof value === 'object' ? value : document.createTextNode(value);
@@ -188,13 +188,13 @@ function renderLink(value, row, handler, tooltip, href, middleClickHref)
 }
 
 /// \brief Renders the specified array as comma-separated string or 'none' if the array is empty.
-function renderArrayAsCommaSeparatedString(value)
+export function renderArrayAsCommaSeparatedString(value)
 {
     return renderNoneInGrey(!Array.isArray(value) || value.length <= 0 ? 'none' : value.join(', '));
 }
 
 /// \brief Renders the specified array as a possibly elided comma-separated string or 'none' if the array is empty.
-function renderArrayElidedAsCommaSeparatedString(value)
+export function renderArrayElidedAsCommaSeparatedString(value)
 {
     if (!Array.isArray(value) || value.length <= 0) {
         return renderNoneInGrey('none');
@@ -203,7 +203,7 @@ function renderArrayElidedAsCommaSeparatedString(value)
 }
 
 /// \brief Renders the specified value, possibly eliding the end.
-function renderTextPossiblyElidingTheEnd(value)
+export function renderTextPossiblyElidingTheEnd(value)
 {
     const limit = 50;
     if (value.length < limit) {
@@ -223,7 +223,7 @@ function renderTextPossiblyElidingTheEnd(value)
 }
 
 /// \brief Renders the specified \a sizeInByte using an appropriate unit.
-function renderDataSize(sizeInByte, row, includeBytes)
+export function renderDataSize(sizeInByte, row, includeBytes)
 {
     if (typeof(sizeInByte) !== 'number') {
         return renderNoneInGrey('none');
@@ -264,7 +264,7 @@ function accessProperty(object, accessor)
 }
 
 /// \brief Renders a checkbox for selecting a table row.
-function renderCheckBoxForTableRow(value, row, computeCheckBoxValue)
+export function renderCheckBoxForTableRow(value, row, computeCheckBoxValue)
 {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -275,7 +275,7 @@ function renderCheckBoxForTableRow(value, row, computeCheckBoxValue)
 }
 
 /// \brief Returns a table for the specified JSON array.
-function renderTableFromJsonArray(args)
+export function renderTableFromJsonArray(args)
 {
     // handle arguments
     const rows = args.rows;
@@ -568,7 +568,7 @@ function renderTableFromJsonArray(args)
 }
 
 /// \brief Returns a table for the specified JSON object.
-function renderTableFromJsonObject(args)
+export function renderTableFromJsonObject(args)
 {
     // handle arguments
     const data = args.data;
@@ -619,7 +619,7 @@ function renderTableFromJsonObject(args)
 }
 
 /// \brief Returns a heading for each key and values via renderStandardTableCell().
-function renderObjectWithHeadings(object, row, level)
+export function renderObjectWithHeadings(object, row, level)
 {
     const elements = [];
     for (const [key, value] of Object.entries(object)) {

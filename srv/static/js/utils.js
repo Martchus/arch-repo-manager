@@ -1,4 +1,5 @@
-function splitHashParts()
+
+export function splitHashParts()
 {
     const currentHash = location.hash.substr(1);
     const hashParts = currentHash.split('?');
@@ -8,10 +9,10 @@ function splitHashParts()
     return hashParts;
 }
 
-function hashAsObject()
+export function hashAsObject()
 {
     const hashObject = {};
-    location.hash.substr(1).split('?').forEach(function(hashPart) {
+    location.hash.substr(1).split('&').forEach(function(hashPart) {
         const parts = hashPart.split('=', 2);
         if (parts.length < 1) {
             return;
@@ -21,12 +22,12 @@ function hashAsObject()
     return hashObject;
 }
 
-function getAndEmptyElement(elementId, specialActionsById)
+export function getAndEmptyElement(elementId, specialActionsById)
 {
     return emptyDomElement(document.getElementById(elementId), specialActionsById);
 }
 
-function emptyDomElement(domElement, specialActionsById)
+export function emptyDomElement(domElement, specialActionsById)
 {
     let child = domElement.firstChild;
     while (child) {
@@ -40,7 +41,7 @@ function emptyDomElement(domElement, specialActionsById)
     return domElement;
 }
 
-function alterFormSelection(form, command)
+export function alterFormSelection(form, command)
 {
     // modify form elements
     const elements = form.elements;
@@ -78,7 +79,7 @@ function alterFormSelection(form, command)
     }
 }
 
-function getProperty(object, property, fallback)
+export function getProperty(object, property, fallback)
 {
     if (typeof object !== 'object') {
         return fallback;
@@ -87,13 +88,13 @@ function getProperty(object, property, fallback)
     return value !== undefined ? value : fallback;
 }
 
-function makeRepoName(dbName, dbArch)
+export function makeRepoName(dbName, dbArch)
 {
     return dbArch && dbArch !== 'x86_64' ? dbName + '@' + dbArch : dbName;
 }
 
 /// \brief Returns the table row data for the table within the element with the specified ID.
-function getFormTableData(formId)
+export function getFormTableData(formId)
 {
     const formElement = document.getElementById(formId);
     const tableElement = formElement.getElementsByTagName('table')[0];
@@ -106,7 +107,7 @@ function getFormTableData(formId)
 
 /// \brief Returns the cell values of selected rows.
 /// \remarks The row data needs to be passed. The cell is determined by the specified \a propertyName.
-function getSelectedRowProperties(data, propertyName)
+export function getSelectedRowProperties(data, propertyName)
 {
     const propertyValues = [];
     data.forEach(function (row) {

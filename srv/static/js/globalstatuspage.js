@@ -1,12 +1,20 @@
-function queryGlobalStatus()
+import * as AjaxHelper from './ajaxhelper.js';
+import * as BuildActionsPage from './buildactionspage.js';
+import * as CustomRendering from './customrendering.js';
+import * as GenericRendering from './genericrendering.js';
+import * as Utils from './utils.js';
+
+const status = {repoNames: undefined};
+
+export function queryGlobalStatus()
 {
-    queryRoute('GET', '/status', handleGlobalStatusUpdate);
+    AjaxHelper.queryRoute('GET', '/status', handleGlobalStatusUpdate);
     return true;
 }
 
 function handleGlobalStatusUpdate(ajaxRequest)
 {
-    const globalStatus = getAndEmptyElement('global-status');
+    const globalStatus = Utils.getAndEmptyElement('global-status');
     let responseText = ajaxRequest.responseText;
     if (ajaxRequest.status === 500) {
         responseText = 'internal server error';
@@ -18,24 +26,24 @@ function handleGlobalStatusUpdate(ajaxRequest)
     const responseJson = JSON.parse(responseText);
     const applicationVersion = responseJson.version;
     if (applicationVersion) {
-        getAndEmptyElement('application-version').appendChild(document.createTextNode(applicationVersion));
+        Utils.getAndEmptyElement('application-version').appendChild(document.createTextNode(applicationVersion));
     }
     const dbStats = responseJson.config.dbStats;
-    const table = renderTableFromJsonArray({
+    const table = GenericRendering.renderTableFromJsonArray({
         rows: dbStats,
         columnHeaders: ['Arch', 'Database', 'Package count', 'Last update', 'Synced from mirror'],
         columnAccessors: ['arch', 'name', 'packageCount', 'lastUpdate', 'syncFromMirror'],
         customRenderer: {
             name: function (value, row) {
-                return renderLink(value, row, showRepository);
+                return GenericRendering.renderLink(value, row, showRepository);
             },
-            lastUpdate: renderShortTimeStamp,
+            lastUpdate: GenericRendering.renderShortTimeStamp,
             note: function(rows) {
                 const note = document.createElement('div');
                 const totalPackageCount = rows.reduce((acc, cur) => acc + cur.packageCount, 0);
                 note.className = 'form-row';
                 note.appendChild(document.createTextNode(rows.length + ' databases and ' + totalPackageCount + ' packages '));
-                note.appendChild(renderReloadButton(queryGlobalStatus));
+                note.appendChild(CustomRendering.renderReloadButton(queryGlobalStatus));
                 return note;
             },
         },
@@ -44,13 +52,13 @@ function handleGlobalStatusUpdate(ajaxRequest)
 
     // update database selections
     const repoSelections = [
-        getAndEmptyElement('build-action-source-repo', {'build-action-source-repo-none': 'keep'}),
-        getAndEmptyElement('build-action-destination-repo', {'build-action-destination-repo-none': 'keep'}),
-        getAndEmptyElement('package-search-db', {'package-search-db-any': 'keep'}),
+        Utils.getAndEmptyElement('build-action-source-repo', {'build-action-source-repo-none': 'keep'}),
+        Utils.getAndEmptyElement('build-action-destination-repo', {'build-action-destination-repo-none': 'keep'}),
+        Utils.getAndEmptyElement('package-search-db', {'package-search-db-any': 'keep'}),
     ];
     status.repoNames = [];
     dbStats.forEach(function (dbInfo) {
-        const repoName = makeRepoName(dbInfo.name, dbInfo.arch);
+        const repoName = Utils.makeRepoName(dbInfo.name, dbInfo.arch);
         status.repoNames.push(repoName);
         repoSelections.forEach(function (selection) {
             const option = document.createElement('option');
@@ -74,9 +82,9 @@ function handleGlobalStatusUpdate(ajaxRequest)
     });
 
     // update build action form and make settingNames/settingParams arrays for build action details
-    const buildActionTypeSelect = getAndEmptyElement('build-action-type');
-    const buildActionFlagsContainer = getAndEmptyElement('build-action-flags');
-    const buildActionSettingsTable = getAndEmptyElement('build-action-settings');
+    const buildActionTypeSelect = Utils.getAndEmptyElement('build-action-type');
+    const buildActionFlagsContainer = Utils.getAndEmptyElement('build-action-flags');
+    const buildActionSettingsTable = Utils.getAndEmptyElement('build-action-settings');
     let optgroupElements = {};
     const makeOrReuseOptgroup = function (label) {
         const existingOptgroupElement = optgroupElements[label];
@@ -148,7 +156,7 @@ function handleGlobalStatusUpdate(ajaxRequest)
     });
 
     // update presets/tasks form
-    const buildActionPresetSelect = getAndEmptyElement('build-action-task', {'build-action-task-none': 'keep'});
+    const buildActionPresetSelect = Utils.getAndEmptyElement('build-action-task', {'build-action-task-none': 'keep'});
     const presets = responseJson.presets;
     globalInfo.presets = presets;
     optgroupElements = {};
@@ -167,8 +175,8 @@ function handleGlobalStatusUpdate(ajaxRequest)
     window.functionsPostponedUntilGlobalInfo.forEach(function(f) { f(); });
     window.functionsPostponedUntilGlobalInfo = [];
 
-    handleBuildActionTypeChange();
-    handleBuildActionPresetChange();
+    BuildActionsPage.handleBuildActionTypeChange();
+    BuildActionsPage.handleBuildActionPresetChange();
 }
 
 function showRepository(dbName, dbInfo)
