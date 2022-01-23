@@ -67,7 +67,7 @@ find_package(reflective_rapidjson${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
 use_reflective_rapidjson(VISIBILITY PUBLIC)
 
 # find lmdb
-use_pkg_config_module(PKG_CONFIG_MODULES "lmdb" VISIBILITY PUBLIC)
+use_pkg_config_module(PKG_CONFIG_MODULES "lmdb")
 
 # find 3rd party libraries zlib
 use_zlib()
