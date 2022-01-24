@@ -126,7 +126,7 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &sto
     auto txn = storage.packages.getRWTransaction();
     if (!res.oldEntry) {
         res.oldEntry = std::make_shared<Entry>();
-        if (txn.template get<0>(entry->name, *res.oldEntry)) {
+        if ((res.id = txn.template get<0>(entry->name, *res.oldEntry))) {
             entry->addDepsAndProvidesFromOtherPackage(*res.oldEntry);
         } else {
             res.oldEntry.reset();
@@ -167,7 +167,7 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &sto
     // check for package in storage
     if (!res.oldEntry) {
         res.oldEntry = std::make_shared<Entry>();
-        if (txn.template get<0>(entry->name, *res.oldEntry)) {
+        if ((res.id = txn.template get<0>(entry->name, *res.oldEntry))) {
             entry->addDepsAndProvidesFromOtherPackage(*res.oldEntry);
         } else {
             res.oldEntry.reset();
