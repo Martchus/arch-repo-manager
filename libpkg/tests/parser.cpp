@@ -305,7 +305,7 @@ void ParserTests::testParsingDatabase()
         db->filesPath = testFilePath("core.files");
 
         // load packages
-        config.loadAllPackages(true);
+        config.loadAllPackages(true, false);
         CPPUNIT_ASSERT_EQUAL_MESSAGE("all 215 packages present"s, 215_st, db->packageCount());
         const auto autoreconf = db->findPackage("autoconf");
         CPPUNIT_ASSERT_MESSAGE("autoreconf exists", autoreconf != nullptr);

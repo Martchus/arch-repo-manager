@@ -107,6 +107,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::string testFilesDir;
         BuildPresets presets;
         bool loadFilesDbs = false;
+        bool forceLoadingDbs = false;
 
         // never changed after startup
         unsigned short threadCount = 4;
@@ -151,7 +152,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     void restoreLibraryDependenciesFromJson(const std::string &json, ReflectiveRapidJSON::JsonDeserializationErrors *errors);
     std::size_t restoreState();
     std::size_t saveState();
-    void  initStorage();
+    void initStorage();
     void run();
     ServiceStatus computeStatus() const;
 };

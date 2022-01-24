@@ -28,6 +28,8 @@ ReloadDatabase::ReloadDatabase(ServiceSetup &setup, const std::shared_ptr<BuildA
 
 void ReloadDatabase::run()
 {
+    const auto flags = static_cast<ReloadDatabaseFlags>(m_buildAction->flags);
+    const auto force = flags & ReloadDatabaseFlags::ForceReload;
     const auto withFiles = m_setup.building.loadFilesDbs;
     vector<LibPkg::Database *> dbsToLoadFromMirror;
 
@@ -70,15 +72,26 @@ void ReloadDatabase::run()
             continue;
         }
         boost::asio::post(
-            m_setup.building.ioContext.get_executor(), [this, session, dbName = db->name, dbArch = db->arch, dbPath = move(dbPath)]() mutable {
-                m_buildAction->appendOutput(
-                    Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch, "\" from local file \"", dbPath, "\"\n");
+            m_setup.building.ioContext.get_executor(), [this, force, session, dbName = db->name, dbArch = db->arch, dbPath = move(dbPath)]() mutable {
                 try {
                     auto dbFileLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(dbName, dbArch));
                     const auto lastModified = LibPkg::lastModified(dbPath);
+                    if (!force) {
+                        auto configReadLock2 = m_setup.config.lockToRead();
+                        auto *const destinationDb = m_setup.config.findDatabase(dbName, dbArch);
+                        if (const auto lastUpdate = destinationDb->lastUpdate; lastModified <= lastUpdate) {
+                            configReadLock2.unlock();
+                            m_buildAction->appendOutput(Phrases::InfoMessage, "Skip loading database \"", dbName, '@', dbArch,
+                                "\" from local file \"", dbPath, "\"; last modification time <= last update (", lastModified.toString(), '<', '=',
+                                lastUpdate.toString(), ')', '\n');
+                            return;
+                        }
+                    }
                     auto dbFile = LibPkg::extractFiles(dbPath, &LibPkg::Database::isFileRelevant);
                     auto packages = LibPkg::Package::fromDatabaseFile(move(dbFile));
                     dbFileLock.lock().unlock();
+                    m_buildAction->appendOutput(
+                        Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch, "\" from local file \"", dbPath, "\"\n");
                     const auto configLock = m_setup.config.lockToWrite();
                     auto *const destinationDb = m_setup.config.findDatabase(dbName, dbArch);
                     if (!destinationDb) {
@@ -99,7 +112,7 @@ void ReloadDatabase::run()
     // query databases
     auto query = WebClient::prepareDatabaseQuery(m_buildAction->log(), dbsToLoadFromMirror, withFiles);
     std::get<std::shared_lock<std::shared_mutex>>(configReadLock).unlock();
-    WebClient::queryDatabases(m_buildAction->log(), m_setup, std::move(query.queryParamsForDbs), session);
+    WebClient::queryDatabases(m_buildAction->log(), m_setup, std::move(query.queryParamsForDbs), session, force);
     m_preparationFailures = std::move(query.failedDbs);
 
     // clear AUR cache

@@ -30,11 +30,11 @@ struct DatabaseQuery {
 
 [[nodiscard]] DatabaseQuery prepareDatabaseQuery(LogContext &log, const std::vector<LibPkg::Database *> &dbs, bool withFiles);
 std::shared_ptr<DatabaseQuerySession> queryDatabases(
-    LogContext &log, ServiceSetup &setup, std::vector<DatabaseQueryParams> &&urls, DatabaseQuerySession::HandlerType &&handler);
+    LogContext &log, ServiceSetup &setup, std::vector<DatabaseQueryParams> &&urls, bool force, DatabaseQuerySession::HandlerType &&handler);
 std::shared_ptr<DatabaseQuerySession> queryDatabases(LogContext &log, ServiceSetup &setup, std::shared_lock<std::shared_mutex> *configReadLock,
-    const std::vector<LibPkg::Database *> &dbs, DatabaseQuerySession::HandlerType &&handler);
-void queryDatabases(
-    LogContext &log, ServiceSetup &setup, std::vector<DatabaseQueryParams> &&urls, std::shared_ptr<DatabaseQuerySession> &dbQuerySession);
+    const std::vector<LibPkg::Database *> &dbs, bool force, DatabaseQuerySession::HandlerType &&handler);
+void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQueryParams> &&urls,
+    std::shared_ptr<DatabaseQuerySession> &dbQuerySession, bool force = false);
 
 struct PackageCachingDataForPackage {
     std::string_view url;

@@ -92,7 +92,7 @@ int main(int argc, const char *argv[])
             } else {
                 db.filesPath = db.filesPathFromRegularPath();
             }
-            db.loadPackages(true);
+            db.loadPackagesFromConfiguredPaths(true, true);
         } catch (const std::runtime_error &e) {
             std::cerr << "Unable to load database \"" << db.name << "\": " << e.what() << '\n';
         }

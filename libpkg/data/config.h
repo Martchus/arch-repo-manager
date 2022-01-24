@@ -111,7 +111,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
 
     // load config and packages
     void loadPacmanConfig(const char *pacmanConfigPath);
-    void loadAllPackages(bool withFiles);
+    void loadAllPackages(bool withFiles, bool force);
 
     // storage and caching
     void initStorage(const char *path = "libpkg.db", std::uint32_t maxDbs = 0);

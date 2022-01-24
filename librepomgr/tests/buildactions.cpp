@@ -550,7 +550,7 @@ void BuildActionsTests::testConductingBuild()
         readFile("repos/boost/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
 
     // add packages needing a rebuild to trigger auto-staging
-    m_setup.config.loadAllPackages(false);
+    m_setup.config.loadAllPackages(false, true);
     auto *const boostDb = m_setup.config.findDatabase("boost"sv, "x86_64"sv);
     auto *const miscDb = m_setup.config.findDatabase("misc"sv, "x86_64"sv);
     CPPUNIT_ASSERT_MESSAGE("boost database present", boostDb);
@@ -670,7 +670,7 @@ void BuildActionsTests::testCleanup()
     auto *const miscDb = m_setup.config.findOrCreateDatabase("misc"sv, std::string_view());
     miscDb->path = repoDir64 / "misc.db";
     miscDb->localDbDir = miscDb->localPkgDir = repoDir64;
-    miscDb->loadPackages();
+    miscDb->loadPackagesFromConfiguredPaths();
 
     // create and run build action
     m_buildAction = std::make_shared<BuildAction>(0, &m_setup);

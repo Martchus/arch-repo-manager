@@ -143,11 +143,11 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
     }
 }
 
-void Config::loadAllPackages(bool withFiles)
+void Config::loadAllPackages(bool withFiles, bool force)
 {
     for (auto &db : databases) {
         try {
-            db.loadPackages(withFiles);
+            db.loadPackagesFromConfiguredPaths(withFiles, force);
         } catch (const runtime_error &e) {
             cerr << Phrases::ErrorMessage << "Unable to load database \"" << db.name << "\": " << e.what() << Phrases::EndFlush;
         }

@@ -57,10 +57,10 @@ void Session::run(
 
     // set up an HTTP request message
     request.version(version);
-    request.method(verb);
     request.target(target);
     request.set(http::field::host, host);
     request.set(http::field::user_agent, APP_NAME " " APP_VERSION);
+    method = verb;
 
     // setup a file response
     if (!destinationFilePath.empty()) {
@@ -131,10 +131,39 @@ void Session::handshakeDone(boost::beast::error_code ec)
 void Session::sendRequest()
 {
     // send the HTTP request to the remote host
+    if (m_headHandler) {
+        request.method(boost::beast::http::verb::head);
+        std::visit(
+            [this](auto &&stream) {
+                boost::beast::http::async_write(
+                    stream, request, std::bind(&Session::headRequested, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+            },
+            m_stream);
+        return;
+    }
+    request.method(method);
     std::visit(
         [this](auto &&stream) {
             boost::beast::http::async_write(
                 stream, request, std::bind(&Session::requested, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        },
+        m_stream);
+}
+
+void Session::headRequested(boost::beast::error_code ec, std::size_t bytesTransferred)
+{
+    boost::ignore_unused(bytesTransferred);
+    if (ec) {
+        m_handler(*this, HttpClientError("sending HEAD request", ec));
+        return;
+    }
+
+    // receive the HTTP response
+    headResponse.skip(true);
+    std::visit(
+        [this](auto &stream) {
+            http::async_read(
+                stream, m_buffer, headResponse, std::bind(&Session::headReceived, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
         },
         m_stream);
 }
@@ -222,6 +251,22 @@ bool Session::continueReadingChunks()
     return true;
 }
 
+void Session::headReceived(boost::beast::error_code ec, std::size_t bytesTransferred)
+{
+    boost::ignore_unused(bytesTransferred);
+    if (ec) {
+        m_handler(*this, HttpClientError("receiving HEAD response", ec));
+        return;
+    }
+    m_headHandler(*this);
+    m_headHandler = HeadHandler();
+    if (skip) {
+        sendRequest();
+    } else {
+        closeGracefully();
+    }
+}
+
 void Session::received(boost::beast::error_code ec, std::size_t bytesTransferred)
 {
     boost::ignore_unused(bytesTransferred);
@@ -229,8 +274,12 @@ void Session::received(boost::beast::error_code ec, std::size_t bytesTransferred
         m_handler(*this, HttpClientError("receiving response", ec));
         return;
     }
+    closeGracefully();
+}
 
-    // close the stream gracefully
+void Session::closeGracefully()
+{
+    auto ec = boost::beast::error_code();
     if (auto *const sslStream = std::get_if<SslStream>(&m_stream)) {
         // perform the SSL handshake
         sslStream->async_shutdown(std::bind(&Session::closed, shared_from_this(), std::placeholders::_1));
@@ -249,6 +298,14 @@ void Session::closed(boost::beast::error_code ec)
 std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext,
     std::string_view url, Session::Handler &&handler, std::string &&destinationPath, std::string_view userName, std::string_view password,
     boost::beast::http::verb verb, std::optional<std::uint64_t> bodyLimit, Session::ChunkHandler &&chunkHandler)
+{
+    return runSessionFromUrl(ioContext, sslContext, url, std::move(handler), Session::HeadHandler(), std::move(destinationPath), userName, password,
+        verb, bodyLimit, std::move(chunkHandler));
+}
+
+std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext,
+    std::string_view url, Session::Handler &&handler, Session::HeadHandler &&headHandler, std::string &&destinationPath, std::string_view userName,
+    std::string_view password, boost::beast::http::verb verb, std::optional<std::uint64_t> bodyLimit, Session::ChunkHandler &&chunkHandler)
 {
     std::string host, port, target;
     auto ssl = false;
@@ -284,8 +341,8 @@ std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asi
         port = ssl ? "443" : "80";
     }
 
-    auto session
-        = ssl ? std::make_shared<Session>(ioContext, sslContext, std::move(handler)) : std::make_shared<Session>(ioContext, std::move(handler));
+    auto session = ssl ? std::make_shared<Session>(ioContext, sslContext, std::move(handler), std::move(headHandler))
+                       : std::make_shared<Session>(ioContext, std::move(handler), std::move(headHandler));
     if (!userName.empty()) {
         const auto authInfo = userName % ":" + password;
         session->request.set(boost::beast::http::field::authorization,

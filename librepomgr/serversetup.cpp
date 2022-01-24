@@ -636,7 +636,7 @@ void ServiceSetup::run()
 #endif
         loadConfigFiles(true);
         config.discardDatabases();
-        config.loadAllPackages(building.loadFilesDbs);
+        config.loadAllPackages(building.loadFilesDbs, building.forceLoadingDbs);
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
         cerr << Phrases::SubError << e.what() << endl;

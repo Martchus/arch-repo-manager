@@ -30,12 +30,14 @@ int main(int argc, const char *argv[])
     OperationArgument runArg("run", 'r', "runs the server");
     ConfigValueArgument configFileArg("config-file", 'c', "specifies the path of the config file", { "path" });
     configFileArg.setEnvironmentVariable(PROJECT_VARNAME_UPPER "_CONFIG_FILE");
-    runArg.setSubArguments({ &configFileArg });
+    ConfigValueArgument forceLoadingDBsArg("force-loading-dbs", 'f', "forces loading DBs, even if DB files have not been modified since last parse");
+    runArg.setSubArguments({ &configFileArg, &forceLoadingDBsArg });
     runArg.setImplicit(true);
-    runArg.setCallback([&setup, &configFileArg](const ArgumentOccurrence &) {
-        if (configFileArg.firstValue()) {
-            setup.configFilePath = configFileArg.firstValue();
+    runArg.setCallback([&setup, &configFileArg, &forceLoadingDBsArg](const ArgumentOccurrence &) {
+        if (const auto configFilePath = configFileArg.firstValue()) {
+            setup.configFilePath = configFilePath;
         }
+        setup.building.forceLoadingDbs = forceLoadingDBsArg.isPresent();
         setup.run();
     });
     HelpArgument helpArg(parser);

@@ -21,13 +21,16 @@ bool Database::isFileRelevant(const char *filePath, const char *fileName, mode_t
     return !std::strcmp(fileName, "desc") || !std::strcmp(fileName, "depends") || !std::strcmp(fileName, "files");
 }
 
-void Database::loadPackages(bool withFiles)
+void Database::loadPackagesFromConfiguredPaths(bool withFiles, bool force)
 {
     const auto &dbPath = withFiles && !filesPath.empty() ? filesPath : path;
     if (dbPath.empty()) {
         throw runtime_error("local path not configured");
     }
-    loadPackages(extractFiles(dbPath, &isFileRelevant), lastModified(dbPath));
+    const auto lastFileUpdate = lastModified(dbPath);
+    if (force || lastFileUpdate > lastUpdate) {
+        loadPackages(extractFiles(dbPath, &isFileRelevant), lastFileUpdate);
+    }
 }
 
 void LibPkg::Database::loadPackages(const string &databaseData, DateTime lastModified)

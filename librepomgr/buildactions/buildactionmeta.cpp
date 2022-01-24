@@ -78,7 +78,14 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .category = "Repo management",
             .name = "Reload databases",
             .type = "reload-database",
-            .flags = {},
+            .flags = {
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(ReloadDatabaseFlags::ForceReload),
+                    .name = "Force reload",
+                    .desc = "Load the database even if its last modification data isn't newer than the last time the database was loaded",
+                    .param = "force-reload",
+                },
+            },
             .settings = {},
             .directory = false,
             .sourceDb = false,

@@ -55,6 +55,10 @@ enum class CheckForUpdatesFlags : BuildActionFlagType {
     None,
     ConsiderRegularPackage = (1 << 0), // be consistent with LibPkg::UpdateCheckOptions here
 };
+enum class ReloadDatabaseFlags : BuildActionFlagType {
+    None,
+    ForceReload = (1 << 0),
+};
 enum class ReloadLibraryDependenciesFlags : BuildActionFlagType {
     None,
     ForceReload = (1 << 0),
@@ -179,6 +183,7 @@ inline const BuildActionTypeMetaMapping &BuildActionMetaInfo::mappingForId(Build
 
 } // namespace LibRepoMgr
 
+CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ReloadDatabaseFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ReloadLibraryDependenciesFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::PrepareBuildFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ConductBuildFlags)
