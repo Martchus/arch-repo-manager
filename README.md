@@ -350,7 +350,7 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
         * Let different clients connect and disconnect fast
 * [ ] Improve test coverage
 * [ ] Add fancy graphs for dependencies on the web UI
-* [ ] Include `xterm.js` properly
+* [ ] Include `xterm.js` via JavaScript modules (blocked by https://github.com/xtermjs/xterm.js/issues/2878)
 
 ## Build instructions and dependencies
 For a PKGBUILD checkout my [PKGBUILDs repository](https://github.com/Martchus/PKGBUILDs).
@@ -369,4 +369,5 @@ retrieved using npm:
 ```
 cd srv/static/node_modules
 npm install xterm
+npm install --save xterm-addon-search
 ```
