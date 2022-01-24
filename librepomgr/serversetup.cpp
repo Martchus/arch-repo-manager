@@ -506,6 +506,10 @@ std::size_t ServiceSetup::restoreState()
         cerr << Phrases::WarningMessage << "An IO error occurred when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
     }
 
+    // open LMDB storage
+    cout << Phrases::InfoMessage << "Opening LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
+    config.initStorage(dbPath.data(), maxDbs);
+
     // restore build actions from JSON file
     if (!hasBuildActions) {
         try {
@@ -621,8 +625,6 @@ std::size_t ServiceSetup::saveState()
 
 void ServiceSetup::initStorage()
 {
-    cout << Phrases::InfoMessage << "Opening LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
-    config.initStorage(dbPath.data(), maxDbs);
     restoreState();
     config.markAllDatabasesToBeDiscarded();
 }
