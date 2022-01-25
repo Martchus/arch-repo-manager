@@ -62,6 +62,11 @@ void Config::initStorage(const char *path, std::uint32_t maxDbs)
     aur.initStorage(*m_storage);
 }
 
+void Config::setPackageCacheLimit(std::size_t limit)
+{
+    m_storage->packageCache().setLimit(limit);
+}
+
 static std::string addDatabaseDependencies(
     Config &config, Database &database, std::vector<Database *> &result, std::unordered_map<Database *, bool> &visited, bool addSelf)
 {

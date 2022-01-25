@@ -235,6 +235,7 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
                 convertValue(iniEntry.second, "pacman_config_file_path", pacmanConfigFilePath);
                 convertValue(iniEntry.second, "working_directory", workingDirectory);
                 convertValue(iniEntry.second, "max_dbs", maxDbs);
+                convertValue(iniEntry.second, "package_cache_limit", packageCacheLimit);
             }
         }
         // apply working directory
@@ -288,6 +289,8 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
     // restore state/cache and discard databases if not done yet
     if (doFirstTimeSetup) {
         initStorage();
+    } else {
+        config.setPackageCacheLimit(packageCacheLimit);
     }
 
     // read pacman config
@@ -509,6 +512,7 @@ std::size_t ServiceSetup::restoreState()
     // open LMDB storage
     cout << Phrases::InfoMessage << "Opening LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
     config.initStorage(dbPath.data(), maxDbs);
+    config.setPackageCacheLimit(packageCacheLimit);
 
     // restore build actions from JSON file
     if (!hasBuildActions) {

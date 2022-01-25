@@ -44,6 +44,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::string workingDirectory = "workingdir";
     std::string dbPath = "libpkg.db";
     std::uint32_t maxDbs = 512;
+    std::size_t packageCacheLimit = 1000;
 
     // variables relevant for the web server; only changed when (re)loading config
     struct LIBREPOMGR_EXPORT WebServerSetup {

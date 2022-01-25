@@ -104,6 +104,7 @@ public:
     std::size_t clear(const Storage &storage);
     iterator begin();
     iterator end();
+    void setLimit(std::size_t limit);
 
 private:
     EntryList m_entries;
@@ -156,6 +157,7 @@ template <typename StorageEntriesType, typename StorageType, typename SpecType> 
     bool invalidate(Storage &storage, const std::string &entryName);
     void clear(Storage &storage);
     void clearCacheOnly(Storage &storage);
+    void setLimit(std::size_t limit);
 
 private:
     Entries m_entries;
@@ -181,6 +183,7 @@ struct StorageDistribution {
     explicit StorageDistribution(const char *path, std::uint32_t maxDbs);
 
     std::unique_ptr<DatabaseStorage> forDatabase(std::string_view uniqueDatabaseName);
+    PackageCache &packageCache();
 
 private:
     std::shared_ptr<LMDBSafe::MDBEnv> m_env;
@@ -190,6 +193,11 @@ private:
 inline std::unique_ptr<DatabaseStorage> StorageDistribution::forDatabase(std::string_view uniqueDatabaseName)
 {
     return std::make_unique<DatabaseStorage>(m_env, m_packageCache, uniqueDatabaseName);
+}
+
+inline PackageCache &StorageDistribution::packageCache()
+{
+    return m_packageCache;
 }
 
 struct DatabaseStorage {

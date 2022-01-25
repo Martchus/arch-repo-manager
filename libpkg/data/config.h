@@ -115,6 +115,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
 
     // storage and caching
     void initStorage(const char *path = "libpkg.db", std::uint32_t maxDbs = 0);
+    void setPackageCacheLimit(std::size_t limit);
     std::unique_ptr<StorageDistribution> &storage();
     std::uint64_t restoreFromCache();
     std::uint64_t dumpCacheFile();

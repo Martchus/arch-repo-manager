@@ -43,6 +43,14 @@ template <typename StorageEntryType> std::size_t StorageCacheEntries<StorageEntr
     return count;
 }
 
+template <typename StorageEntryType> void StorageCacheEntries<StorageEntryType>::setLimit(std::size_t limit)
+{
+    m_limit = limit;
+    while (m_entries.size() > limit) {
+        m_entries.pop_back();
+    }
+}
+
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
 auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, ROTxn *txn, StorageID storageID) -> SpecType
 {
@@ -232,6 +240,13 @@ void StorageCache<StorageEntriesType, StorageType, SpecType>::clearCacheOnly(Sto
 {
     const auto lock = std::unique_lock(m_mutex);
     m_entries.clear(storage);
+}
+
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+void StorageCache<StorageEntriesType, StorageType, SpecType>::setLimit(std::size_t limit)
+{
+    const auto lock = std::unique_lock(m_mutex);
+    m_entries.setLimit(limit);
 }
 
 template struct StorageCacheRef<DatabaseStorage, Package>;
