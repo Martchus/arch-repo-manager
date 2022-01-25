@@ -99,7 +99,6 @@ public:
 
     template <typename IndexType> StorageEntry *find(const IndexType &ref);
     StorageEntry &insert(StorageEntry &&entry);
-    void undo();
     std::size_t erase(const Ref &ref);
     std::size_t clear(const Storage &storage);
     iterator begin();
@@ -115,11 +114,6 @@ template <typename StorageEntryType>
 inline StorageCacheEntries<StorageEntryType>::StorageCacheEntries(std::size_t limit)
     : m_limit(limit)
 {
-}
-
-template <typename StorageEntryType> inline void StorageCacheEntries<StorageEntryType>::undo()
-{
-    m_entries.pop_front();
 }
 
 template <typename StorageEntryType> inline std::size_t StorageCacheEntries<StorageEntryType>::erase(const Ref &ref)
