@@ -32,7 +32,7 @@ private:
 inline void GlobalSharedMutex::lock()
 {
     auto lock = std::unique_lock<std::mutex>(m_mutex);
-    if (m_sharedOwners || m_exclusivelyOwned) {
+    while (m_sharedOwners || m_exclusivelyOwned) {
         m_cv.wait(lock);
     }
     m_exclusivelyOwned = true;
@@ -50,14 +50,16 @@ inline bool GlobalSharedMutex::try_lock()
 
 inline void GlobalSharedMutex::unlock()
 {
+    auto lock = std::unique_lock<std::mutex>(m_mutex);
     m_exclusivelyOwned = false;
+    lock.unlock();
     m_cv.notify_one();
 }
 
 inline void GlobalSharedMutex::lock_shared()
 {
     auto lock = std::unique_lock<std::mutex>(m_mutex);
-    if (m_exclusivelyOwned) {
+    while (m_exclusivelyOwned) {
         m_cv.wait(lock);
     }
     ++m_sharedOwners;
