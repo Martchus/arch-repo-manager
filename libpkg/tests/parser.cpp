@@ -38,7 +38,7 @@ class ParserTests : public TestFixture {
     CPPUNIT_TEST(testParsingPkgName);
     CPPUNIT_TEST(testExtractingPkgFile);
     CPPUNIT_TEST(testParsingDescriptions);
-    CPPUNIT_TEST(testParsingDatabase);
+    CPPUNIT_TEST(testParsingDatabaseAndOverallStorageBehavior);
     CPPUNIT_TEST(testParsingSignatureLevel);
     CPPUNIT_TEST(testSerializingDatabaseSignatureLevel);
     CPPUNIT_TEST_SUITE_END();
@@ -58,7 +58,7 @@ public:
     void testParsingPkgName();
     void testExtractingPkgFile();
     void testParsingDescriptions();
-    void testParsingDatabase();
+    void testParsingDatabaseAndOverallStorageBehavior();
     void testParsingSignatureLevel();
     void testSerializingDatabaseSignatureLevel();
 };
@@ -290,7 +290,7 @@ void ParserTests::testParsingDescriptions()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("sha256sum"s, "ff62339041c19d2a986eed8231fb8e1be723b3afd354cca833946305456e8ec7"s, pkg->packageInfo->sha256);
 }
 
-void ParserTests::testParsingDatabase()
+void ParserTests::testParsingDatabaseAndOverallStorageBehavior()
 {
     auto dbFile = workingCopyPath("test-parsing-database.db", WorkingCopyMode::Cleanup);
 
@@ -319,6 +319,18 @@ void ParserTests::testParsingDatabase()
         config.initStorage(dbFile.data());
         auto *const db = config.findOrCreateDatabase("test"sv, "x86_64"sv);
         CPPUNIT_ASSERT_EQUAL_MESSAGE("config persistent; all 215 packages still present"s, 215_st, db->packageCount());
+
+        // test clearing storage
+        db->clearPackages();
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("config cleared; no more packages present"s, 0_st, db->packageCount());
+
+        // insert one package again to test whether setup still works (e.g. not whole database has been dropped)
+        auto pkg = std::make_shared<Package>();
+        pkg->name = "foo";
+        pkg->version = "42";
+        const auto pkgID = db->updatePackage(pkg);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("again one package present"s, 1_st, db->packageCount());
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("same object returned due to caching", pkg, db->findPackage(pkgID));
     }
 }
 
