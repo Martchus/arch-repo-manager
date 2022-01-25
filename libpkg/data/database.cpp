@@ -111,7 +111,7 @@ void Database::resetConfiguration()
 
 void Database::clearPackages()
 {
-    lastUpdate = CppUtilities::DateTime::gmtNow();
+    lastUpdate = DateTime();
     if (m_storage) {
         m_storage->packageCache.clear(*m_storage);
     }
