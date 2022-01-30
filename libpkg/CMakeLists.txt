@@ -30,12 +30,7 @@ set(SRC_FILES
     parser/config.cpp
     parser/utils.cpp
     parser/binary.cpp
-    parser/siglevel.cpp
-    lmdb-safe/lmdb-safe.hh
-    lmdb-safe/lmdb-typed.hh
-    lmdb-safe/lmdb-reflective.hh
-    lmdb-safe/lmdb-safe.cc
-    lmdb-safe/lmdb-typed.cc)
+    parser/siglevel.cpp)
 set(TEST_HEADER_FILES tests/parser_helper.h)
 set(TEST_SRC_FILES tests/cppunit.cpp tests/parser.cpp tests/parser_binary.cpp tests/parser_helper.cpp tests/data.cpp
                    tests/utils.cpp)
@@ -49,7 +44,6 @@ set(META_APP_DESCRIPTION "C++ library to parse Arch Linux packages and databases
 set(META_VERSION_MAJOR 0)
 set(META_VERSION_MINOR 0)
 set(META_VERSION_PATCH 1)
-set(META_TIDY_EXCLUDE_REGEX "lmdb-safe/.*")
 
 # find c++utilities
 set(CONFIGURATION_PACKAGE_SUFFIX
@@ -66,8 +60,9 @@ use_standard_filesystem(VISIBILITY PUBLIC)
 find_package(reflective_rapidjson${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
 use_reflective_rapidjson(VISIBILITY PUBLIC)
 
-# find lmdb
-use_pkg_config_module(PKG_CONFIG_MODULES "lmdb")
+# find lmdb-safe
+find_package(lmdb-safe${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
+use_lmdb_safe()
 
 # find 3rd party libraries zlib
 use_zlib()
@@ -81,7 +76,7 @@ set_property(TARGET libarchive PROPERTY IMPORTED_LOCATION "${LibArchive_LIBRARIE
 set_property(TARGET libarchive PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${LibArchive_INCLUDE_DIRS}")
 use_target(TARGET_NAME libarchive)
 
-# find boost libraries (required by lmdb-safe)
+# find boost libraries (required by lmdb-safe's integration with reflective-rapidjson)
 option(BOOST_STATIC_LINKAGE "${STATIC_LINKAGE}" "link statically against Boost (instead of dynamically)")
 set(Boost_USE_MULTITHREADED ON)
 if (BOOST_STATIC_LINKAGE)
