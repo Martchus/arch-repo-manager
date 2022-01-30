@@ -853,11 +853,9 @@ function renderUpdateOrDowngrade(value, obj, level, row)
     });
 }
 
-function triggerToolbarAction(toolbarElement)
+function triggerToolbarAction()
 {
-    if (!toolbarElement || toolbarElement instanceof PointerEvent) {
-        toolbarElement = this;
-    }
+    const toolbarElement = this;
     const confirmQuestion = toolbarElement.dataset.confirmation;
     if (confirmQuestion !== undefined && !window.confirm(confirmQuestion)) {
         return false;
