@@ -18,6 +18,7 @@ set(JAVA_SCRIPT_FILES
     static/js/singlepage.js
     static/js/terminal.js
     static/js/utils.js
+    static/js/main.js
     static/node_modules/xterm/lib/xterm.js
     static/node_modules/xterm-addon-search/lib/xterm-addon-search.js)
 set(CSS_FILES static/css/basics.css static/css/genericrendering.css static/css/layout.css static/css/log.css
