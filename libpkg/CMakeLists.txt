@@ -63,6 +63,13 @@ use_reflective_rapidjson(VISIBILITY PUBLIC)
 # find lmdb-safe
 find_package(lmdb-safe${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
 use_lmdb_safe()
+if (INCLUDE_LMDB_SAFE_PROJECT)
+    set(BUNDLED_TARGETS "${LMDB_SAFE_LIB}")
+    if (NOT LMDB_SAFE_BUILD_SHARED_LIBS)
+        target_compile_options("${LMDB_SAFE_LIB}" PRIVATE -fPIC)
+    endif ()
+    use_pkg_config_module(PKG_CONFIG_MODULES "lmdb")
+endif ()
 
 # find 3rd party libraries zlib
 use_zlib()
