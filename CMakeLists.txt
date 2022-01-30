@@ -15,6 +15,9 @@ set(META_CXX_STANDARD 20)
 
 project(${META_PROJECT_NAME})
 
+# allow using non-default configuration
+set(CONFIGURATION_PACKAGE_SUFFIX "" CACHE STRING "sets the suffix for find_package() calls to packages configured via c++utilities")
+
 enable_testing()
 
 # add subdirectories
@@ -27,6 +30,7 @@ if (INCLUDE_LMDB_SAFE_PROJECT)
     set(META_NO_INSTALL_TARGETS ON)
     set(LMDB_SAFE_BUILD_SHARED_LIBS OFF CACHE BOOL "whether to build lmdb-safe as shared library")
     add_subdirectory(3rdparty/lmdb-safe)
+    set(${NAMESPACE_PREFIX}lmdb-safe${CONFIGURATION_PACKAGE_SUFFIX}_DIR "${CMAKE_CURRENT_BINARY_DIR}/3rdparty/lmdb-safe")
     unset(META_NO_INSTALL_TARGETS)
 endif ()
 add_subdirectory(libpkg)
