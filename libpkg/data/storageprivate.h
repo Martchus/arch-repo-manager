@@ -145,6 +145,7 @@ template <typename StorageEntriesType, typename StorageType, typename SpecType> 
 
     SpecType retrieve(Storage &storage, ROTxn *, StorageID storageID);
     SpecType retrieve(Storage &storage, StorageID storageID);
+    SpecType retrieve(Storage &storage, RWTxn *, const std::string &entryName);
     SpecType retrieve(Storage &storage, const std::string &entryName);
     StoreResult store(Storage &storage, const std::shared_ptr<Entry> &entry, bool force);
     StoreResult store(Storage &storage, RWTxn &txn, const std::shared_ptr<Entry> &entry);

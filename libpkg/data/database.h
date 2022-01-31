@@ -102,6 +102,7 @@ struct LIBPKG_EXPORT PackageUpdater {
     explicit PackageUpdater(Database &database);
     ~PackageUpdater();
 
+    PackageSpec findPackageWithID(const std::string &packageName);
     StorageID update(const std::shared_ptr<Package> &package);
     void commit();
 

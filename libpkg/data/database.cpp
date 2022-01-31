@@ -718,6 +718,11 @@ PackageUpdater::~PackageUpdater()
 {
 }
 
+LibPkg::PackageSpec LibPkg::PackageUpdater::findPackageWithID(const std::string &packageName)
+{
+    return m_database.m_storage->packageCache.retrieve(*m_database.m_storage, &m_d->packagesTxn, packageName);
+}
+
 StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
 {
     const auto res = m_database.m_storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package);

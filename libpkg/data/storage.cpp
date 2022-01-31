@@ -83,7 +83,7 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
 }
 
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
-auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, const std::string &entryName) -> SpecType
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, RWTxn *txn, const std::string &entryName) -> SpecType
 {
     // check for package in cache
     using CacheRef = typename Entries::Ref;
@@ -95,8 +95,7 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
     lock.unlock();
     // check for package in storage, populate cache entry
     auto entry = std::make_shared<Entry>();
-    auto txn = storage.packages.getROTransaction();
-    if (auto id = txn.template get<0>(entryName, *entry)) {
+    if (auto id = txn ? txn->template get<0>(entryName, *entry) : storage.packages.getROTransaction().template get<0>(entryName, *entry)) {
         using CacheEntry = typename Entries::StorageEntry;
         auto newCacheEntry = CacheEntry(ref, id);
         newCacheEntry.entry = entry;
@@ -106,6 +105,12 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
         return SpecType(id, entry);
     }
     return SpecType(0, std::shared_ptr<Entry>());
+}
+
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, const std::string &entryName) -> SpecType
+{
+    return retrieve(storage, nullptr, entryName);
 }
 
 template <typename StorageEntriesType, typename StorageType, typename SpecType>

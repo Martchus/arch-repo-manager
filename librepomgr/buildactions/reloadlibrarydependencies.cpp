@@ -337,19 +337,20 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
     // store the information in the database
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Adding parsed information to databases ...\n");
     std::size_t counter = 0;
-    auto configWritelock = m_setup.config.lockToWrite();
     for (DatabaseToConsider &relevantDb : m_relevantPackagesByDatabase) {
+        auto configWritelock = m_setup.config.lockToWrite(); // acquire lock within loop to allow intermediate reads
         auto *const db = m_setup.config.findDatabase(relevantDb.name, relevantDb.arch);
         if (!db) {
             continue; // the whole database has been removed while we were loading package contents
         }
+        auto updater = LibPkg::PackageUpdater(*db);
         for (PackageToConsider &package : relevantDb.packages) {
             // skip if package info could not be parsed from package contents
             if (package.info.origin != LibPkg::PackageOrigin::PackageContents) {
                 continue;
             }
             // find the package in the database again
-            const auto [packageID, existingPackage] = db->findPackageWithID(package.info.name);
+            const auto [packageID, existingPackage] = updater.findPackageWithID(package.info.name);
             if (!existingPackage) {
                 continue; // the package has been removed while we were loading package contents
             }
@@ -362,11 +363,11 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
                 existingPackage->timestamp = package.lastModified;
             }
             // add the new dependencies on database-level
-            db->forceUpdatePackage(existingPackage);
+            updater.update(existingPackage);
             ++counter;
         }
+        updater.commit();
     }
-    configWritelock.unlock();
 
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Added dependency information for ", counter, " packages\n");
     conclude();
