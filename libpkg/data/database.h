@@ -119,7 +119,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     explicit Database(std::string &&name, std::string &&path);
     Database(Database &&other);
     ~Database();
-    Database &operator=(Database &&rhs);
+    Database &operator=(Database &&rhs) = default;
 
     void initStorage(StorageDistribution &storage);
     void deducePathsFromLocalDirs();
@@ -170,14 +170,6 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
 private:
     std::unique_ptr<DatabaseStorage> m_storage;
 };
-
-inline Database &Database::operator=(Database &&rhs)
-{
-    if (this != &rhs) {
-        *this = std::move(rhs);
-    }
-    return *this;
-}
 
 inline PackageSearchResult::PackageSearchResult()
     : db(nullptr)

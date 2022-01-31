@@ -55,23 +55,7 @@ Database::Database(std::string &&name, std::string &&path)
 {
 }
 
-Database::Database(Database &&other)
-    : name(std::move(other.name))
-    , path(std::move(other.path))
-    , filesPath(std::move(other.filesPath))
-    , mirrors(std::move(other.mirrors))
-    , usage(other.usage)
-    , signatureLevel(other.signatureLevel)
-    , arch(std::move(other.arch))
-    , dependencies(std::move(other.dependencies))
-    , localPkgDir(std::move(other.localPkgDir))
-    , localDbDir(std::move(other.localDbDir))
-    , lastUpdate(other.lastUpdate)
-    , syncFromMirror(other.syncFromMirror)
-    , toBeDiscarded(other.toBeDiscarded)
-    , m_storage(std::move(other.m_storage))
-{
-}
+Database::Database(Database &&other) = default;
 
 Database::~Database()
 {
