@@ -513,7 +513,7 @@ REFLECTIVE_RAPIDJSON_TREAT_AS_MULTI_MAP_OR_HASH(LibPkg::DependencySet);
 
 namespace JsonReflector {
 
-// declare custom (de)serialization for PackageSearchResult
+// declare custom (de)serialization for LibPkg::PackageSpec
 template <>
 LIBPKG_EXPORT void push<LibPkg::PackageSpec>(
     const LibPkg::PackageSpec &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator);

@@ -781,7 +781,7 @@ function renderBuildPreparationBuildData(buildDataForPackage)
 
 function makeVersionsString(packages)
 {
-    const versions = packages.map(packageObj => packageObj.version);
+    const versions = packages.map(packageObj => packageObj.pkg ? packageObj.pkg.version : packageObj.version);
     if (versions.length === 0) {
         return '?';
     } else if (versions.length === 1) {

@@ -65,6 +65,11 @@ const fieldsWithBasics = ['name', 'version', ...fieldsWithoutBasics];
 
 export function renderPackage(packageObj, withoutBasics)
 {
+    const pkgInfo = packageObj.pkg;
+    if (pkgInfo) {
+        pkgInfo.id = packageObj.id;
+        packageObj = pkgInfo;
+    }
     const table = GenericRendering.renderTableFromJsonObject({
         data: packageObj,
         displayLabels: withoutBasics ? labelsWithoutBasics : labelsWithBasics,

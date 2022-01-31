@@ -553,8 +553,23 @@ template <>
 LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,
     const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors)
 {
-    // just deserialize the package (and ignore the ID)
-    pull(reflectable.pkg, value, errors);
+    // allow the package being specified with ID or directly
+    if (!value.IsObject()) {
+        if (errors) {
+            errors->reportTypeMismatch<LibPkg::PackageSpec>(value.GetType());
+        }
+        return;
+    }
+    // find member
+    const auto obj = value.GetObject();
+    if (const auto pkg = value.FindMember("pkg"); pkg != value.MemberEnd()) {
+        pull(reflectable.pkg, pkg->value, errors);
+        if (const auto id = value.FindMember("id"); id != value.MemberEnd()) {
+            pull(reflectable.id, id->value, errors);
+        }
+    } else {
+        pull(reflectable.pkg, value, errors);
+    }
 }
 
 } // namespace JsonReflector
