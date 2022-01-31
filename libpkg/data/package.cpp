@@ -561,7 +561,6 @@ LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,
         return;
     }
     // find member
-    const auto obj = value.GetObject();
     if (const auto pkg = value.FindMember("pkg"); pkg != value.MemberEnd()) {
         pull(reflectable.pkg, pkg->value, errors);
         if (const auto id = value.FindMember("id"); id != value.MemberEnd()) {
