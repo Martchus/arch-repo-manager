@@ -34,7 +34,7 @@ function makePackageID(row)
     return row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + row.name;
 }
 
-function queryPackageDetails(value, row)
+export function queryPackageDetails(value, row)
 {
     AjaxHelper.queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(makePackageID(row)), function(ajaxRequest) {
         showPackageDetails(ajaxRequest, row);
