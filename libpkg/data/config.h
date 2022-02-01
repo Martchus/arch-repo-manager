@@ -128,10 +128,6 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     LicenseResult computeLicenseInfo(const std::vector<std::string> &dependencyDenotations);
     std::variant<std::vector<Database *>, std::string> computeDatabaseDependencyOrder(Database &database, bool addSelf = true);
     std::vector<Database *> computeDatabasesRequiringDatabase(Database &database);
-    void pullDependentPackages(const std::vector<Dependency> &dependencies, const std::shared_ptr<Package> &relevantPackage,
-        const std::unordered_set<LibPkg::Database *> &relevantDbs,
-        std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
-        std::unordered_set<StorageID> &visited);
     void pullDependentPackages(const std::shared_ptr<Package> &package, const std::unordered_set<LibPkg::Database *> &relevantDbs,
         std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
         std::unordered_set<StorageID> &visited);

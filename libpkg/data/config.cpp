@@ -145,41 +145,39 @@ std::vector<Database *> Config::computeDatabasesRequiringDatabase(Database &data
     return result;
 }
 
-void Config::pullDependentPackages(const std::vector<Dependency> &dependencies, const std::shared_ptr<Package> &relevantPackage,
-    const std::unordered_set<LibPkg::Database *> &relevantDbs,
-    std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
-    std::unordered_set<StorageID> &visited)
-{
-    auto found = false;
-    for (const auto &dependency : dependencies) {
-        for (auto &db : databases) {
-            if (relevantDbs.find(&db) == relevantDbs.end()) {
-                continue;
-            }
-            db.providingPackages(dependency, false, [&](StorageID packageID, const std::shared_ptr<Package> &package) {
-                found = true;
-                if (visited.emplace(packageID).second) {
-                    const auto &[i, inserted] = runtimeDependencies.try_emplace(packageID);
-                    if (inserted) {
-                        i->second = package;
-                    }
-                    pullDependentPackages(i->second, relevantDbs, runtimeDependencies, missingDependencies, visited);
-                }
-                return false;
-            });
-        }
-        if (!found) {
-            missingDependencies.add(dependency, relevantPackage);
-        }
-    }
-}
-
 void Config::pullDependentPackages(const std::shared_ptr<Package> &package, const std::unordered_set<LibPkg::Database *> &relevantDbs,
     std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
     std::unordered_set<StorageID> &visited)
 {
-    pullDependentPackages(package->dependencies, package, relevantDbs, runtimeDependencies, missingDependencies, visited);
-    pullDependentPackages(package->optionalDependencies, package, relevantDbs, runtimeDependencies, missingDependencies, visited);
+    auto remainingPackages = std::unordered_set<std::shared_ptr<LibPkg::Package>>{ package };
+    for (auto packageIterator = remainingPackages.begin(); packageIterator != remainingPackages.end(); packageIterator = remainingPackages.begin()) {
+        const auto &currentPackage = *packageIterator;
+        for (const auto &dependencies : { currentPackage->dependencies, currentPackage->optionalDependencies }) {
+            auto found = false;
+            for (const auto &dependency : dependencies) {
+                for (auto &db : databases) {
+                    if (relevantDbs.find(&db) == relevantDbs.end()) {
+                        continue;
+                    }
+                    db.providingPackages(dependency, false, [&](StorageID packageID, const std::shared_ptr<Package> &providingPackage) {
+                        found = true;
+                        if (visited.emplace(packageID).second) {
+                            const auto &[i, inserted] = runtimeDependencies.try_emplace(packageID);
+                            if (inserted) {
+                                i->second = providingPackage;
+                            }
+                            remainingPackages.emplace(providingPackage);
+                        }
+                        return false;
+                    });
+                }
+                if (!found) {
+                    missingDependencies.add(dependency, currentPackage);
+                }
+            }
+        }
+        remainingPackages.erase(packageIterator);
+    }
 }
 
 void Config::markAllDatabasesToBeDiscarded()
