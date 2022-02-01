@@ -97,7 +97,7 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
     auto entry = std::make_shared<Entry>();
     if (auto id = txn ? txn->template get<0>(entryName, *entry) : storage.packages.getROTransaction().template get<0>(entryName, *entry)) {
         using CacheEntry = typename Entries::StorageEntry;
-        auto newCacheEntry = CacheEntry(ref, id);
+        auto newCacheEntry = CacheEntry(CacheRef(storage, entry), id);
         newCacheEntry.entry = entry;
         lock = std::unique_lock(m_mutex);
         m_entries.insert(std::move(newCacheEntry));
