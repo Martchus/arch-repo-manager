@@ -83,6 +83,7 @@ private:
 
     RawSocket &socket();
 
+    bool openDestinationFile();
     void resolved(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results);
     void connected(boost::beast::error_code ec);
     void handshakeDone(boost::beast::error_code ec);
@@ -114,6 +115,7 @@ private:
     Request m_headRequest;
     Handler m_handler;
     HeadHandler m_headHandler;
+    std::uint64_t m_bodyLimit;
 };
 
 template <typename ResponseType>

@@ -41,6 +41,20 @@ void Session::setChunkHandler(ChunkHandler &&handler)
     m_chunkProcessing->handler = std::move(handler);
 }
 
+bool LibRepoMgr::WebClient::Session::openDestinationFile()
+{
+    auto &fileResponse = response.emplace<FileResponse>();
+    boost::beast::error_code errorCode;
+    fileResponse.body_limit(m_bodyLimit);
+    fileResponse.get().body().open(destinationFilePath.data(), file_mode::write, errorCode);
+    if (errorCode != boost::beast::errc::success) {
+        m_handler(*this, HttpClientError("opening output file", errorCode));
+        m_handler = decltype(m_handler)();
+        return false;
+    }
+    return true;
+}
+
 void Session::run(
     const char *host, const char *port, http::verb verb, const char *target, std::optional<std::uint64_t> bodyLimit, unsigned int version)
 {
@@ -61,15 +75,11 @@ void Session::run(
     request.set(http::field::host, host);
     request.set(http::field::user_agent, APP_NAME " " APP_VERSION);
     method = verb;
+    m_bodyLimit = bodyLimit.value_or(500 * 1024 * 1024);
 
     // setup a file response
     if (!destinationFilePath.empty()) {
-        auto &fileResponse = response.emplace<FileResponse>();
-        boost::beast::error_code errorCode;
-        fileResponse.body_limit(bodyLimit.value_or(500 * 1024 * 1024));
-        fileResponse.get().body().open(destinationFilePath.data(), file_mode::write, errorCode);
-        if (errorCode != boost::beast::errc::success) {
-            m_handler(*this, HttpClientError("opening output file", errorCode));
+        if (!m_headHandler && !openDestinationFile()) {
             return;
         }
     } else if (m_chunkProcessing) {
@@ -260,7 +270,7 @@ void Session::headReceived(boost::beast::error_code ec, std::size_t bytesTransfe
     }
     m_headHandler(*this);
     m_headHandler = HeadHandler();
-    if (skip) {
+    if (!skip && (destinationFilePath.empty() || openDestinationFile())) {
         sendRequest();
     } else {
         closeGracefully();
@@ -285,14 +295,18 @@ void Session::closeGracefully()
         sslStream->async_shutdown(std::bind(&Session::closed, shared_from_this(), std::placeholders::_1));
     } else if (auto *const socket = std::get_if<RawSocket>(&m_stream)) {
         socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-        m_handler(*this, ec && ec != boost::beast::errc::not_connected ? HttpClientError("closing connection", ec) : HttpClientError());
+        if (m_handler) {
+            m_handler(*this, ec && ec != boost::beast::errc::not_connected ? HttpClientError("closing connection", ec) : HttpClientError());
+        }
     }
 }
 
 void Session::closed(boost::beast::error_code ec)
 {
     // rationale regarding boost::asio::error::eof: http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
-    m_handler(*this, ec && ec != boost::asio::error::eof ? HttpClientError("closing connection", ec) : HttpClientError());
+    if (m_handler) {
+        m_handler(*this, ec && ec != boost::asio::error::eof ? HttpClientError("closing connection", ec) : HttpClientError());
+    }
 }
 
 std::variant<std::string, std::shared_ptr<Session>> runSessionFromUrl(boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext,
