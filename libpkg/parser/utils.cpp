@@ -133,6 +133,10 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
 void walkThroughArchiveFromBuffer(const string &archiveData, const string &archiveName, const FilePredicate &isFileRelevant,
     FileHandler &&fileHandler, DirectoryHandler &&directoryHandler)
 {
+    // refuse opening empty buffer
+    if (archiveData.empty()) {
+        throw std::runtime_error("Unable to open archive \"" % archiveName + "\": received data is empty");
+    }
     // open archive buffer using libarchive
     struct archive *ar = archive_read_new();
     archive_read_support_filter_all(ar);
@@ -140,9 +144,9 @@ void walkThroughArchiveFromBuffer(const string &archiveData, const string &archi
     int returnCode = archive_read_open_memory(ar, archiveData.data(), archiveData.size());
     if (returnCode != ARCHIVE_OK) {
         if (const char *const error = archive_error_string(ar)) {
-            throw runtime_error("Unable to open/read archive: " % archiveName % "; " + error);
+            throw std::runtime_error("Unable to open/read archive \"" % archiveName % "\": " + error);
         } else {
-            throw runtime_error("Unable to open/read archive: " + archiveName);
+            throw std::runtime_error("Unable to open/read archive \"" % archiveName + "\": unable to open archive from memory");
         }
     }
     walkThroughArchiveInternal(ar, archiveName, isFileRelevant, std::move(fileHandler), std::move(directoryHandler));
@@ -162,12 +166,19 @@ void walkThroughArchive(
     if (archivePath.empty()) {
         throw std::runtime_error("Unable to open archive: no path specified");
     }
+    if (!std::filesystem::file_size(archivePath)) {
+        throw std::runtime_error("Unable to open archive \"" % archivePath + "\": file is empty");
+    }
     struct archive *ar = archive_read_new();
     archive_read_support_filter_all(ar);
     archive_read_support_format_all(ar);
     const auto returnCode = archive_read_open_filename(ar, archivePath.data(), 10240);
     if (returnCode != ARCHIVE_OK) {
-        throw std::runtime_error("Unable to open/read archive: " + archivePath);
+        if (const char *const error = archive_error_string(ar)) {
+            throw std::runtime_error("Unable to open/read archive \"" % archivePath % "\": " + error);
+        } else {
+            throw std::runtime_error("Unable to open/read archive \"" % archivePath + "\": unable to open archive from file");
+        }
     }
     walkThroughArchiveInternal(ar, archivePath, isFileRelevant, std::move(fileHandler), std::move(directoryHandler));
 }
