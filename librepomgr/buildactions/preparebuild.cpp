@@ -546,7 +546,6 @@ bool PrepareBuild::pullFurtherDependencies(const std::vector<LibPkg::Dependency>
 struct BatchItem {
     struct MissingDependency {
         LibPkg::Dependency dependency;
-
         LibPkg::Dependency requiredBy;
     };
 
