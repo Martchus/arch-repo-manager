@@ -638,12 +638,13 @@ void PackageUpdaterPrivate::submit(const std::string &dependencyName, AffectedDe
             continue;
         }
         auto &pkgs = existingDependency.relevantPackages;
-        auto size = pkgs.size();
-        pkgs.merge(affected.newPackages);
-        auto change = pkgs.size() != size;
+        auto change = false;
         for (auto &toRemove : affected.removedPackages) {
             change = pkgs.erase(toRemove) || change;
         }
+        auto size = pkgs.size();
+        pkgs.merge(affected.newPackages);
+        change = change || pkgs.size() != size;
         if (change) {
             txn.put(existingDependency, i.getID());
         }
