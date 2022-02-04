@@ -630,6 +630,22 @@ void PackageUpdaterPrivate::update(const StorageID packageID, bool removed, cons
     }
 }
 
+template <typename Dependency, typename MappedType, typename Txn>
+static void submitExistingDependency(StorageID id, Dependency &existingDependency, MappedType &affected, Txn &txn)
+{
+    auto &pkgs = existingDependency.relevantPackages;
+    auto change = false;
+    for (auto &toRemove : affected.removedPackages) {
+        change = pkgs.erase(toRemove) || change;
+    }
+    auto size = pkgs.size();
+    pkgs.merge(affected.newPackages);
+    change = change || pkgs.size() != size;
+    if (change) {
+        txn.put(existingDependency, id);
+    }
+}
+
 void PackageUpdaterPrivate::submit(const std::string &dependencyName, AffectedDeps::mapped_type &affected, DependencyStorage::RWTransaction &txn)
 {
     for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
@@ -637,17 +653,7 @@ void PackageUpdaterPrivate::submit(const std::string &dependencyName, AffectedDe
         if (static_cast<const Dependency &>(existingDependency).version != affected.version) {
             continue;
         }
-        auto &pkgs = existingDependency.relevantPackages;
-        auto change = false;
-        for (auto &toRemove : affected.removedPackages) {
-            change = pkgs.erase(toRemove) || change;
-        }
-        auto size = pkgs.size();
-        pkgs.merge(affected.newPackages);
-        change = change || pkgs.size() != size;
-        if (change) {
-            txn.put(existingDependency, i.getID());
-        }
+        submitExistingDependency(i.getID(), existingDependency, affected, txn);
         return;
     }
     auto newDependency = DatabaseDependency(dependencyName, affected.version, affected.mode);
@@ -658,17 +664,7 @@ void PackageUpdaterPrivate::submit(const std::string &dependencyName, AffectedDe
 void PackageUpdaterPrivate::submit(const std::string &libraryName, AffectedLibs::mapped_type &affected, LibraryDependencyStorage::RWTransaction &txn)
 {
     for (auto [i, end] = txn.equal_range<0>(libraryName); i != end; ++i) {
-        auto &existingDependency = i.value();
-        auto &pkgs = existingDependency.relevantPackages;
-        auto size = pkgs.size();
-        pkgs.merge(affected.newPackages);
-        auto change = pkgs.size() != size;
-        for (auto &toRemove : affected.removedPackages) {
-            change = pkgs.erase(toRemove) || change;
-        }
-        if (change) {
-            txn.put(existingDependency, i.getID());
-        }
+        submitExistingDependency(i.getID(), i.value(), affected, txn);
         return;
     }
     auto newDependency = DatabaseLibraryDependency(libraryName);
