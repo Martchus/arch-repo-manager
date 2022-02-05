@@ -68,7 +68,6 @@ if (INCLUDE_LMDB_SAFE_PROJECT)
     if (NOT LMDB_SAFE_BUILD_SHARED_LIBS)
         target_compile_options("${LMDB_SAFE_LIB}" PRIVATE -fPIC)
     endif ()
-    use_pkg_config_module(PKG_CONFIG_MODULES "lmdb")
 endif ()
 
 # find 3rd party libraries zlib
