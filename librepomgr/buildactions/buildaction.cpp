@@ -204,6 +204,43 @@ BuildAction::BuildAction(IdType id, ServiceSetup *setup) noexcept
 {
 }
 
+BuildAction &BuildAction::operator=(BuildAction &&other)
+{
+    if (this == &other) {
+        return *this;
+    }
+    id = other.id;
+    taskName = std::move(other.taskName);
+    templateName = std::move(other.templateName);
+    directory = std::move(other.directory);
+    packageNames = std::move(other.packageNames);
+    sourceDbs = std::move(other.sourceDbs);
+    destinationDbs = std::move(other.destinationDbs);
+    settings = std::move(other.settings);
+    flags = other.flags;
+    type = other.type;
+    status = other.status;
+    result = other.result;
+    resultData = std::move(other.resultData);
+    output = std::move(other.output);
+    outputMimeType = std::move(other.outputMimeType);
+    logfiles = std::move(other.logfiles);
+    artefacts = std::move(other.artefacts);
+    created = other.created;
+    started = other.started;
+    finished = other.finished;
+    startAfter = std::move(other.startAfter);
+    m_log = std::move(other.m_log);
+    m_setup = other.m_setup;
+    m_aborted = false;
+    m_stopHandler = std::function<void(void)>();
+    m_concludeHandler = std::function<void(void)>();
+    m_ongoingProcesses.clear();
+    m_bufferingForSession.clear();
+    m_internalBuildAction = std::move(other.m_internalBuildAction);
+    return *this;
+}
+
 BuildAction::~BuildAction()
 {
 }
@@ -223,10 +260,10 @@ bool BuildAction::haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> 
  *        the build action is setup-globally visible.
  * \returns Returns immediately. The real work is done in a build action thread.
  */
-void BuildAction::start(ServiceSetup &setup)
+LibPkg::StorageID BuildAction::start(ServiceSetup &setup)
 {
     if (!isScheduled()) {
-        return;
+        return 0;
     }
 
     started = DateTime::gmtNow();
@@ -236,8 +273,7 @@ void BuildAction::start(ServiceSetup &setup)
     switch (type) {
     case BuildActionType::Invalid:
         resultData = "type is invalid";
-        conclude(BuildActionResult::Failure);
-        break;
+        return conclude(BuildActionResult::Failure);
     case BuildActionType::RemovePackages:
         post<RemovePackages>();
         break;
@@ -281,31 +317,17 @@ void BuildAction::start(ServiceSetup &setup)
         break;
     default:
         resultData = "not implemented yet or invalid type";
-        conclude(BuildActionResult::Failure);
+        return conclude(BuildActionResult::Failure);
     }
-}
 
-void BuildAction::startAfterOtherBuildActions(ServiceSetup &setup, const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions)
-{
-    auto allSucceeded = true;
-    for (auto &previousBuildAction : startsAfterBuildActions) {
-        if (!previousBuildAction->hasSucceeded()) {
-            previousBuildAction->m_followUpActions.emplace_back(weak_from_this());
-            allSucceeded = false;
-        }
-    }
-    if (allSucceeded) {
-        start(setup);
-    }
+    // update in persistent storage and create entry in "running cache"
+    return m_setup->building.storeBuildAction(shared_from_this());
 }
 
 void BuildAction::assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions)
 {
     for (auto &previousBuildAction : startsAfterBuildActions) {
         startAfter.emplace_back(previousBuildAction->id);
-        if (!previousBuildAction->hasSucceeded()) {
-            previousBuildAction->m_followUpActions.emplace_back(weak_from_this());
-        }
     }
 }
 
@@ -333,7 +355,7 @@ template <typename Callback> void BuildAction::post(Callback &&codeToRun)
 /*!
  * \brief Internally called to conclude the build action.
  */
-void BuildAction::conclude(BuildActionResult result)
+LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
 {
     // set fields accordingly
     status = BuildActionStatus::Finished;
@@ -354,19 +376,26 @@ void BuildAction::conclude(BuildActionResult result)
 
     // start globally visible follow-up actions if succeeded
     if (result == BuildActionResult::Success && m_setup) {
-        for (auto &maybeStillValidFollowUpAction : m_followUpActions) {
-            auto followUpAction = maybeStillValidFollowUpAction.lock();
-            if (followUpAction && followUpAction->isScheduled()
-                && BuildAction::haveSucceeded(m_setup->building.getBuildActions(followUpAction->startAfter))) {
+        const auto followUps = m_setup->building.followUpBuildActions(id);
+        for (auto &followUpAction : followUps) {
+            if (followUpAction->isScheduled() && BuildAction::haveSucceeded(m_setup->building.getBuildActions(followUpAction->startAfter))) {
                 followUpAction->start(*m_setup);
             }
         }
         // note: Not cleaning up the follow-up actions here because at some point I might implement recursive restarting.
     }
 
+    // write build action to persistent storage
+    // TODO: should this also be done in the middle of the execution to have some "save points"?
+    auto id = LibPkg::StorageID();
+    if (m_setup && m_setup->building.hasStorage()) {
+        id = m_setup->building.storeBuildAction(shared_from_this());
+    }
+
     if (m_concludeHandler) {
         m_concludeHandler();
     }
+    return id;
 }
 
 #ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED

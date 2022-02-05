@@ -353,16 +353,6 @@ void postLoadPackages(const Params &params, ResponseHandler &&handler)
     handler(makeText(params.request(), "packages loaded"));
 }
 
-void postDumpCacheFile(const Params &params, ResponseHandler &&handler)
-{
-    auto configLock = params.setup.config.lockToRead();
-    auto buildLock = params.setup.building.lockToRead();
-    const auto size = params.setup.saveState();
-    buildLock.unlock();
-    configLock.unlock();
-    handler(makeText(params.request(), "cache file written (" % dataSizeToString(size) + ')'));
-}
-
 void postQuit(const Params &params, ResponseHandler &&handler)
 {
     cerr << Phrases::SuccessMessage << "Stopping via route /quit" << endl;

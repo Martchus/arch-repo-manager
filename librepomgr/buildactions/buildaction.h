@@ -173,6 +173,7 @@ public:
     static constexpr IdType invalidId = std::numeric_limits<BuildAction::IdType>::max();
 
     explicit BuildAction(IdType id = invalidId, ServiceSetup *setup = nullptr) noexcept;
+    BuildAction &operator=(BuildAction &&other);
     ~BuildAction();
     bool isScheduled() const;
     bool isExecuting() const;
@@ -180,8 +181,7 @@ public:
     bool hasSucceeded() const;
     static bool haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> &buildActions);
     bool isAborted() const;
-    void start(ServiceSetup &setup);
-    void startAfterOtherBuildActions(ServiceSetup &setup, const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
+    LibPkg::StorageID start(ServiceSetup &setup);
     void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
     void abort();
     void appendOutput(std::string &&output);
@@ -197,12 +197,13 @@ public:
     void terminateOngoingBuildProcesses();
     void streamFile(const WebAPI::Params &params, const std::string &filePath, std::string_view fileMimeType);
     void streamOutput(const WebAPI::Params &params, std::size_t offset = 0);
+    ServiceSetup *setup();
 
 protected:
 private:
     template <typename InternalBuildActionType> void post();
     template <typename Callback> void post(Callback &&codeToRun);
-    void conclude(BuildActionResult result);
+    LibPkg::StorageID conclude(BuildActionResult result);
     void continueStreamingExistingOutputToSession(std::shared_ptr<WebAPI::Session> session, OutputBufferingForSession &buffering,
         const boost::system::error_code &error, std::size_t bytesTransferred);
     void continueStreamingNewOutputToSession(std::shared_ptr<WebAPI::Session> session, OutputBufferingForSession &buffering,
@@ -216,7 +217,6 @@ public:
     std::string directory;
     std::vector<std::string> packageNames;
     std::vector<std::string> sourceDbs, destinationDbs;
-    std::vector<std::string> extraParams; // deprecated; remove at some point
     std::unordered_map<std::string, std::string> settings;
     BuildActionFlagType flags = noBuildActionFlags;
     BuildActionType type = BuildActionType::Invalid;
@@ -248,7 +248,6 @@ private:
     std::mutex m_outputStreamingMutex;
     std::unordered_map<std::shared_ptr<WebAPI::Session>, std::unique_ptr<OutputBufferingForSession>> m_bufferingForSession;
     std::unique_ptr<InternalBuildAction> m_internalBuildAction;
-    std::vector<std::weak_ptr<BuildAction>> m_followUpActions;
 };
 
 inline bool BuildAction::isScheduled() const
@@ -295,6 +294,11 @@ inline std::shared_ptr<BuildProcessSession> BuildAction::findBuildProcess(const 
 {
     const auto i = m_ongoingProcesses.find(filePath);
     return i != m_ongoingProcesses.cend() ? i->second : nullptr;
+}
+
+inline ServiceSetup *BuildAction::setup()
+{
+    return m_setup;
 }
 
 /*!

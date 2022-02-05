@@ -40,7 +40,6 @@ const Router Server::s_router = {
     { { http::verb::post, "/api/v0/build-action/clone" }, Route{&Routes::postCloneBuildActions, UserPermissions::ModifyBuildActions} },
     { { http::verb::post, "/api/v0/build-action/start" }, Route{&Routes::postStartBuildActions, UserPermissions::ModifyBuildActions} },
     { { http::verb::post, "/api/v0/build-action/stop" }, Route{&Routes::postStopBuildActions, UserPermissions::ModifyBuildActions} },
-    { { http::verb::post, "/api/v0/dump/cache-file" }, Route{&Routes::postDumpCacheFile, UserPermissions::PerformAdminActions} },
     { { http::verb::post, "/api/v0/quit" }, Route{&Routes::postQuit, UserPermissions::PerformAdminActions} },
 };
 // clang-format on

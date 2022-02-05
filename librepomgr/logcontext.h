@@ -15,12 +15,13 @@ struct BuildAction;
 struct LIBREPOMGR_EXPORT LogContext {
     explicit LogContext(BuildAction *buildAction = nullptr);
     LogContext &operator=(const LogContext &) = delete;
+    LogContext &operator=(LogContext &&) = default;
     template <typename... Args> LogContext &operator()(CppUtilities::EscapeCodes::Phrases phrase, Args &&...args);
     template <typename... Args> LogContext &operator()(Args &&...args);
     template <typename... Args> LogContext &operator()(std::string &&msg);
 
 private:
-    BuildAction *const m_buildAction;
+    BuildAction *m_buildAction;
 };
 
 inline LogContext::LogContext(BuildAction *buildAction)

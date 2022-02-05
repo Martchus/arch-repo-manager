@@ -276,7 +276,7 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
 struct ProcessResult;
 
 /// \brief The InternalBuildAction struct contains internal details (which are not serialized / accessible via the web API) and helpers.
-/// \remarks This struct is mean to be inherited from when creating a new type build action like it is down by the classes below.
+/// \remarks This struct is mean to be inherited from when creating a new type of build action like it is done by the classes below.
 struct LIBREPOMGR_EXPORT InternalBuildAction {
     InternalBuildAction(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction);
 

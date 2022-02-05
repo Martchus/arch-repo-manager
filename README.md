@@ -6,8 +6,8 @@ repositories. It is built on top of the official tools provided by the `pacman` 
 
 At this point the project is rather raw and there are many things left to implement and
 to improve (checkout the TODOs section below). Currently builds are exclusively triggered
-manually (although the API brings the possibility for automation), scalability is limited
-through the partial use of an in-memory database. Builds are only conducted on one host.
+manually (although the API brings the possibility for automation) and are only conducted
+on one host (although one can simply setup the build service on multiple hosts).
 
 On the upside, this project can easily be used to together with other build scripts. It
 doesn't care if your repository's DB file is updated by another application; just be sure
@@ -333,11 +333,8 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
   only `pkgrel` changes or when building from VCS sources or when some sources just remain the same).
 
 ## TODOs and further ideas for improvement
-* [ ] Use persistent, non-in-memory database (e.g. lmdb or leveldb) to improve scalability
-    * [x] Use db for packages
-    * [ ] Use db for build actions
 * [ ] Allow triggering tasks automatically/periodically
-* [ ] Allow to run `makechrootpkg` on a remote host (e.g. via SSH) to work can be spread across multiple hosts
+* [ ] Allow to run `makechrootpkg` on a remote host (e.g. via SSH) so work can be spread across multiple hosts
 * [ ] More advanced search options
 * [ ] Refresh build action details on the web UI automatically while an action is pending
 * [ ] Fix permission error when stopping a process
@@ -351,7 +348,7 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
         * Start process producing lots of output very fast
         * Let different clients connect and disconnect fast
 * [ ] Improve test coverage
-* [ ] Add fancy graphs for dependencies on the web UI
+* [ ] Add fancy graphs for dependencies of build actions on the web UI
 * [ ] Include `xterm.js` via JavaScript modules (blocked by https://github.com/xtermjs/xterm.js/issues/2878)
 
 ## Build instructions and dependencies

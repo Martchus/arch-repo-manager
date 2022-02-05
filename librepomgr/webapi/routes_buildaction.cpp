@@ -24,33 +24,27 @@ void getBuildActions(const Params &params, ResponseHandler &&handler)
     RAPIDJSON_NAMESPACE::Value::Array array(jsonDoc.GetArray());
 
     auto buildActionLock = params.setup.building.lockToRead();
-    array.Reserve(ReflectiveRapidJSON::JsonReflector::rapidJsonSize(params.setup.building.actions.size()), jsonDoc.GetAllocator());
-    auto configLock = params.setup.config.lockToRead(); // build actions might refer to "config things" like packages
-    for (const auto &buildAction : params.setup.building.actions) {
-        if (!buildAction) {
-            continue;
-        }
-        ReflectiveRapidJSON::JsonReflector::push(BuildActionBasicInfo(*buildAction), array, jsonDoc.GetAllocator());
-    }
-    configLock.unlock();
+    params.setup.building.forEachBuildAction(
+        [&array, &jsonDoc](std::size_t count) { array.Reserve(ReflectiveRapidJSON::JsonReflector::rapidJsonSize(count), jsonDoc.GetAllocator()); },
+        [&array, &jsonDoc](LibPkg::StorageID, BuildAction &&buildAction) {
+            ReflectiveRapidJSON::JsonReflector::push(BuildActionBasicInfo(buildAction), array, jsonDoc.GetAllocator());
+            return false;
+        });
     buildActionLock.unlock();
 
     handler(makeJson(params.request(), jsonDoc, params.target.hasPrettyFlag()));
 }
 
 struct BuildActionSearchResult {
-    struct ActionRef {
-        std::uint64_t id;
-        BuildAction *action = nullptr;
-    };
-    std::vector<ActionRef> actions;
+    std::vector<BuildActionIdType> specifiedIds;
+    std::vector<std::shared_ptr<BuildAction>> actions;
     std::variant<std::monostate, std::shared_lock<std::shared_mutex>, std::unique_lock<std::shared_mutex>> lock;
     bool ok = false;
 };
 
 BuildActionSearchResult findBuildActions(const Params &params, ResponseHandler &&handler, bool acquireWriteLock = false, std::size_t maxIDs = 100)
 {
-    BuildActionSearchResult result;
+    auto result = BuildActionSearchResult();
     const auto idParams = params.target.decodeValues("id");
     if (idParams.empty()) {
         handler(makeBadRequest(params.request(), "need at least one build action ID"));
@@ -61,10 +55,10 @@ BuildActionSearchResult findBuildActions(const Params &params, ResponseHandler &
         return result;
     }
 
-    result.actions.reserve(idParams.size());
+    result.specifiedIds.reserve(idParams.size());
     for (const auto &idString : idParams) {
         try {
-            result.actions.emplace_back(BuildActionSearchResult::ActionRef{ .id = stringToNumber<std::size_t>(idString) });
+            result.specifiedIds.emplace_back(stringToNumber<BuildActionIdType>(idString));
         } catch (const ConversionException &) {
             handler(makeBadRequest(params.request(), "all IDs must be unsigned integers"));
             return result;
@@ -77,17 +71,15 @@ BuildActionSearchResult findBuildActions(const Params &params, ResponseHandler &
         result.lock = params.setup.building.lockToRead();
     }
 
-    for (auto &actionRef : result.actions) {
-        if (actionRef.id >= params.setup.building.actions.size()) {
+    result.actions.reserve(result.specifiedIds.size());
+    for (const auto id : result.specifiedIds) {
+        auto action = params.setup.building.getBuildAction(id);
+        if (!action) {
             result.lock = std::monostate{};
-            handler(makeBadRequest(params.request(), argsToString("no build action with specified ID \"", actionRef.id, "\" exists")));
+            handler(makeBadRequest(params.request(), argsToString("no build action with specified ID \"", id, "\" exists")));
             return result;
         }
-        actionRef.action = params.setup.building.actions[actionRef.id].get();
-        if (!actionRef.action) {
-            handler(makeBadRequest(params.request(), argsToString("no build action with specified ID \"", actionRef.id, "\" exists")));
-            return result;
-        }
+        result.actions.emplace_back(std::move(action));
     }
     result.ok = true;
     return result;
@@ -101,8 +93,8 @@ void getBuildActionDetails(const Params &params, ResponseHandler &&handler)
     if (!buildActionsSearchResult.ok) {
         return;
     }
-    for (const auto &buildActionRef : buildActionsSearchResult.actions) {
-        ReflectiveRapidJSON::JsonReflector::push(*buildActionRef.action, array, jsonDoc.GetAllocator());
+    for (const auto &action : buildActionsSearchResult.actions) {
+        ReflectiveRapidJSON::JsonReflector::push(*action, array, jsonDoc.GetAllocator());
     }
     buildActionsSearchResult.lock = std::monostate{};
     handler(makeJson(params.request(), jsonDoc, params.target.hasPrettyFlag()));
@@ -128,7 +120,7 @@ void getBuildActionOutput(const Params &params, ResponseHandler &&handler)
     if (!buildActionsSearchResult.ok) {
         return;
     }
-    auto buildAction = buildActionsSearchResult.actions.front().action;
+    auto &buildAction = buildActionsSearchResult.actions.front();
     if (offset > buildAction->output.size()) {
         buildActionsSearchResult.lock = std::monostate{};
         handler(makeBadRequest(params.request(), "the offset must not exceed the output size"));
@@ -163,8 +155,8 @@ static void getBuildActionFile(const Params &params, std::vector<std::string> Bu
         return;
     }
 
-    auto *const buildAction = buildActionsSearchResult.actions.front().action;
-    for (const auto &logFile : buildAction->*fileList) {
+    auto &buildAction = buildActionsSearchResult.actions.front();
+    for (const auto &logFile : (*buildAction).*fileList) {
         if (name == logFile) {
             buildAction->streamFile(params, name, "application/octet-stream");
             return;
@@ -218,7 +210,7 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
             continue;
         }
         try {
-            startAfterIds.emplace_back(stringToNumber<BuildActionIdType>(startAfterIdValue));
+            startAfterIds.emplace_back(stringToNumber<LibPkg::StorageID>(startAfterIdValue));
         } catch (const ConversionException &) {
             handler(makeBadRequest(params.request(), "the specified ID to start after is not a valid build action ID"));
             return;
@@ -226,7 +218,7 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
     }
     if (startAfterAnotherAction) {
         if (startAfterIds.empty()) {
-            handler(makeBadRequest(params.request(), "start condition is \"after\" but not exactly one \"start-after-id\" specified"));
+            handler(makeBadRequest(params.request(), "start condition is \"after\" but not at least one \"start-after-id\" specified"));
             return;
         }
     } else if (!startAfterIdValues.empty() && (startAfterIdValues.size() > 1 || !startAfterIdValues.front().empty())) {
@@ -275,10 +267,8 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
     // initialize build action
     auto buildLock = params.setup.building.lockToWrite();
     const auto id = params.setup.building.allocateBuildActionID();
-    auto startsAfterBuildActions = params.setup.building.getBuildActions(startAfterIds);
-    const auto startNow = startImmediately || (!startsAfterBuildActions.empty() && BuildAction::haveSucceeded(startsAfterBuildActions));
     buildLock.unlock();
-    auto buildAction = std::make_shared<BuildAction>(id);
+    auto buildAction = std::make_shared<BuildAction>(id, &params.setup);
     if (!directories.empty()) {
         buildAction->directory = move(directories.front());
     }
@@ -293,17 +283,13 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
     // serialize build action
     const auto response = buildAction->toJsonDocument();
 
-    // start build action immediately (no locking required because build action is not part of setup-global list yet)
-    if (startNow) {
-        buildAction->start(params.setup);
-    }
-
-    // add build action to setup-global list and to "follow-up actions" of the build action this one should be started after
+    // start build action immediately or just add to setup-global list for now
     auto buildLock2 = params.setup.building.lockToWrite();
-    if (!startNow && !startsAfterBuildActions.empty()) {
-        buildAction->startAfterOtherBuildActions(params.setup, startsAfterBuildActions);
+    if (startImmediately) {
+        buildAction->start(params.setup);
+    } else {
+        params.setup.building.storeBuildAction(buildAction);
     }
-    params.setup.building.actions[id] = std::move(buildAction);
     buildLock2.unlock();
 
     handler(makeJson(params.request(), response));
@@ -502,7 +488,7 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
     // add build actions to setup-global list
     buildLock = building.lockToWrite(buildReadLock);
     for (auto &newAction : allocatedActions) {
-        building.actions[newAction->id] = std::move(newAction);
+        building.storeBuildAction(newAction);
     }
     buildLock.unlock();
 
@@ -515,41 +501,16 @@ void deleteBuildActions(const Params &params, ResponseHandler &&handler)
     if (!buildActionsSearchResult.ok) {
         return;
     }
-    for (const auto &actionRef : buildActionsSearchResult.actions) {
-        if (!actionRef.action->isExecuting()) {
+    for (const auto &action : buildActionsSearchResult.actions) {
+        if (!action->isExecuting()) {
             continue;
         }
         buildActionsSearchResult.lock = std::monostate{};
         handler(
-            makeBadRequest(params.request(), argsToString("can not delete \"", actionRef.id, "\"; it is still being executed; no actions altered")));
+            makeBadRequest(params.request(), argsToString("can not delete \"", action->id, "\"; it is still being executed; no actions altered")));
         return;
     }
-    auto &actions = params.setup.building.actions;
-    auto &invalidActions = params.setup.building.invalidActions;
-    for (auto &actionRef : buildActionsSearchResult.actions) {
-        for (auto &maybeFollowUpAction : actionRef.action->m_followUpActions) {
-            if (auto followUpAction = maybeFollowUpAction.lock()) {
-                auto &startAfter = followUpAction->startAfter;
-                startAfter.erase(std::remove(startAfter.begin(), startAfter.end(), actionRef.id));
-            }
-        }
-        actions[actionRef.id] = nullptr;
-        invalidActions.emplace(actionRef.id);
-    }
-    if (!actions.empty()) {
-        auto newActionsSize = actions.size();
-        for (auto id = newActionsSize - 1;; --id) {
-            if (actions[id]) {
-                break;
-            }
-            newActionsSize = id;
-            invalidActions.erase(id);
-            if (!newActionsSize) {
-                break;
-            }
-        }
-        actions.resize(newActionsSize);
-    }
+    params.setup.building.deleteBuildAction(buildActionsSearchResult.actions);
     buildActionsSearchResult.lock = std::monostate{};
     handler(makeText(params.request(), "ok"));
 }
@@ -570,49 +531,32 @@ void postCloneBuildActions(const Params &params, ResponseHandler &&handler)
     if (!buildActionsSearchResult.ok) {
         return;
     }
-    for (const auto &actionRef : buildActionsSearchResult.actions) {
-        if (actionRef.action->isDone()) {
+    for (const auto &action : buildActionsSearchResult.actions) {
+        if (action->isDone()) {
             continue;
         }
         buildActionsSearchResult.lock = std::monostate{};
         handler(makeBadRequest(
-            params.request(), argsToString("can not clone \"", actionRef.id, "\"; it is still scheduled or executed; no actions altered")));
+            params.request(), argsToString("can not clone \"", action->id, "\"; it is still scheduled or executed; no actions altered")));
         return;
     }
-    std::vector<BuildAction::IdType> cloneIds;
+    auto cloneIds = std::vector<BuildAction::IdType>();
     cloneIds.reserve(buildActionsSearchResult.actions.size());
-    for (const auto &actionRef : buildActionsSearchResult.actions) {
-        const auto orig = actionRef.action;
+    for (const auto &orig : buildActionsSearchResult.actions) {
         const auto id = params.setup.building.allocateBuildActionID();
         auto clone = make_shared<BuildAction>(id);
         clone->directory = orig->directory;
         clone->packageNames = orig->packageNames;
         clone->sourceDbs = orig->sourceDbs;
         clone->destinationDbs = orig->destinationDbs;
-        clone->extraParams = orig->extraParams;
         clone->settings = orig->settings;
         clone->flags = orig->flags;
         clone->type = orig->type;
-        // transfer any follow-up actions which haven't already started yet from the original build action to the new one
-        // TODO: It would be cool to have a "recursive flag" which would allow restarting follow-ups.
-        clone->m_followUpActions.reserve(orig->m_followUpActions.size());
-        for (auto &maybeOrigFollowUp : orig->m_followUpActions) {
-            auto origFollowUp = maybeOrigFollowUp.lock();
-            if (!origFollowUp || !origFollowUp->isScheduled()) {
-                continue;
-            }
-            for (auto &startAfterId : origFollowUp->startAfter) {
-                if (startAfterId == orig->id) {
-                    startAfterId = id;
-                }
-            }
-            clone->m_followUpActions.emplace_back(origFollowUp);
-        }
-        orig->m_followUpActions.clear();
+        clone->startAfter = orig->startAfter;
         if (startImmediately) {
             clone->start(params.setup);
         }
-        params.setup.building.actions[id] = move(clone);
+        params.setup.building.storeBuildAction(std::move(clone));
         cloneIds.emplace_back(id);
     }
     buildActionsSearchResult.lock = std::monostate{};
@@ -625,17 +569,17 @@ void postStartBuildActions(const Params &params, ResponseHandler &&handler)
     if (!buildActionsSearchResult.ok) {
         return;
     }
-    for (const auto &actionRef : buildActionsSearchResult.actions) {
-        if (actionRef.action->isScheduled()) {
+    for (const auto &action : buildActionsSearchResult.actions) {
+        if (action->isScheduled()) {
             continue;
         }
         buildActionsSearchResult.lock = std::monostate{};
         handler(
-            makeBadRequest(params.request(), argsToString("can not start \"", actionRef.id, "\"; it has already been started; no actions altered")));
+            makeBadRequest(params.request(), argsToString("can not start \"", action->id, "\"; it has already been started; no actions altered")));
         return;
     }
-    for (auto &actionRef : buildActionsSearchResult.actions) {
-        actionRef.action->start(params.setup);
+    for (auto &action : buildActionsSearchResult.actions) {
+        action->start(params.setup);
     }
     buildActionsSearchResult.lock = std::monostate{};
     handler(makeText(params.request(), "ok"));
@@ -647,27 +591,28 @@ void postStopBuildActions(const Params &params, ResponseHandler &&handler)
     if (!buildActionsSearchResult.ok) {
         return;
     }
-    for (const auto &actionRef : buildActionsSearchResult.actions) {
-        if (actionRef.action->isExecuting()) {
+    for (const auto &action : buildActionsSearchResult.actions) {
+        if (action->isExecuting()) {
             continue;
         }
         buildActionsSearchResult.lock = std::monostate{};
         handler(makeBadRequest(
-            params.request(), argsToString("can not stop/decline \"", actionRef.id, "\"; it is not being executed; no actions altered")));
+            params.request(), argsToString("can not stop/decline \"", action->id, "\"; it is not being executed; no actions altered")));
         return;
     }
-    for (auto &actionRef : buildActionsSearchResult.actions) {
-        actionRef.action->abort();
-        if (actionRef.action->status == BuildActionStatus::Running) {
+    for (auto &action : buildActionsSearchResult.actions) {
+        action->abort();
+        if (action->status == BuildActionStatus::Running) {
             // can not immediately stop a running action; the action needs to terminate itself acknowledging the aborted flag
             continue;
         }
-        actionRef.action->status = BuildActionStatus::Finished;
-        if (actionRef.action->status == BuildActionStatus::AwaitingConfirmation) {
-            actionRef.action->result = BuildActionResult::ConfirmationDeclined;
+        if (action->status == BuildActionStatus::AwaitingConfirmation) {
+            action->result = BuildActionResult::ConfirmationDeclined;
         } else {
-            actionRef.action->result = BuildActionResult::Aborted;
+            action->result = BuildActionResult::Aborted;
         }
+        action->status = BuildActionStatus::Finished;
+        params.setup.building.storeBuildAction(action);
     }
     buildActionsSearchResult.lock = std::monostate{};
     handler(makeText(params.request(), "ok"));

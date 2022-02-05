@@ -30,6 +30,7 @@ struct LIBREPOMGR_EXPORT ThreadPool {
 };
 
 struct ServiceStatus;
+struct Storage;
 
 struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     // the overall configuration (databases, packages, ...) used at various places
@@ -45,6 +46,13 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::string dbPath = "libpkg.db";
     std::uint32_t maxDbs = 512;
     std::size_t packageCacheLimit = 1000;
+
+    void loadConfigFiles(bool doFirstTimeSetup);
+    void printDatabases();
+    void restoreState();
+    void initStorage();
+    void run();
+    ServiceStatus computeStatus() const;
 
     // variables relevant for the web server; only changed when (re)loading config
     struct LIBREPOMGR_EXPORT WebServerSetup {
@@ -68,16 +76,17 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
 
     // variables relevant for build actions and web server routes dealing with them
     struct LIBREPOMGR_EXPORT BuildSetup : public LibPkg::Lockable {
+        friend void ServiceSetup::restoreState();
+
         struct LIBREPOMGR_EXPORT Worker : private boost::asio::executor_work_guard<boost::asio::io_context::executor_type>, public ThreadPool {
             explicit Worker(BuildSetup &setup);
             ~Worker();
             BuildSetup &setup;
         };
 
-        // read/written by build actions and routes
-        // -> acquire the build lock for these
-        std::vector<std::shared_ptr<BuildAction>> actions;
-        std::unordered_set<std::size_t> invalidActions;
+        explicit BuildSetup();
+        BuildSetup(BuildSetup &&) = delete;
+        ~BuildSetup();
 
         // fields which have their own locking
         // -> acquire the object's lock
@@ -113,13 +122,28 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         // never changed after startup
         unsigned short threadCount = 4;
         boost::asio::io_context ioContext;
+        std::string dbPath = "librepomgr.db";
 
+        void initStorage(const char *path);
+        bool hasStorage() const;
         void applyConfig(const std::multimap<std::string, std::string> &multimap);
         void readPresets(const std::string &configFilePath, const std::string &presetsFile);
         Worker allocateBuildWorker();
-        BuildAction::IdType allocateBuildActionID();
-        std::shared_ptr<BuildAction> getBuildAction(BuildAction::IdType id);
-        std::vector<std::shared_ptr<BuildAction>> getBuildActions(const std::vector<BuildAction::IdType> &ids);
+        LibPkg::StorageID allocateBuildActionID();
+        std::shared_ptr<BuildAction> getBuildAction(BuildActionIdType id);
+        std::vector<std::shared_ptr<BuildAction>> getBuildActions(const std::vector<BuildActionIdType> &ids);
+        LibPkg::StorageID storeBuildAction(const std::shared_ptr<BuildAction> &buildAction);
+        void deleteBuildAction(const std::vector<std::shared_ptr<BuildAction>> &actions);
+        std::size_t buildActionCount();
+        std::size_t runningBuildActionCount();
+        void forEachBuildAction(std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func);
+        void forEachBuildAction(std::function<bool(LibPkg::StorageID, BuildAction &, bool &)> &&func);
+        std::vector<std::shared_ptr<BuildAction>> followUpBuildActions(BuildActionIdType forId);
+
+    private:
+        std::unordered_map<BuildActionIdType, std::shared_ptr<BuildAction>> m_runningActions;
+        std::unordered_map<BuildActionIdType, std::unordered_set<BuildActionIdType>> m_followUpActions;
+        std::unique_ptr<Storage> m_storage;
     } building;
 
     struct LIBREPOMGR_EXPORT Authentication : public LibPkg::Lockable {
@@ -145,22 +169,16 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::shared_mutex m_cleanupMutex;
         LockTable m_locksByName;
     } locks;
-
-    void loadConfigFiles(bool doFirstTimeSetup);
-    void printDatabases();
-    std::string_view cacheFilePath() const;
-    RAPIDJSON_NAMESPACE::Document libraryDependenciesToJson();
-    void restoreLibraryDependenciesFromJson(const std::string &json, ReflectiveRapidJSON::JsonDeserializationErrors *errors);
-    std::size_t restoreState();
-    std::size_t saveState();
-    void initStorage();
-    void run();
-    ServiceStatus computeStatus() const;
 };
 
-inline std::shared_ptr<BuildAction> ServiceSetup::BuildSetup::getBuildAction(BuildAction::IdType id)
+inline bool ServiceSetup::BuildSetup::hasStorage() const
 {
-    return id < actions.size() ? actions[id] : nullptr;
+    return m_storage != nullptr;
+}
+
+inline std::size_t ServiceSetup::BuildSetup::runningBuildActionCount()
+{
+    return m_runningActions.size();
 }
 
 inline GlobalLockable &ServiceSetup::Locks::namedLock(const std::string &lockName)

@@ -7,6 +7,8 @@
 
 #include "./webapi/server.h"
 
+#include "../libpkg/data/storagegeneric.h"
+
 #include "reflection/serversetup.h"
 #include "resources/config.h"
 
@@ -37,6 +39,24 @@ using namespace CppUtilities::EscapeCodes;
 using namespace LibPkg;
 
 namespace LibRepoMgr {
+
+struct Storage {
+    using BuildActionStorage = LMDBSafe::TypedDBI<BuildAction>;
+
+    explicit Storage(const char *path);
+
+private:
+    std::shared_ptr<LMDBSafe::MDBEnv> m_env;
+
+public:
+    BuildActionStorage buildActions;
+};
+
+Storage::Storage(const char *path)
+    : m_env(LMDBSafe::getMDBEnv(path, MDB_NOSUBDIR, 0600, 2))
+    , buildActions(m_env, "buildactions")
+{
+}
 
 static void deduplicateVector(std::vector<std::string> &vector)
 {
@@ -96,6 +116,16 @@ void ServiceSetup::WebServerSetup::applyConfig(const std::multimap<std::string, 
     }
 }
 
+ServiceSetup::BuildSetup::BuildSetup() = default;
+ServiceSetup::BuildSetup::~BuildSetup() = default;
+
+void ServiceSetup::BuildSetup::initStorage(const char *path)
+{
+    if (!m_storage) {
+        m_storage = std::make_unique<Storage>(path);
+    }
+}
+
 void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std::string> &multimap)
 {
     convertValue(multimap, "threads", threadCount);
@@ -121,6 +151,7 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     convertValue(multimap, "package_download_size_limit", packageDownloadSizeLimit);
     convertValue(multimap, "test_files_dir", testFilesDir);
     convertValue(multimap, "load_files_dbs", loadFilesDbs);
+    convertValue(multimap, "db_path", dbPath);
 }
 
 void ServiceSetup::BuildSetup::readPresets(const std::string &configFilePath, const std::string &presetsFileRelativePath)
@@ -191,31 +222,164 @@ ServiceSetup::BuildSetup::Worker ServiceSetup::BuildSetup::allocateBuildWorker()
     return Worker(*this);
 }
 
-BuildAction::IdType ServiceSetup::BuildSetup::allocateBuildActionID()
+LibPkg::StorageID ServiceSetup::BuildSetup::allocateBuildActionID()
 {
-    if (!invalidActions.empty()) {
-        const auto i = invalidActions.begin();
-        const auto id = *i;
-        invalidActions.erase(i);
-        return id;
-    }
-    const auto id = actions.size();
-    actions.emplace_back();
+    static const auto emptyBuildAction = BuildAction();
+    auto txn = m_storage->buildActions.getRWTransaction();
+    const auto id = txn.put(emptyBuildAction);
+    txn.commit();
     return id;
 }
 
-std::vector<std::shared_ptr<BuildAction>> ServiceSetup::BuildSetup::getBuildActions(const std::vector<BuildAction::IdType> &ids)
+std::shared_ptr<BuildAction> ServiceSetup::BuildSetup::getBuildAction(BuildActionIdType id)
 {
+    if (auto i = m_runningActions.find(id); i != m_runningActions.end()) {
+        return i->second;
+    }
+    const auto res = std::make_shared<BuildAction>();
+    auto txn = m_storage->buildActions.getROTransaction();
+    return id <= std::numeric_limits<LibPkg::StorageID>::max() && txn.get(static_cast<LibPkg::StorageID>(id), *res) ? res : nullptr;
+}
+
+std::vector<std::shared_ptr<BuildAction>> ServiceSetup::BuildSetup::getBuildActions(const std::vector<BuildActionIdType> &ids)
+{
+    auto buildAction = std::shared_ptr<BuildAction>();
     auto buildActions = std::vector<std::shared_ptr<BuildAction>>();
     buildActions.reserve(ids.size());
+    auto txn = m_storage->buildActions.getROTransaction();
     for (const auto id : ids) {
-        if (id < actions.size()) {
-            if (auto &buildAction = actions[id]) {
-                buildActions.emplace_back(buildAction);
-            }
+        if (auto i = m_runningActions.find(id); i != m_runningActions.end()) {
+            buildActions.emplace_back(i->second);
+            continue;
+        }
+        if (id > std::numeric_limits<LibPkg::StorageID>::max()) {
+            continue;
+        }
+        if (!buildAction) {
+            buildAction = std::make_shared<BuildAction>();
+        }
+        if (txn.get(static_cast<LibPkg::StorageID>(id), *buildAction)) {
+            buildActions.emplace_back(std::move(buildAction));
         }
     }
     return buildActions;
+}
+
+StorageID ServiceSetup::BuildSetup::storeBuildAction(const std::shared_ptr<BuildAction> &buildAction)
+{
+    // update cache of running build actions
+    if (buildAction->isExecuting()) {
+        m_runningActions[buildAction->id] = buildAction;
+    } else {
+        m_runningActions.erase(buildAction->id);
+    }
+    // update index of follow-up actions for scheduled actions
+    // note: This would break if startAfter would be modified after the initial build action creation.
+    if (buildAction->isScheduled() && !buildAction->startAfter.empty()) {
+        const auto previousBuildActions = getBuildActions(buildAction->startAfter);
+        auto allSucceeded = false;
+        for (auto &previousBuildAction : previousBuildActions) {
+            if (!previousBuildAction->hasSucceeded()) {
+                m_followUpActions[previousBuildAction->id].emplace(buildAction->id);
+                allSucceeded = false;
+            }
+        }
+        // immediately start if all follow-up actions have succeeded
+        if (allSucceeded && buildAction->setup()) {
+            return buildAction->start(*buildAction->setup());
+        }
+    } else {
+        for (const auto id : buildAction->startAfter) {
+            if (const auto i = m_followUpActions.find(id); i != m_followUpActions.end()) {
+                auto &followUps = i->second;
+                followUps.erase(buildAction->id);
+                if (followUps.empty()) {
+                    m_followUpActions.erase(i);
+                }
+            }
+        }
+    }
+    // update persistent storage
+    auto txn = m_storage->buildActions.getRWTransaction();
+    const auto id = txn.put(*buildAction, static_cast<LibPkg::StorageID>(buildAction->id)); // buildAction->id expected to be a valid StorageID or 0
+    txn.commit();
+    return id;
+}
+
+void ServiceSetup::BuildSetup::deleteBuildAction(const std::vector<std::shared_ptr<BuildAction>> &actions)
+{
+    auto txn = m_storage->buildActions.getRWTransaction();
+    for (const auto &action : actions) {
+        // remove action from cache for running actions
+        m_runningActions.erase(action->id);
+        // remove any actions to start after the action to delete
+        m_followUpActions.erase(action->id);
+        // remove follow-up indexes for actions previous to the action to delete
+        for (auto i = m_followUpActions.begin(), end = m_followUpActions.end(); i != end;) {
+            auto &followUps = i->second;
+            followUps.erase(action->id);
+            if (followUps.empty()) {
+                i = m_followUpActions.erase(i);
+            } else {
+                ++i;
+            }
+        }
+        // delete action from storage
+        if (action->id && action->id <= std::numeric_limits<LibPkg::StorageID>::max()) {
+            txn.del(static_cast<LibPkg::StorageID>(action->id));
+        }
+    }
+    txn.commit();
+}
+
+std::size_t ServiceSetup::BuildSetup::buildActionCount()
+{
+    return m_storage->buildActions.getROTransaction().size();
+}
+
+void ServiceSetup::BuildSetup::forEachBuildAction(
+    std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func)
+{
+    auto txn = m_storage->buildActions.getROTransaction();
+    count(txn.size());
+    for (auto i = txn.begin(); i != txn.end(); ++i) {
+        if (func(i.getID(), std::move(i.value()))) {
+            return;
+        }
+    }
+}
+
+void ServiceSetup::BuildSetup::forEachBuildAction(std::function<bool(LibPkg::StorageID, BuildAction &, bool &)> &&func)
+{
+    auto txn = m_storage->buildActions.getRWTransaction();
+    for (auto i = txn.begin(); i != txn.end(); ++i) {
+        const auto running = m_runningActions.find(i.getID());
+        auto &action = running != m_runningActions.end() ? *running->second : i.value();
+        auto save = false;
+        const auto stop = func(i.getID(), action, save);
+        if (save) {
+            txn.put(action, i.getID());
+        }
+        if (stop) {
+            return;
+        }
+    }
+}
+
+std::vector<std::shared_ptr<BuildAction>> ServiceSetup::BuildSetup::followUpBuildActions(BuildActionIdType forId)
+{
+    auto res = std::vector<std::shared_ptr<BuildAction>>();
+    const auto i = m_followUpActions.find(forId);
+    if (i == m_followUpActions.end()) {
+        return res;
+    }
+    res.reserve(i->second.size());
+    for (const auto followUpId : i->second) {
+        if (auto buildAction = getBuildAction(followUpId)) {
+            res.emplace_back(std::move(buildAction));
+        }
+    }
+    return res;
 }
 
 void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
@@ -387,244 +551,29 @@ void ServiceSetup::printDatabases()
     cerr << Phrases::SubMessage << "AUR (" << config.aur.packageCount() << " packages cached)" << Phrases::End;
 }
 
-std::string_view ServiceSetup::cacheFilePath() const
+void ServiceSetup::restoreState()
 {
-    return "cache-v" LIBREPOMGR_CACHE_VERSION ".bin";
-}
-
-RAPIDJSON_NAMESPACE::Document ServiceSetup::libraryDependenciesToJson()
-{
-    namespace JR = ReflectiveRapidJSON::JsonReflector;
-    auto document = RAPIDJSON_NAMESPACE::Document(RAPIDJSON_NAMESPACE::kObjectType);
-    auto &alloc = document.GetAllocator();
-    for (auto &db : config.databases) {
-        auto dbValue = RAPIDJSON_NAMESPACE::Value(RAPIDJSON_NAMESPACE::Type::kObjectType);
-        db.allPackages([&](StorageID, const std::shared_ptr<Package> &package) {
-            if (!package->packageInfo) {
-                return false;
-            }
-            if (package->libdepends.empty() && package->libprovides.empty()) {
-                auto hasVersionedPythonOrPerlDep = false;
-                for (const auto &dependency : package->dependencies) {
-                    if (dependency.mode == DependencyMode::Any || dependency.version.empty()
-                        || (dependency.name != "python" && dependency.name != "python2" && dependency.name != "perl")) {
-                        return false;
-                    }
-                    hasVersionedPythonOrPerlDep = true;
-                    break;
-                }
-                if (!hasVersionedPythonOrPerlDep) {
-                    return false;
-                }
-            }
-            auto pkgValue = RAPIDJSON_NAMESPACE::Value(RAPIDJSON_NAMESPACE::Type::kObjectType);
-            auto pkgObj = pkgValue.GetObject();
-            JR::push(package->version, "v", pkgObj, alloc);
-            JR::push(package->packageInfo->buildDate, "t", pkgObj, alloc);
-            JR::push(package->dependencies, "d", pkgObj, alloc); // for versioned Python/Perl deps
-            JR::push(package->libdepends, "ld", pkgObj, alloc);
-            JR::push(package->libprovides, "lp", pkgObj, alloc);
-            dbValue.AddMember(RAPIDJSON_NAMESPACE::StringRef(package->name.data(), JR::rapidJsonSize(package->name.size())), pkgValue, alloc);
-            return false;
-        });
-        document.AddMember(RAPIDJSON_NAMESPACE::Value(db.name % '@' + db.arch, alloc), dbValue, alloc);
-    }
-    return document;
-}
-
-void ServiceSetup::restoreLibraryDependenciesFromJson(const string &json, ReflectiveRapidJSON::JsonDeserializationErrors *errors)
-{
-    namespace JR = ReflectiveRapidJSON::JsonReflector;
-    const auto document = JR::parseJsonDocFromString(json.data(), json.size());
-    if (!document.IsObject()) {
-        errors->reportTypeMismatch<std::map<std::string, LibPkg::Database>>(document.GetType());
-        return;
-    }
-    // FIXME: be more error resilient here, e.g. set the following line and print list of errors instead of aborting on first error
-    // errors->throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::None;
-    const auto dbObj = document.GetObject();
-    for (const auto &dbEntry : dbObj) {
-        if (!dbEntry.value.IsObject()) {
-            errors->reportTypeMismatch<RAPIDJSON_NAMESPACE::kObjectType>(document.GetType());
-            continue;
-        }
-        auto *const db = config.findOrCreateDatabaseFromDenotation(std::string_view(dbEntry.name.GetString()));
-        const auto pkgsObj = dbEntry.value.GetObject();
-        for (const auto &pkgEntry : pkgsObj) {
-            if (!pkgEntry.value.IsObject()) {
-                errors->reportTypeMismatch<LibPkg::Package>(document.GetType());
-                continue;
-            }
-            const auto pkgObj = pkgEntry.value.GetObject();
-            auto name = std::string(pkgEntry.name.GetString());
-            auto [pkgID, pkg] = db->findPackageWithID(name);
-            if (pkg) {
-                // do not mess with already existing packages; this restoring stuff is supposed to be done before loading packages from DBs
-                continue;
-            }
-            pkg = std::make_shared<LibPkg::Package>();
-            pkg->name = std::move(name);
-            pkg->origin = PackageOrigin::CustomSource;
-            pkg->packageInfo = std::make_unique<LibPkg::PackageInfo>();
-            JR::pull(pkg->version, "v", pkgObj, errors);
-            JR::pull(pkg->packageInfo->buildDate, "t", pkgObj, errors);
-            JR::pull(pkg->dependencies, "d", pkgObj, errors); // for versioned Python/Perl deps
-            JR::pull(pkg->libdepends, "ld", pkgObj, errors);
-            JR::pull(pkg->libprovides, "lp", pkgObj, errors);
-            db->updatePackage(pkg);
-        }
-    }
-}
-
-std::size_t ServiceSetup::restoreState()
-{
-    // clear old build actions before (There must not be any ongoing build actions when calling this function!)
-    building.actions.clear();
-    building.invalidActions.clear();
-
-    // restore configuration and maybe build actions from JSON file
-    const auto cacheFilePath = this->cacheFilePath();
-    std::size_t size = 0;
-    bool hasConfig = false, hasBuildActions = false;
-    try {
-        fstream cacheFile;
-        cacheFile.exceptions(ios_base::failbit | ios_base::badbit);
-        cacheFile.open(cacheFilePath.data(), ios_base::in | ios_base::binary);
-        ReflectiveRapidJSON::BinaryReflector::BinaryDeserializer deserializer(&cacheFile);
-        deserializer.read(config);
-        hasConfig = true;
-        if (!hasBuildActions) {
-            deserializer.read(building.actions);
-            hasBuildActions = true;
-        }
-        size = static_cast<std::uint64_t>(cacheFile.tellg());
-        cacheFile.close();
-        cerr << Phrases::SuccessMessage << "Restored cache file \"" << cacheFilePath << "\", " << dataSizeToString(size) << Phrases::EndFlush;
-        if (hasBuildActions) {
-            cerr << Phrases::SubMessage << "Restored build actions from cache file 😌" << Phrases::EndFlush;
-        }
-    } catch (const ConversionException &) {
-        cerr << Phrases::WarningMessage << "A conversion error occurred when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
-    } catch (const ios_base::failure &) {
-        cerr << Phrases::WarningMessage << "An IO error occurred when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
-    }
-
     // open LMDB storage
-    cout << Phrases::InfoMessage << "Opening LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
+    cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
     config.initStorage(dbPath.data(), maxDbs);
     config.setPackageCacheLimit(packageCacheLimit);
-
-    // restore build actions from JSON file
-    if (!hasBuildActions) {
-        try {
-            if (!restoreJsonObject(building.actions, workingDirectory, "build-actions-v" LIBREPOMGR_BUILD_ACTIONS_JSON_VERSION,
-                    RestoreJsonExistingFileHandling::Skip)
-                     .empty()) {
-                cerr << Phrases::SuccessMessage << "Restored build actions from JSON file 😒" << Phrases::EndFlush;
-            }
-        } catch (const std::runtime_error &e) {
-            cerr << Phrases::ErrorMessage << e.what() << Phrases::EndFlush;
-        }
-    }
-
-    // restore provided/required libraries from JSON file
-    if (!hasConfig) {
-        try {
-            if (!restoreJsonObject(std::bind(&ServiceSetup::restoreLibraryDependenciesFromJson, this, std::placeholders::_1, std::placeholders::_2),
-                    workingDirectory, "library-dependencies-v" LIBREPOMGR_LIBRARY_DEPENDENCIES_JSON_VERSION, RestoreJsonExistingFileHandling::Skip)
-                     .empty()) {
-                cerr << Phrases::SuccessMessage << "Restored library dependencies from JSON file 😒" << Phrases::EndFlush;
-            }
-        } catch (const std::runtime_error &e) {
-            cerr << Phrases::ErrorMessage << e.what() << Phrases::EndFlush;
-        }
-    }
-
-    // determine invalid build actions
-    if (building.actions.empty()) {
-        return size;
-    }
-    auto newActionsSize = building.actions.size();
-    for (auto id = newActionsSize - 1;; --id) {
-        if (building.actions[id]) {
-            break;
-        }
-        newActionsSize = id;
-        if (!newActionsSize) {
-            break;
-        }
-    }
-    building.actions.resize(newActionsSize);
-    for (std::size_t buildActionId = 0u, buildActionsSize = building.actions.size(); buildActionId != buildActionsSize; ++buildActionId) {
-        if (!building.actions[buildActionId]) {
-            building.invalidActions.emplace(buildActionId);
-        }
-    }
+    cout << Phrases::InfoMessage << "Opening actions LMDB file: " << building.dbPath << Phrases::EndFlush;
+    building.initStorage(building.dbPath.data());
 
     // ensure no build actions are considered running anymore and populate follow up actions
-    for (auto &action : building.actions) {
-        if (!action) {
-            continue;
-        }
-        for (const auto previousBuildActionID : action->startAfter) {
-            if (auto previousBuildAction = building.getBuildAction(previousBuildActionID)) {
-                previousBuildAction->m_followUpActions.emplace_back(action->weak_from_this());
+    building.forEachBuildAction([this](LibPkg::StorageID, BuildAction &buildAction, bool &save) {
+        if (buildAction.isExecuting()) {
+            buildAction.status = BuildActionStatus::Finished;
+            buildAction.result = BuildActionResult::Failure;
+            buildAction.resultData = "service crashed while exectuing";
+            save = true;
+        } else if (buildAction.isScheduled()) {
+            for (const auto previousBuildActionId : buildAction.startAfter) {
+                building.m_followUpActions[previousBuildActionId].emplace(buildAction.id);
             }
         }
-        if (action->isExecuting()) {
-            action->status = BuildActionStatus::Finished;
-            action->result = BuildActionResult::Failure;
-            action->resultData = "service crashed while exectuing";
-        }
-    }
-
-    return size;
-}
-
-std::size_t ServiceSetup::saveState()
-{
-    // write cache file to be able to restore the service state when restarting the service efficiently
-    const auto cacheFilePath = this->cacheFilePath();
-    std::size_t size = 0;
-    try {
-        fstream cacheFile;
-        cacheFile.exceptions(ios_base::failbit | ios_base::badbit);
-        cacheFile.open(cacheFilePath.data(), ios_base::out | ios_base::trunc | ios_base::binary);
-        ReflectiveRapidJSON::BinaryReflector::BinarySerializer serializer(&cacheFile);
-        serializer.write(config);
-        serializer.write(building.actions);
-        size = static_cast<std::uint64_t>(cacheFile.tellp());
-        cacheFile.close();
-        cerr << Phrases::SuccessMessage << "Wrote cache file \"" << cacheFilePath << "\", " << dataSizeToString(size) << Phrases::EndFlush;
-    } catch (const ios_base::failure &) {
-        cerr << Phrases::WarningMessage << "An IO error occurred when dumping the cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
-    }
-
-    // write build actions to a JSON file to be able to restore build actions even if the cache file can not be used due to version mismatch
-    // note: The JSON file's format is hopefully more stable.
-    try {
-        if (!dumpJsonObject(
-                building.actions, workingDirectory, "build-actions-v" LIBREPOMGR_BUILD_ACTIONS_JSON_VERSION, DumpJsonExistingFileHandling::Override)
-                 .empty()) {
-            cerr << Phrases::SuccessMessage << "Wrote build actions to JSON file." << Phrases::EndFlush;
-        }
-    } catch (const std::runtime_error &e) {
-        cerr << Phrases::ErrorMessage << e.what() << Phrases::EndFlush;
-    }
-
-    // write provided/required libraries to a JSON file to be able to restore this information even if the cache file can not be used due to version
-    // mismatch
-    try {
-        if (!dumpJsonDocument(std::bind(&ServiceSetup::libraryDependenciesToJson, this), workingDirectory,
-                "library-dependencies-v" LIBREPOMGR_LIBRARY_DEPENDENCIES_JSON_VERSION, DumpJsonExistingFileHandling::Override)
-                 .empty()) {
-            cerr << Phrases::SuccessMessage << "Wrote library dependencies to JSON file." << Phrases::EndFlush;
-        }
-    } catch (const std::runtime_error &e) {
-        cerr << Phrases::ErrorMessage << e.what() << Phrases::EndFlush;
-    }
-
-    return size;
+        return false;
+    });
 }
 
 void ServiceSetup::initStorage()
@@ -674,14 +623,14 @@ void ServiceSetup::run()
 #endif
     }
 
-    for (auto &buildAction : building.actions) {
-        if (buildAction && buildAction->isExecuting()) {
-            buildAction->status = BuildActionStatus::Finished;
-            buildAction->result = BuildActionResult::Aborted;
+    building.forEachBuildAction([](LibPkg::StorageID, BuildAction &buildAction, bool &save) {
+        if (buildAction.isExecuting()) {
+            buildAction.status = BuildActionStatus::Finished;
+            buildAction.result = BuildActionResult::Aborted;
+            save = true;
         }
-    }
-
-    saveState();
+        return false;
+    });
 }
 
 void ServiceSetup::Locks::clear()

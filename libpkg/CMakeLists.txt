@@ -19,6 +19,7 @@ set(SRC_FILES
     data/database.cpp
     data/config.cpp
     data/lockable.cpp
+    data/storagegeneric.h
     data/storageprivate.h
     data/storage.cpp
     algo/search.cpp

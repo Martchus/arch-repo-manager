@@ -52,7 +52,7 @@ public:
     void testPostingBuildActionsFromTask();
 
 private:
-    std::string m_dbFile;
+    std::string m_configDbFile, m_buildingDbFile;
     ServiceSetup m_setup;
     boost::beast::error_code m_lastError;
     string m_body;
@@ -75,9 +75,11 @@ WebAPITests::WebAPITests()
 void WebAPITests::setUp()
 {
     applicationInfo.version = APP_VERSION;
-    m_dbFile = workingCopyPath("test-webapi.db", WorkingCopyMode::Cleanup);
+    m_configDbFile = workingCopyPath("test-webapi-config.db", WorkingCopyMode::Cleanup);
+    m_buildingDbFile = workingCopyPath("test-webapi-building.db", WorkingCopyMode::Cleanup);
     m_setup.webServer.port = randomPort();
-    m_setup.config.initStorage(m_dbFile.data());
+    m_setup.config.initStorage(m_configDbFile.data());
+    m_setup.building.initStorage(m_buildingDbFile.data());
 }
 
 void WebAPITests::tearDown()
@@ -248,7 +250,8 @@ void WebAPITests::testPostingBuildActionsFromTask()
     building.presets = decltype(building.presets)::fromJson(readFile(testFilePath("test-config/presets.json")));
     CPPUNIT_ASSERT_MESSAGE("templates parsed from JSON", !building.presets.templates.empty());
     CPPUNIT_ASSERT_MESSAGE("task parsed from JSON", building.presets.tasks.contains("foobarbaz"));
-    CPPUNIT_ASSERT_MESSAGE("no build actions present before", building.actions.empty());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no build actions present before", 0_st, building.buildActionCount());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no build actions running before", 0_st, building.runningBuildActionCount());
 
     const auto response = invokeRouteHandler(&WebAPI::Routes::postBuildAction,
         {
@@ -260,28 +263,46 @@ void WebAPITests::testPostingBuildActionsFromTask()
     const auto buildActions = parseBuildActions(response->body());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("expected number of build actions created", 5_st, buildActions.size());
 
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions actually present", 5_st, building.actions.size());
-    for (const auto &action : building.actions) {
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action->id, " not started yet"), BuildActionStatus::Created, action->status);
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action->id, " has no result yet"), BuildActionResult::None, action->result);
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action->id, " has task name assigned"), "foobarbaz"s, action->taskName);
-    }
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("foo is 1st action", "foo"s, building.actions[0]->templateName);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has dir assigned", "foo"s, building.actions[0]->directory);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has correct deps", std::vector<BuildAction::IdType>{}, building.actions[0]->startAfter);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 is 2nd action", "bar-1"s, building.actions[1]->templateName);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 has dir assigned", "bar"s, building.actions[1]->directory);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 has correct deps", std::vector<BuildAction::IdType>{ 0 }, building.actions[1]->startAfter);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 is 3rd action", "bar-2"s, building.actions[2]->templateName);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 has dir assigned", "bar"s, building.actions[2]->directory);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 has correct deps", std::vector<BuildAction::IdType>{ 1 }, building.actions[2]->startAfter);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("baz is 4th action", "baz"s, building.actions[3]->templateName);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("baz has dir assigned", "baz"s, building.actions[3]->directory);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("baz has correct deps", std::vector<BuildAction::IdType>{ 0 }, building.actions[3]->startAfter);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("buz is 5th action", "buz"s, building.actions[4]->templateName);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("buz has dir assigned", "buz"s, building.actions[4]->directory);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "buz has correct deps", std::vector<BuildAction::IdType>{ 2 CPP_UTILITIES_PP_COMMA 3 }, building.actions[4]->startAfter);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions actually present", 5_st, building.buildActionCount());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions not started yet", 0_st, building.runningBuildActionCount());
+    building.forEachBuildAction([](std::size_t count) { CPPUNIT_ASSERT_EQUAL_MESSAGE("for-each loop returns correct size", 5_st, count); },
+        [](LibPkg::StorageID id, BuildAction &&action) {
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action.id, " not started yet"), BuildActionStatus::Created, action.status);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action.id, " has no result yet"), BuildActionResult::None, action.result);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action.id, " has task name assigned"), "foobarbaz"s, action.taskName);
+            switch (id) {
+            case 1:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("foo is 1st action", "foo"s, action.templateName);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has dir assigned", "foo"s, action.directory);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has correct deps", std::vector<BuildAction::IdType>{}, action.startAfter);
+                break;
+            case 2:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 is 2nd action", "bar-1"s, action.templateName);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 has dir assigned", "bar"s, action.directory);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-1 has correct deps", std::vector<BuildAction::IdType>{ 1 }, action.startAfter);
+                break;
+            case 3:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 is 3rd action", "bar-2"s, action.templateName);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 has dir assigned", "bar"s, action.directory);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("bar-2 has correct deps", std::vector<BuildAction::IdType>{ 2 }, action.startAfter);
+                break;
+            case 4:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("baz is 4th action", "baz"s, action.templateName);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("baz has dir assigned", "baz"s, action.directory);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("baz has correct deps", std::vector<BuildAction::IdType>{ 1 }, action.startAfter);
+                break;
+            case 5:
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("buz is 5th action", "buz"s, action.templateName);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("buz has dir assigned", "buz"s, action.directory);
+                CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                    "buz has correct deps", std::vector<BuildAction::IdType>{ 3 CPP_UTILITIES_PP_COMMA 4 }, action.startAfter);
+                break;
+            default:
+                CPPUNIT_FAIL(argsToString("build action with unexpected ID \"", id, "\" present"));
+            }
+
+            return false;
+        });
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE("response ok", boost::beast::http::status::ok, response->result());
 }

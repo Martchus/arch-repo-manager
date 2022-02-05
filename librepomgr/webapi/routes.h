@@ -22,7 +22,6 @@ LIBREPOMGR_EXPORT void getBuildActionOutput(const Params &params, ResponseHandle
 LIBREPOMGR_EXPORT void getBuildActionLogFile(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void getBuildActionArtefact(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void postLoadPackages(const Params &params, ResponseHandler &&handler);
-LIBREPOMGR_EXPORT void postDumpCacheFile(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void postBuildAction(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, const std::string &taskName,
     const std::string &directory, const std::vector<BuildActionIdType> &startAfterIds, bool startImmediately);

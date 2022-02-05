@@ -70,7 +70,7 @@ private:
     void runBuildAction(const char *message, TimeSpan timeout = TimeSpan::fromSeconds(5));
     template <typename InternalBuildActionType> InternalBuildActionType *internalBuildAction();
 
-    std::string m_dbFile;
+    std::string m_configDbFile, m_buildingDbFile;
     ServiceSetup m_setup;
     std::shared_ptr<BuildAction> m_buildAction;
     std::filesystem::path m_workingDir;
@@ -100,8 +100,14 @@ void BuildActionsTests::tearDown()
 
 void BuildActionsTests::initStorage()
 {
-    m_dbFile = workingCopyPath("test-build-actions.db", WorkingCopyMode::Cleanup);
-    m_setup.config.initStorage(m_dbFile.data());
+    if (!m_setup.config.storage()) {
+        m_configDbFile = workingCopyPath("test-build-actions-config.db", WorkingCopyMode::Cleanup);
+        m_setup.config.initStorage(m_configDbFile.data());
+    }
+    if (!m_setup.building.hasStorage()) {
+        m_buildingDbFile = workingCopyPath("test-build-actions-building.db", WorkingCopyMode::Cleanup);
+        m_setup.building.initStorage(m_buildingDbFile.data());
+    }
 }
 
 /*!
@@ -131,9 +137,7 @@ void BuildActionsTests::loadBasicTestSetup()
  */
 void BuildActionsTests::loadTestConfig()
 {
-    if (!m_setup.config.storage()) {
-        initStorage();
-    }
+    initStorage();
     m_setup.loadConfigFiles(false);
     m_setup.building.workingDirectory = m_setup.workingDirectory + "/building";
     m_setup.printDatabases();

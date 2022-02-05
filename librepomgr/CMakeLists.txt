@@ -71,9 +71,6 @@ set(META_APP_DESCRIPTION "Library for managing custom Arch Linux repositories")
 set(META_VERSION_MAJOR 0)
 set(META_VERSION_MINOR 0)
 set(META_VERSION_PATCH 1)
-set(META_VERSION_CACHE 11)
-set(META_VERSION_BUILD_ACTIONS_JSON 0)
-set(META_VERSION_LIBRARY_DEPENDENCIES_JSON 0)
 set(LINK_TESTS_AGAINST_APP_TARGET ON)
 
 # find c++utilities
@@ -89,9 +86,10 @@ set(Boost_USE_MULTITHREADED ON)
 if (BOOST_STATIC_LINKAGE)
     set(Boost_USE_STATIC_LIBS ON)
 endif ()
-set(BOOST_ARGS "REQUIRED;COMPONENTS;system;filesystem")
+set(BOOST_ARGS "REQUIRED;COMPONENTS;system;filesystem;iostreams")
 use_package(TARGET_NAME Boost::system PACKAGE_NAME Boost PACKAGE_ARGS "${BOOST_ARGS}")
 use_package(TARGET_NAME Boost::filesystem PACKAGE_NAME Boost PACKAGE_ARGS "${BOOST_ARGS}")
+use_package(TARGET_NAME Boost::iostreams PACKAGE_NAME Boost PACKAGE_ARGS "${BOOST_ARGS}")
 option(BOOST_ASIO_IO_URING OFF "enable use of io_uring")
 if (BOOST_ASIO_IO_URING)
     list(APPEND META_PUBLIC_COMPILE_DEFINITIONS BOOST_ASIO_HAS_IO_URING BOOST_ASIO_DISABLE_EPOLL)
@@ -106,6 +104,10 @@ use_reflective_rapidjson(VISIBILITY PUBLIC)
 find_package(libpkg ${META_APP_VERSION} REQUIRED)
 use_libpkg(VISIBILITY PUBLIC)
 
+# find lmdb-safe
+find_package(lmdb-safe${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
+use_lmdb_safe()
+
 # link against crypto and SSL library from OpenSSL
 use_openssl(VISIBILITY PUBLIC)
 
@@ -114,13 +116,6 @@ list(APPEND PUBLIC_LIBRARIES pthread)
 
 # apply basic configuration
 include(BasicConfig)
-
-# add cache version to config header
-string(APPEND META_CUSTOM_CONFIG "#define ${META_PROJECT_VARNAME}_CACHE_VERSION \"${META_VERSION_CACHE}\"\n")
-string(APPEND META_CUSTOM_CONFIG
-       "#define ${META_PROJECT_VARNAME}_BUILD_ACTIONS_JSON_VERSION \"${META_VERSION_BUILD_ACTIONS_JSON}\"\n")
-string(APPEND META_CUSTOM_CONFIG
-       "#define ${META_PROJECT_VARNAME}_LIBRARY_DEPENDENCIES_JSON_VERSION \"${META_VERSION_LIBRARY_DEPENDENCIES_JSON}\"\n")
 
 # trigger code generator for tests because the tests already contain structs to be (de)serialized
 include(ReflectionGenerator)
