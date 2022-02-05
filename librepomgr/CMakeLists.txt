@@ -92,6 +92,11 @@ endif ()
 set(BOOST_ARGS "REQUIRED;COMPONENTS;system;filesystem")
 use_package(TARGET_NAME Boost::system PACKAGE_NAME Boost PACKAGE_ARGS "${BOOST_ARGS}")
 use_package(TARGET_NAME Boost::filesystem PACKAGE_NAME Boost PACKAGE_ARGS "${BOOST_ARGS}")
+option(BOOST_ASIO_IO_URING OFF "enable use of io_uring")
+if (BOOST_ASIO_IO_URING)
+    list(APPEND META_PUBLIC_COMPILE_DEFINITIONS BOOST_ASIO_HAS_IO_URING BOOST_ASIO_DISABLE_EPOLL)
+    use_pkg_config_module(PKG_CONFIG_MODULES "liburing" VISIBILITY PUBLIC)
+endif ()
 
 # find reflective-rapidjson
 find_package(reflective_rapidjson${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
