@@ -362,6 +362,11 @@ StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
 
 void Database::replacePackages(const std::vector<std::shared_ptr<Package>> &newPackages, DateTime lastModified)
 {
+    for (const auto &package : newPackages) {
+        if (const auto existingPackage = findPackage(package->name)) {
+            package->addDepsAndProvidesFromOtherPackage(*existingPackage);
+        }
+    }
     clearPackages();
     auto updater = PackageUpdater(*this);
     for (const auto &package : newPackages) {
