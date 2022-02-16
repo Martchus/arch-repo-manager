@@ -51,6 +51,10 @@ enum class BuildActionType : std::uint64_t {
 
 using BuildActionFlagType = std::uint64_t;
 constexpr BuildActionFlagType noBuildActionFlags = 0;
+enum class MovePackagesFlags : BuildActionFlagType {
+    None,
+    IgnoreExistingFiles = (1 << 0),
+};
 enum class CheckForUpdatesFlags : BuildActionFlagType {
     None,
     ConsiderRegularPackage = (1 << 0), // be consistent with LibPkg::UpdateCheckOptions here
@@ -183,6 +187,7 @@ inline const BuildActionTypeMetaMapping &BuildActionMetaInfo::mappingForId(Build
 
 } // namespace LibRepoMgr
 
+CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::MovePackagesFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ReloadDatabaseFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ReloadLibraryDependenciesFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::PrepareBuildFlags)

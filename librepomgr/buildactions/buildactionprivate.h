@@ -354,6 +354,7 @@ private:
     void conclude();
 
     std::string m_addErrorMessage;
+    LibRepoMgr::MovePackagesFlags m_options = LibRepoMgr::MovePackagesFlags::None;
 };
 
 struct LIBREPOMGR_EXPORT UpdateCheck : public InternalBuildAction {

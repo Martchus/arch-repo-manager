@@ -231,6 +231,9 @@ MovePackages::MovePackages(ServiceSetup &setup, const std::shared_ptr<BuildActio
 
 void MovePackages::run()
 {
+    const auto flags = static_cast<CheckForUpdatesFlags>(m_buildAction->flags);
+    m_options = static_cast<LibRepoMgr::MovePackagesFlags>(flags);
+
     if (!prepareRepoAction(RequiredDatabases::OneSource | RequiredDatabases::OneDestination)) {
         return;
     }
@@ -270,9 +273,13 @@ void MovePackages::run()
                 }
             }
         } catch (const std::filesystem::filesystem_error &e) {
-            ok = false;
-            m_result.failedPackages.emplace_back(packageName, argsToString("unable to copy to destination repo: ", e.what()));
-            continue;
+            const auto ignoreError = (m_options & MovePackagesFlags::IgnoreExistingFiles)
+                && (e.code() == std::errc::file_exists || e.code() == std::errc::invalid_argument);
+            if (!ignoreError) {
+                ok = false;
+                m_result.failedPackages.emplace_back(packageName, argsToString("unable to copy to destination repo: ", e.what()));
+                continue;
+            }
         }
         m_fileNames.emplace_back(packageLocation.pathWithinRepo.filename());
         m_result.processedPackages.emplace_back(packageName);

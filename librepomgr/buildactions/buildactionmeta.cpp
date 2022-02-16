@@ -47,7 +47,14 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .category = "Repo management",
             .name = "Move packages",
             .type = "move-packages",
-            .flags = {},
+            .flags = {
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(MovePackagesFlags::IgnoreExistingFiles),
+                    .name = "Ignore existing files",
+                    .desc = "Ignore copying errors caused by already existing files in the destination repository",
+                    .param = "ignore-existing-files",
+                },
+            },
             .settings = {},
             .directory = true,
             .sourceDb = true,
