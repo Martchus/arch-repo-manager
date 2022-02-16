@@ -358,12 +358,16 @@ void ServiceSetup::BuildSetup::forEachBuildAction(std::function<bool(LibPkg::Sto
         auto save = false;
         const auto stop = func(i.getID(), action, save);
         if (save) {
+            if (running != m_runningActions.end() && !action.isExecuting()) {
+                m_runningActions.erase(running);
+            }
             txn.put(action, i.getID());
         }
         if (stop) {
             return;
         }
     }
+    txn.commit();
 }
 
 std::vector<std::shared_ptr<BuildAction>> ServiceSetup::BuildSetup::followUpBuildActions(BuildActionIdType forId)
