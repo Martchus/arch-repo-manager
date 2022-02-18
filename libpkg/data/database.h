@@ -113,6 +113,7 @@ private:
 
 struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Database>, public ReflectiveRapidJSON::BinarySerializable<Database> {
     using PackageVisitor = std::function<bool(StorageID, const std::shared_ptr<Package> &)>;
+    using PackageVisitorByName = std::function<bool(std::string_view, const std::function<PackageSpec(void)> &)>;
 
     friend struct PackageUpdater;
 
@@ -134,6 +135,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     void removePackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
     void addPackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
     void allPackages(const PackageVisitor &visitor);
+    void allPackagesByName(const PackageVisitorByName &visitor);
     std::size_t packageCount() const;
     void providingPackages(const Dependency &dependency, bool reverse, const PackageVisitor &visitor);
     void providingPackages(const std::string &libraryName, bool reverse, const PackageVisitor &visitor);

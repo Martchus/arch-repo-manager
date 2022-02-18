@@ -186,8 +186,27 @@ std::vector<PackageSearchResult> Config::findPackages(const std::regex &regex)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        db.allPackages([&](StorageID packageID, const std::shared_ptr<Package> &package) {
-            if (std::regex_match(package->name, regex)) {
+        db.allPackagesByName([&](std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
+            if (std::regex_match(packageName.begin(), packageName.end(), regex)) {
+                auto [packageID, package] = getPackage();
+                pkgs.emplace_back(db, package, packageID);
+            }
+            return false;
+        });
+    }
+    return pkgs;
+}
+
+std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &)> &databasePred, std::string_view term)
+{
+    auto pkgs = std::vector<PackageSearchResult>();
+    for (auto &db : databases) {
+        if (!databasePred(db)) {
+            continue;
+        }
+        db.allPackagesByName([&](std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
+            if (packageName.find(term) != std::string_view::npos) {
+                const auto [packageID, package] = getPackage();
                 pkgs.emplace_back(db, package, packageID);
             }
             return false;

@@ -147,6 +147,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     std::vector<PackageSearchResult> findPackages(const Dependency &dependency, bool reverse = false);
     std::vector<PackageSearchResult> findPackagesProvidingLibrary(const std::string &library, bool reverse = false);
     std::vector<PackageSearchResult> findPackages(const std::regex &regex);
+    std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &)> &databasePred, std::string_view term);
     std::vector<PackageSearchResult> findPackages(const Package &package);
     std::vector<PackageSearchResult> findPackages(
         const std::function<bool(const Database &)> &databasePred, const std::function<bool(const Database &, const Package &)> &packagePred);

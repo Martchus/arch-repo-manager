@@ -265,8 +265,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         }
         case Mode::NameContains:
             pushPackages(params.setup.config.findPackages(
-                [&dbs, onlyFromAur](const LibPkg::Database &db) { return (dbs.empty() && !onlyFromAur) || dbs.find(db.name) != dbs.end(); },
-                [&name](const LibPkg::Database &, const LibPkg::Package &pkg) { return pkg.name.find(name) != std::string::npos; }));
+                [&dbs, onlyFromAur](const LibPkg::Database &db) { return (dbs.empty() && !onlyFromAur) || dbs.find(db.name) != dbs.end(); }, name));
             if (fromAur && !name.empty()) {
                 neededAurPackages.emplace_back(std::move(name));
             }

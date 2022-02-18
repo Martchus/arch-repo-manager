@@ -104,12 +104,11 @@ void Database::clearPackages()
 std::vector<std::shared_ptr<Package>> Database::findPackages(const std::function<bool(const Database &, const Package &)> &pred)
 {
     // TODO: use cache here
-    // TODO: avoid std::move()
     auto pkgs = std::vector<std::shared_ptr<Package>>();
     auto txn = m_storage->packages.getROTransaction();
-    for (auto i = txn.begin(); i != txn.end(); ++i) {
+    for (auto i = txn.begin<std::shared_ptr>(); i != txn.end(); ++i) {
         if (pred(*this, *i)) {
-            pkgs.emplace_back(std::make_shared<Package>(std::move(*i)));
+            pkgs.emplace_back(std::move(i.getPointer()));
         }
     }
     return pkgs;
@@ -252,6 +251,17 @@ void Database::allPackages(const PackageVisitor &visitor)
     auto txn = m_storage->packages.getROTransaction();
     for (auto i = txn.begin<std::shared_ptr>(); i != txn.end(); ++i) {
         if (visitor(i.getID(), std::move(i.getPointer()))) {
+            return;
+        }
+    }
+}
+
+void LibPkg::Database::allPackagesByName(const PackageVisitorByName &visitor)
+{
+    auto txn = m_storage->packages.getROTransaction();
+    for (auto i = txn.begin_idx<0, std::shared_ptr>(); i != txn.end(); ++i) {
+        const auto packageName = i.getKey().get<string_view>();
+        if (visitor(packageName, [this, &txn, &i]() { return m_storage->packageCache.retrieve(*m_storage, &txn, i.value()); })) {
             return;
         }
     }
