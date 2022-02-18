@@ -249,10 +249,9 @@ void Database::addPackageDependencies(StorageID packageID, const std::shared_ptr
 
 void Database::allPackages(const PackageVisitor &visitor)
 {
-    // TODO: use cache here, e.g. implement a "lazy" iterator for LMDB that also directly yields a std::shared_ptr
     auto txn = m_storage->packages.getROTransaction();
-    for (auto i = txn.begin(); i != txn.end(); ++i) {
-        if (visitor(i.getID(), std::make_shared<Package>(std::move(i.value())))) {
+    for (auto i = txn.begin<std::shared_ptr>(); i != txn.end(); ++i) {
+        if (visitor(i.getID(), std::move(i.getPointer()))) {
             return;
         }
     }
@@ -268,11 +267,12 @@ void Database::providingPackages(const Dependency &dependency, bool reverse, con
     auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
     auto packagesTxn = m_storage->packages.getROTransaction();
     for (auto [i, end] = providesTxn.equal_range<0>(dependency.name); i != end; ++i) {
-        const Dependency &providedDependency = i.value();
-        if (!Dependency::matches(dependency.mode, dependency.version, providedDependency.version)) {
+        const auto &providedDependency = i.value();
+        const auto &asDependency = static_cast<const Dependency &>(providedDependency);
+        if (!Dependency::matches(dependency.mode, dependency.version, asDependency.version)) {
             continue;
         }
-        for (const auto packageID : i->relevantPackages) {
+        for (const auto packageID : providedDependency.relevantPackages) {
             const auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
             if (res.pkg && visitor(packageID, res.pkg)) {
                 return;
