@@ -268,7 +268,6 @@ static void printBuildAction(const LibRepoMgr::BuildAction &a, const LibRepoMgr:
     }
     t.add_row({ "Log files", printListOfStringsAsSubTable(a.logfiles) });
     t.add_row({ "Artefacts", printListOfStringsAsSubTable(a.artefacts) });
-    t.add_row({ "Output", a.output });
     t.column(0).format().font_align(tabulate::FontAlign::right);
     std::cout << t << '\n';
 }

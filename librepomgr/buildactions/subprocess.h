@@ -62,6 +62,9 @@ inline BaseProcessSession::BaseProcessSession(boost::asio::io_context &ioContext
 
 inline BaseProcessSession::~BaseProcessSession()
 {
+    if (!m_handler) {
+        return;
+    }
     boost::asio::post(m_ioContext, [child = std::move(this->child), result = std::move(this->result), handler = std::move(m_handler)]() mutable {
         handler(std::move(child), std::move(result));
     });

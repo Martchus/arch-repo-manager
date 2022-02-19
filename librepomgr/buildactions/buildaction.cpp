@@ -222,8 +222,6 @@ BuildAction &BuildAction::operator=(BuildAction &&other)
     status = other.status;
     result = other.result;
     resultData = std::move(other.resultData);
-    output = std::move(other.output);
-    outputMimeType = std::move(other.outputMimeType);
     logfiles = std::move(other.logfiles);
     artefacts = std::move(other.artefacts);
     created = other.created;
@@ -236,7 +234,7 @@ BuildAction &BuildAction::operator=(BuildAction &&other)
     m_stopHandler = std::function<void(void)>();
     m_concludeHandler = std::function<void(void)>();
     m_ongoingProcesses.clear();
-    m_bufferingForSession.clear();
+    m_outputSession.reset();
     m_internalBuildAction = std::move(other.m_internalBuildAction);
     return *this;
 }
@@ -363,15 +361,8 @@ LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
     finished = DateTime::gmtNow();
 
     // tell clients waiting for output that it's over
-    const auto outputStreamingLock = std::unique_lock<std::mutex>(m_outputStreamingMutex);
-    for (auto i = m_bufferingForSession.begin(); i != m_bufferingForSession.end();) {
-        if (!i->second->currentlySentBuffers.empty() || !i->second->outstandingBuffersToSend.empty()) {
-            ++i;
-            continue;
-        }
-        boost::beast::net::async_write(i->first->socket(), boost::beast::http::make_chunk_last(),
-            std::bind(&WebAPI::Session::responded, i->first, std::placeholders::_1, std::placeholders::_2, true));
-        i = m_bufferingForSession.erase(i);
+    if (const auto outputStreamingLock = std::unique_lock<std::mutex>(m_outputSessionMutex); m_outputSession) {
+        m_outputSession->writeEnd();
     }
 
     // start globally visible follow-up actions if succeeded

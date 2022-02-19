@@ -100,36 +100,6 @@ void getBuildActionDetails(const Params &params, ResponseHandler &&handler)
     handler(makeJson(params.request(), jsonDoc, params.target.hasPrettyFlag()));
 }
 
-void getBuildActionOutput(const Params &params, ResponseHandler &&handler)
-{
-    const auto offsetParams = params.target.decodeValues("offset");
-    std::size_t offset = 0;
-    if (offsetParams.size() > 1) {
-        handler(makeBadRequest(params.request(), "the offset parameter must be specified at most once"));
-        return;
-    }
-    if (!offsetParams.empty()) {
-        try {
-            offset = stringToNumber<std::size_t>(offsetParams.front());
-        } catch (const ConversionException &) {
-            handler(makeBadRequest(params.request(), "the offset must be an unsigned integer"));
-            return;
-        }
-    }
-    auto buildActionsSearchResult = findBuildActions(params, std::move(handler), false, 1);
-    if (!buildActionsSearchResult.ok) {
-        return;
-    }
-    auto &buildAction = buildActionsSearchResult.actions.front();
-    if (offset > buildAction->output.size()) {
-        buildActionsSearchResult.lock = std::monostate{};
-        handler(makeBadRequest(params.request(), "the offset must not exceed the output size"));
-        return;
-    }
-    buildActionsSearchResult.lock = std::monostate{};
-    buildAction->streamOutput(params, offset);
-}
-
 static std::string readNameParam(const Params &params, ResponseHandler &&handler)
 {
     const auto nameParams = params.target.decodeValues("name");

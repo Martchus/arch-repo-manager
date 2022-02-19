@@ -20,7 +20,6 @@ void MakeLicenseInfo::run()
     std::get<std::shared_lock<std::shared_mutex>>(configReadLock).unlock();
 
     const auto buildActionWriteLock = m_setup.building.lockToWrite();
-    m_buildAction->outputMimeType = "application/json";
     m_buildAction->resultData = std::move(result);
     reportResult(result.success ? BuildActionResult::Success : BuildActionResult::Failure);
 }

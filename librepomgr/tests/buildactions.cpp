@@ -230,8 +230,11 @@ void BuildActionsTests::testLogging()
         m_buildAction->log()(Phrases::ErrorMessage, "some error: ", "message", '\n');
         m_buildAction->log()(Phrases::InfoMessage, "info", '\n');
     }
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("messages added to build action output",
-        "\e[1;31m==> ERROR: \e[0m\e[1msome error: message\n\e[1;37m==> \e[0m\e[1minfo\n"s, m_buildAction->output);
+    m_buildAction->conclude(BuildActionResult::Success);
+    m_setup.building.ioContext.run();
+    const auto output = readFile("logs/build-action-0.log");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "messages added to build action output", "\e[1;31m==> ERROR: \e[0m\e[1msome error: message\n\e[1;37m==> \e[0m\e[1minfo\n"s, output);
 }
 
 /*!
@@ -258,7 +261,7 @@ void BuildActionsTests::testProcessSession()
  */
 void BuildActionsTests::testBuildActionProcess()
 {
-    m_buildAction = std::make_shared<BuildAction>(0, &m_setup);
+    m_buildAction = std::make_shared<BuildAction>(1, &m_setup);
 
     const auto scriptPath = testFilePath("scripts/print_some_data.sh");
     const auto logFilePath = std::filesystem::path(TestApplication::instance()->workingDirectory()) / "logfile.log";
@@ -269,11 +272,11 @@ void BuildActionsTests::testBuildActionProcess()
 
     auto &ioc = m_setup.building.ioContext;
     auto session = std::make_shared<BuildProcessSession>(
-        m_buildAction.get(), ioc, "test", std::string(logFilePath), [&ioc](boost::process::child &&child, ProcessResult &&result) {
+        m_buildAction.get(), ioc, "test", std::string(logFilePath), [this](boost::process::child &&child, ProcessResult &&result) {
             CPPUNIT_ASSERT_EQUAL(std::error_code(), result.errorCode);
             CPPUNIT_ASSERT_EQUAL(0, result.exitCode);
             CPPUNIT_ASSERT_GREATER(0, child.native_handle());
-            ioc.stop();
+            m_buildAction->conclude(BuildActionResult::Success);
         });
     session->launch(scriptPath);
     session.reset();
@@ -281,11 +284,12 @@ void BuildActionsTests::testBuildActionProcess()
 
     const auto logFile = readFile(logFilePath);
     const auto logLines = splitStringSimple<std::vector<std::string_view>>(logFile, "\r\n");
+    const auto output = readFile("logs/build-action-1.log");
     CPPUNIT_ASSERT_EQUAL(5002_st, logLines.size());
     CPPUNIT_ASSERT_EQUAL("printing some numbers"sv, logLines.front());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("trailing line break", ""sv, logLines.back());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("last line", "line 5000"sv, logLines[logLines.size() - 2u]);
-    TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*Launched \"test\", PID\\: [0-9]+.*\n.*"s, std::regex::extended, m_buildAction->output);
+    TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*Launched \"test\", PID\\: [0-9]+.*\n.*"s, std::regex::extended, output);
 }
 
 /*!

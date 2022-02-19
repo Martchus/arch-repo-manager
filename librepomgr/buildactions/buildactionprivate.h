@@ -112,22 +112,6 @@ template <typename StorageType> inline std::size_t BufferPool<StorageType>::stor
     return m_buffers.size();
 }
 
-/// \brief The OutputBufferingForSession struct holds buffers used by the BuildAction live-streaming.
-struct LIBREPOMGR_EXPORT OutputBufferingForSession {
-    static constexpr std::size_t bufferSize = 4096;
-    using StorageType = std::array<char, bufferSize>;
-    using BufferPoolType = BufferPool<StorageType>;
-    using BufferType = BufferPoolType::BufferType;
-    using BufferPile = std::vector<std::pair<BufferType, std::size_t>>;
-    using BufferRefs = std::vector<boost::asio::const_buffer>;
-    BufferPile currentlySentBuffers;
-    BufferPile outstandingBuffersToSend;
-    BufferRefs currentlySentBufferRefs;
-    std::atomic<std::size_t> bytesSent = 0;
-    std::atomic<std::size_t> existingOutputSize = 0;
-    std::atomic_bool existingOutputSent = false;
-};
-
 /// \brief The BuildProcessSession class spawns a process associated with a build action.
 /// The process output is make available as a logfile of the build action allowing live-steaming.
 class LIBREPOMGR_EXPORT BuildProcessSession : public std::enable_shared_from_this<BuildProcessSession>, public BaseProcessSession {
@@ -138,11 +122,15 @@ public:
     using BufferType = BufferPoolType::BufferType;
 
     explicit BuildProcessSession(BuildAction *buildAction, boost::asio::io_context &ioContext, std::string &&displayName, std::string &&logFilePath,
-        Handler &&handler, AssociatedLocks &&locks = AssociatedLocks());
+        Handler &&handler = Handler(), AssociatedLocks &&locks = AssociatedLocks());
     template <typename... ChildArgs> void launch(ChildArgs &&...childArgs);
     void registerWebSession(std::shared_ptr<WebAPI::Session> &&webSession);
     void registerNewDataHandler(std::function<void(BufferType, std::size_t)> &&handler);
+    void prepareLogFile();
+    void writeData(std::string_view data);
+    void writeEnd();
     AssociatedLocks &locks();
+    const std::string &logFilePath() const;
     bool hasExited() const;
 
 private:
@@ -171,12 +159,13 @@ private:
         boost::asio::posix::stream_descriptor m_descriptor;
     };
 
-    void prpareLogFile();
     void readMoreFromPipe();
-    void writeDataFromPipe(boost::system::error_code ec, std::size_t bytesRead);
+    void writeDataFromPipe(boost::system::error_code ec, std::size_t bytesTransferred);
+    void writeCurrentBuffer(std::size_t bytesTransferred);
     void writeNextBufferToLogFile(const boost::system::error_code &error, std::size_t bytesTransferred);
     void writeNextBufferToWebSession(
         const boost::system::error_code &error, std::size_t bytesTransferred, WebAPI::Session &session, BuffersToWrite &sessionInfo);
+    void close();
     void conclude();
 
     std::weak_ptr<BuildAction> m_buildAction;
@@ -224,6 +213,11 @@ inline AssociatedLocks &BuildProcessSession::locks()
     return m_locks;
 }
 
+inline const std::string &BuildProcessSession::logFilePath() const
+{
+    return m_logFilePath;
+}
+
 inline bool BuildProcessSession::hasExited() const
 {
     return m_exited.load();
@@ -231,7 +225,7 @@ inline bool BuildProcessSession::hasExited() const
 
 template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&...childArgs)
 {
-    prpareLogFile();
+    prepareLogFile();
     if (result.errorCode) {
         conclude();
         return;

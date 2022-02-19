@@ -152,7 +152,6 @@ struct LIBREPOMGR_EXPORT BuildActionMessages : public ReflectiveRapidJSON::JsonS
 };
 
 class BuildProcessSession;
-struct OutputBufferingForSession;
 struct ServiceSetup;
 
 struct LIBREPOMGR_EXPORT BuildAction : public std::enable_shared_from_this<BuildAction>,
@@ -184,8 +183,8 @@ public:
     LibPkg::StorageID start(ServiceSetup &setup);
     void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
     void abort();
-    void appendOutput(std::string &&output);
     void appendOutput(std::string_view output);
+    void appendOutput(std::string &&output);
     template <typename... Args> void appendOutput(Args &&...args);
     template <typename... Args> void appendOutput(CppUtilities::EscapeCodes::Phrases phrase, Args &&...args);
     LogContext &log();
@@ -204,11 +203,6 @@ private:
     template <typename InternalBuildActionType> void post();
     template <typename Callback> void post(Callback &&codeToRun);
     LibPkg::StorageID conclude(BuildActionResult result);
-    void continueStreamingExistingOutputToSession(std::shared_ptr<WebAPI::Session> session, OutputBufferingForSession &buffering,
-        const boost::system::error_code &error, std::size_t bytesTransferred);
-    void continueStreamingNewOutputToSession(std::shared_ptr<WebAPI::Session> session, OutputBufferingForSession &buffering,
-        const boost::system::error_code &error, std::size_t bytesTransferred);
-    template <typename OutputType> void appendOutput(OutputType &&output);
 
 public:
     IdType id;
@@ -228,8 +222,6 @@ public:
     std::variant<std::string, std::vector<std::string>, LibPkg::LicenseResult, LibPkg::PackageUpdates, BuildPreparation, BuildProgress,
         PackageMovementResult, std::unordered_map<std::string, std::vector<RepositoryProblem>>, BuildActionMessages>
         resultData;
-    std::string output;
-    std::string outputMimeType = "text/plain";
     std::vector<std::string> logfiles;
     std::vector<std::string> artefacts;
     CppUtilities::DateTime created = CppUtilities::DateTime::gmtNow();
@@ -245,8 +237,8 @@ private:
     std::function<void(void)> m_concludeHandler;
     std::mutex m_processesMutex;
     std::unordered_map<std::string, std::shared_ptr<BuildProcessSession>> m_ongoingProcesses;
-    std::mutex m_outputStreamingMutex;
-    std::unordered_map<std::shared_ptr<WebAPI::Session>, std::unique_ptr<OutputBufferingForSession>> m_bufferingForSession;
+    std::mutex m_outputSessionMutex;
+    std::shared_ptr<BuildProcessSession> m_outputSession;
     std::unique_ptr<InternalBuildAction> m_internalBuildAction;
 };
 
@@ -307,6 +299,14 @@ inline ServiceSetup *BuildAction::setup()
 template <typename... Args> inline void BuildAction::appendOutput(Args &&...args)
 {
     appendOutput(CppUtilities::argsToString(std::forward<Args>(args)...));
+}
+
+/*!
+ * \brief Append output (overload needed to prevent endless recursion).
+ */
+inline void BuildAction::appendOutput(std::string &&output)
+{
+    appendOutput(std::string_view(output));
 }
 
 /*!

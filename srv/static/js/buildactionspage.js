@@ -463,8 +463,8 @@ function renderBuildActionDetailsTable(buildActionDetails)
 {
     return GenericRendering.renderTableFromJsonObject({
         data: buildActionDetails,
-        displayLabels: ['ID', 'Task', 'Type', 'Status', 'Result', 'Result data', 'Created', 'Started', 'Finished', 'Start after', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Flags', 'Settings', 'Log files', 'Artefacts', 'Output'],
-        fieldAccessors: ['id', 'taskName', 'type', 'status', 'result', 'resultData', 'created', 'started', 'finished', 'startAfter', 'directory', 'sourceDbs', 'destinationDbs', 'packageNames', 'flags', 'settings', 'logfiles', 'artefacts', 'output'],
+        displayLabels: ['ID', 'Task', 'Type', 'Status', 'Result', 'Result data', 'Created', 'Started', 'Finished', 'Start after', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Flags', 'Settings', 'Log files', 'Artefacts'],
+        fieldAccessors: ['id', 'taskName', 'type', 'status', 'result', 'resultData', 'created', 'started', 'finished', 'startAfter', 'directory', 'sourceDbs', 'destinationDbs', 'packageNames', 'flags', 'settings', 'logfiles', 'artefacts'],
         customRenderer: {
             taskName: function (value) {
                 if (!value) {
@@ -602,28 +602,6 @@ function renderBuildActionDetailsTable(buildActionDetails)
             },
             logfiles: renderBuildActionLogFiles,
             artefacts: renderBuildActionArtefacts,
-            output: function(value, row) {
-                const isFinished = row.status === 4;
-                if (!value && isFinished) {
-                    return GenericRendering.renderNoneInGrey();
-                }
-                const targetElement = document.createElement('div');
-                if (isFinished) {
-                    const terminal = Terminal.makeTerminal();
-                    Terminal.setupTerminalLater(terminal, targetElement, value);
-                    return targetElement;
-                }
-                const streamingSetup = setupTerminalForStreaming({
-                    id: 'output-' + row.id,
-                    targetElement: targetElement,
-                    path: '/build-action/output?id=' + encodeURIComponent(row.id) + '&offset=' + encodeURIComponent(value.length),
-                });
-                streamingSetup.startStreaming();
-                const terminal = streamingSetup.terminal();
-                terminal.setOption('convertEol', true);
-                terminal.write(value);
-                return streamingSetup.elements;
-            },
         },
     });
 }

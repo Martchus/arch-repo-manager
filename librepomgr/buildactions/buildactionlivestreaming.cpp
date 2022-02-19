@@ -12,8 +12,6 @@ using namespace CppUtilities::EscapeCodes;
 
 namespace LibRepoMgr {
 
-static OutputBufferingForSession::BufferPoolType outputStreamingBufferPool(OutputBufferingForSession::bufferSize);
-
 void BuildProcessSession::BuffersToWrite::clear()
 {
     currentlySentBuffers.clear();
@@ -70,6 +68,9 @@ void BuildProcessSession::DataForWebSession::writeFileData(
         m_descriptor.close(ec);
     }
     // send file data to web client
+    if (bytesTransferred > m_bytesToSendFromFile) {
+        bytesTransferred = m_bytesToSendFromFile;
+    }
     const auto bytesLeftToRead = m_bytesToSendFromFile - bytesTransferred;
     boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk(boost::asio::buffer(*m_fileBuffer, bytesTransferred)),
         [this, &filePath, session, bytesLeftToRead, moreToRead = !eof && bytesLeftToRead](
@@ -112,14 +113,42 @@ void BuildProcessSession::registerWebSession(std::shared_ptr<WebAPI::Session> &&
 
 void BuildProcessSession::registerNewDataHandler(std::function<void(BuildProcessSession::BufferType, std::size_t)> &&handler)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
+    const auto lock = std::lock_guard<std::mutex>(m_mutex);
     m_newDataHandlers.emplace_back(std::move(handler));
 }
 
-void BuildProcessSession::prpareLogFile()
+void BuildProcessSession::writeData(std::string_view data)
 {
+    const auto lock = std::lock_guard<std::mutex>(m_mutex);
+    while (const auto bufferSize = std::min<std::size_t>(data.size(), m_bufferPool.bufferSize())) {
+        m_buffer = m_bufferPool.newBuffer();
+        data.copy(m_buffer->data(), bufferSize);
+        writeCurrentBuffer(bufferSize);
+        data = data.substr(bufferSize);
+    }
+}
+
+void BuildProcessSession::writeEnd()
+{
+    m_exited = true;
+    close();
+}
+
+void BuildProcessSession::prepareLogFile()
+{
+    // ensure directory exists
+    auto path = std::filesystem::path(m_logFilePath);
+    if (path.has_parent_path()) {
+        auto ec = std::error_code();
+        std::filesystem::create_directories(path.parent_path(), ec);
+        if (ec) {
+            result.errorCode = std::move(ec);
+            result.error = CppUtilities::argsToString("unable to create directory \"", path.parent_path(), ": ", ec.message());
+            return;
+        }
+    }
     // open logfile and a "file descriptor" for writing in a non-blocking way
-    boost::beast::error_code ec;
+    auto ec = boost::beast::error_code();
     m_logFile.open(m_logFilePath.data(), boost::beast::file_mode::write, ec);
     if (ec) {
         result.errorCode = std::error_code(ec.value(), ec.category());
@@ -152,35 +181,8 @@ void BuildProcessSession::writeDataFromPipe(boost::system::error_code ec, std::s
     }
     // write bytes to log file and web clients
     if (bytesTransferred) {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (!m_logFileBuffers.error) {
-            if (m_logFileBuffers.currentlySentBuffers.empty()) {
-                m_logFileBuffers.currentlySentBuffers.emplace_back(std::pair(m_buffer, bytesTransferred));
-                boost::asio::async_write(m_logFileDescriptor, boost::asio::buffer(m_buffer.get(), bytesTransferred),
-                    std::bind(&BuildProcessSession::writeNextBufferToLogFile, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-            } else {
-                m_logFileBuffers.outstandingBuffersToSend.emplace_back(std::pair(m_buffer, bytesTransferred));
-            }
-        }
-        for (auto &[session, sessionInfo] : m_registeredWebSessions) {
-            if (sessionInfo->error) {
-                continue;
-            }
-            if (sessionInfo->currentlySentBuffers.empty() && !sessionInfo->bytesToSendFromFile()) {
-                sessionInfo->currentlySentBuffers.emplace_back(std::pair(m_buffer, bytesTransferred));
-                boost::beast::net::async_write(session->socket(),
-                    boost::beast::http::make_chunk(boost::asio::buffer(m_buffer.get(), bytesTransferred)),
-                    std::bind(&BuildProcessSession::writeNextBufferToWebSession, shared_from_this(), std::placeholders::_1, std::placeholders::_2,
-                        std::ref(*session), std::ref(*sessionInfo)));
-            } else {
-                sessionInfo->outstandingBuffersToSend.emplace_back(std::pair(m_buffer, bytesTransferred));
-            }
-        }
-        for (const auto &handler : m_newDataHandlers) {
-            if (handler) {
-                handler(m_buffer, bytesTransferred);
-            }
-        }
+        auto lock = std::lock_guard<std::mutex>(m_mutex);
+        writeCurrentBuffer(bytesTransferred);
     }
     // continue reading from the pipe unless there was an error
     if (!ec) {
@@ -188,23 +190,48 @@ void BuildProcessSession::writeDataFromPipe(boost::system::error_code ec, std::s
         return;
     }
     // stop reading from the pipe if there was an error; close the log file and tell web clients that it's over
-    if (bytesTransferred) {
-        return;
+    if (!bytesTransferred) {
+        close();
     }
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_logFileBuffers.outstandingBuffersToSend.empty()) {
-        boost::system::error_code error;
-        m_logFile.close(error);
-        if (error) {
-            cerr << Phrases::WarningMessage << "Error closing \"" << m_logFilePath << "\": " << error.message() << Phrases::EndFlush;
+}
+
+void BuildProcessSession::writeCurrentBuffer(std::size_t bytesTransferred)
+{
+    // write bytesTransferred bytes from m_buffer to log file
+    if (!m_logFileBuffers.error) {
+        if (m_logFileBuffers.currentlySentBuffers.empty()) {
+            m_logFileBuffers.currentlySentBuffers.emplace_back(std::pair(m_buffer, bytesTransferred));
+            boost::asio::async_write(m_logFileDescriptor, boost::asio::buffer(m_buffer.get(), bytesTransferred),
+                std::bind(&BuildProcessSession::writeNextBufferToLogFile, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        } else {
+            m_logFileBuffers.outstandingBuffersToSend.emplace_back(std::pair(m_buffer, bytesTransferred));
         }
     }
+    // write bytesTransferred bytes from m_buffer to web sessions
     for (auto &[session, sessionInfo] : m_registeredWebSessions) {
-        if (!sessionInfo->outstandingBuffersToSend.empty()) {
+        if (sessionInfo->error) {
             continue;
         }
-        boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk_last(),
-            std::bind(&WebAPI::Session::responded, session, std::placeholders::_1, std::placeholders::_2, true));
+        if (sessionInfo->currentlySentBuffers.empty() && !sessionInfo->bytesToSendFromFile()) {
+            sessionInfo->currentlySentBuffers.swap(sessionInfo->outstandingBuffersToSend);
+            sessionInfo->currentlySentBuffers.emplace_back(std::pair(m_buffer, bytesTransferred));
+            sessionInfo->currentlySentBufferRefs.clear();
+            for (const auto &buffer : sessionInfo->currentlySentBuffers) {
+                sessionInfo->currentlySentBufferRefs.emplace_back(boost::asio::buffer(buffer.first.get(), buffer.second));
+            }
+            boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk(sessionInfo->currentlySentBufferRefs),
+                std::bind(&BuildProcessSession::writeNextBufferToWebSession, shared_from_this(), std::placeholders::_1, std::placeholders::_2,
+                    std::ref(*session), std::ref(*sessionInfo)));
+
+        } else {
+            sessionInfo->outstandingBuffersToSend.emplace_back(std::pair(m_buffer, bytesTransferred));
+        }
+    }
+    // invoke new data handlers
+    for (const auto &handler : m_newDataHandlers) {
+        if (handler) {
+            handler(m_buffer, bytesTransferred);
+        }
     }
 }
 
@@ -214,23 +241,21 @@ void BuildProcessSession::writeNextBufferToLogFile(const boost::system::error_co
     CPP_UTILITIES_UNUSED(bytesTransferred)
     if (error) {
         cerr << Phrases::ErrorMessage << "Error writing to \"" << m_logFilePath << "\": " << error.message() << Phrases::EndFlush;
-        std::lock_guard<std::mutex> lock(m_mutex);
+        auto lock = std::lock_guard<std::mutex>(m_mutex);
         m_logFileBuffers.clear();
         m_logFileBuffers.error = true;
         return;
     }
     // write more data to the logfile if there's more
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        auto lock = std::lock_guard<std::mutex>(m_mutex);
         m_logFileBuffers.currentlySentBuffers.clear();
-        if (m_logFileBuffers.outstandingBuffersToSend.empty()) {
-            // close the logfile when the process exited and we've written all the output
-            if (m_exited.load()) {
-                boost::system::error_code closeError;
-                m_logFile.close(closeError);
-                if (closeError) {
-                    cerr << Phrases::WarningMessage << "Error closing \"" << m_logFilePath << "\": " << closeError.message() << Phrases::EndFlush;
-                }
+        // close the logfile when the process exited and we've written all the output
+        if (m_logFileBuffers.outstandingBuffersToSend.empty() && m_exited.load()) {
+            auto closeError = boost::system::error_code();
+            m_logFile.close(closeError);
+            if (closeError) {
+                cerr << Phrases::WarningMessage << "Error closing \"" << m_logFilePath << "\": " << closeError.message() << Phrases::EndFlush;
             }
             return;
         }
@@ -258,14 +283,12 @@ void BuildProcessSession::writeNextBufferToWebSession(
     }
     // send more data to the client if there's more
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        auto lock = std::lock_guard<std::mutex>(m_mutex);
         sessionInfo.currentlySentBuffers.clear();
         // tell the client it's over when the process exited and we've sent all the output
-        if (sessionInfo.outstandingBuffersToSend.empty()) {
-            if (m_exited.load()) {
-                boost::beast::net::async_write(session.socket(), boost::beast::http::make_chunk_last(),
-                    std::bind(&WebAPI::Session::responded, session.shared_from_this(), std::placeholders::_1, std::placeholders::_2, true));
-            }
+        if (sessionInfo.outstandingBuffersToSend.empty() && m_exited.load()) {
+            boost::beast::net::async_write(session.socket(), boost::beast::http::make_chunk_last(),
+                std::bind(&WebAPI::Session::responded, session.shared_from_this(), std::placeholders::_1, std::placeholders::_2, true));
             return;
         }
         sessionInfo.currentlySentBuffers.swap(sessionInfo.outstandingBuffersToSend);
@@ -274,9 +297,30 @@ void BuildProcessSession::writeNextBufferToWebSession(
             sessionInfo.currentlySentBufferRefs.emplace_back(boost::asio::buffer(buffer.first.get(), buffer.second));
         }
     }
-    boost::beast::net::async_write(session.socket(), boost::beast::http::make_chunk(sessionInfo.currentlySentBufferRefs),
-        std::bind(&BuildProcessSession::writeNextBufferToWebSession, shared_from_this(), std::placeholders::_1, std::placeholders::_2,
-            std::ref(session), std::ref(sessionInfo)));
+    if (!sessionInfo.currentlySentBufferRefs.empty()) {
+        boost::beast::net::async_write(session.socket(), boost::beast::http::make_chunk(sessionInfo.currentlySentBufferRefs),
+            std::bind(&BuildProcessSession::writeNextBufferToWebSession, shared_from_this(), std::placeholders::_1, std::placeholders::_2,
+                std::ref(session), std::ref(sessionInfo)));
+    }
+}
+
+void BuildProcessSession::close()
+{
+    auto lock = std::lock_guard<std::mutex>(m_mutex);
+    if (m_logFileBuffers.outstandingBuffersToSend.empty()) {
+        auto error = boost::system::error_code();
+        m_logFile.close(error);
+        if (error) {
+            cerr << Phrases::WarningMessage << "Error closing \"" << m_logFilePath << "\": " << error.message() << Phrases::EndFlush;
+        }
+    }
+    for (auto &[session, sessionInfo] : m_registeredWebSessions) {
+        if (!sessionInfo->outstandingBuffersToSend.empty()) {
+            continue;
+        }
+        boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk_last(),
+            std::bind(&WebAPI::Session::responded, session, std::placeholders::_1, std::placeholders::_2, true));
+    }
 }
 
 void BuildProcessSession::conclude()
@@ -289,8 +333,12 @@ void BuildProcessSession::conclude()
     if (!buildAction) {
         return;
     }
-    const auto processesLock = std::lock_guard<std::mutex>(buildAction->m_processesMutex);
-    buildAction->m_ongoingProcesses.erase(m_logFilePath);
+    if (const auto outputLock = std::lock_guard<std::mutex>(buildAction->m_outputSessionMutex); buildAction->m_outputSession.get() == this) {
+        buildAction->m_outputSession.reset();
+    } else {
+        const auto processesLock = std::lock_guard<std::mutex>(buildAction->m_processesMutex);
+        buildAction->m_ongoingProcesses.erase(m_logFilePath);
+    }
 }
 
 std::shared_ptr<BuildProcessSession> BuildAction::makeBuildProcess(
@@ -330,9 +378,13 @@ void BuildAction::terminateOngoingBuildProcesses()
 
 void BuildAction::streamFile(const WebAPI::Params &params, const std::string &filePath, std::string_view fileMimeType)
 {
-    auto processesLock = std::unique_lock<std::mutex>(m_processesMutex);
-    auto buildProcess = findBuildProcess(filePath);
-    processesLock.unlock();
+    auto buildProcess = std::shared_ptr<BuildProcessSession>();
+    if (const auto outputLock = std::unique_lock<std::mutex>(m_outputSessionMutex); m_outputSession && m_outputSession->logFilePath() == filePath) {
+        buildProcess = m_outputSession;
+    } else {
+        const auto processesLock = std::unique_lock<std::mutex>(m_processesMutex);
+        buildProcess = findBuildProcess(filePath);
+    }
     if (!buildProcess) {
         // simply send the file if there's no ongoing process writing to it anymore
         params.session.respond(filePath.data(), fileMimeType.data(), params.target.path);
@@ -353,154 +405,31 @@ void BuildAction::streamFile(const WebAPI::Params &params, const std::string &fi
         });
 }
 
-void BuildAction::streamOutput(const WebAPI::Params &params, std::size_t offset)
-{
-    if (!m_setup) {
-        m_setup = &params.setup;
-    }
-    auto session = params.session.shared_from_this();
-    auto chunkResponse = WebAPI::Render::makeChunkResponse(params.request(), "application/octet-stream");
-    auto outputStreamingLock = std::unique_lock<std::mutex>(m_outputStreamingMutex);
-    auto &buffersForSession = m_bufferingForSession[session];
-    if (buffersForSession) {
-        return; // skip when already streaming to that session
-    }
-    buffersForSession = std::make_unique<OutputBufferingForSession>();
-    auto buildLock = params.setup.building.lockToRead();
-    buffersForSession->existingOutputSize = output.size();
-    buffersForSession->bytesSent = offset;
-    buildLock.unlock();
-    outputStreamingLock.unlock();
-    boost::beast::http::async_write_header(params.session.socket(), chunkResponse->serializer,
-        [buildAction = shared_from_this(), session = std::move(session), &buffering = *buffersForSession, chunkResponse](
-            const boost::system::error_code &error, std::size_t bytesTransferred) {
-            CPP_UTILITIES_UNUSED(bytesTransferred)
-            buildAction->continueStreamingExistingOutputToSession(std::move(session), buffering, error, 0);
-        });
-}
-
-void BuildAction::continueStreamingExistingOutputToSession(std::shared_ptr<WebAPI::Session> session, OutputBufferingForSession &buffering,
-    const boost::system::error_code &error, std::size_t bytesTransferred)
-{
-    auto outputStreamingLock = std::unique_lock<std::mutex>(m_outputStreamingMutex);
-    if (error) {
-        m_bufferingForSession.erase(session);
-        return;
-    }
-    const auto bytesSent = buffering.bytesSent += bytesTransferred;
-    if (bytesSent >= buffering.existingOutputSize) {
-        buffering.currentlySentBuffers.clear();
-        buffering.existingOutputSent = true;
-        if (!buffering.outstandingBuffersToSend.empty()) {
-            outputStreamingLock.unlock();
-            continueStreamingNewOutputToSession(std::move(session), buffering, error, 0);
-            return;
-        }
-        if (isDone()) {
-            m_bufferingForSession.erase(session);
-            outputStreamingLock.unlock();
-            boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk_last(),
-                std::bind(&WebAPI::Session::responded, session, std::placeholders::_1, std::placeholders::_2, true));
-        }
-        return;
-    }
-    auto buffer = buffering.currentlySentBuffers.empty() ? outputStreamingBufferPool.newBuffer() : buffering.currentlySentBuffers.front().first;
-    const auto bytesToCopy = std::min(output.size() - bytesSent, outputStreamingBufferPool.bufferSize());
-    if (buffering.currentlySentBuffers.empty()) {
-        buffering.currentlySentBuffers.emplace_back(std::pair(buffer, bytesToCopy));
-    }
-    outputStreamingLock.unlock();
-
-    auto buildLock = m_setup->building.lockToRead();
-    output.copy(buffer->data(), bytesToCopy, bytesSent);
-    buildLock.unlock();
-    boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk(boost::asio::buffer(buffer->data(), bytesToCopy)),
-        std::bind(&BuildAction::continueStreamingExistingOutputToSession, shared_from_this(), session, std::ref(buffering), std::placeholders::_1,
-            std::placeholders::_2));
-}
-
-void BuildAction::continueStreamingNewOutputToSession(std::shared_ptr<WebAPI::Session> session, OutputBufferingForSession &buffering,
-    const boost::system::error_code &error, std::size_t bytesTransferred)
-{
-    auto outputStreamingLock = std::unique_lock<std::mutex>(m_outputStreamingMutex);
-    buffering.bytesSent += bytesTransferred;
-    buffering.currentlySentBuffers.clear();
-    buffering.currentlySentBufferRefs.clear();
-    if (error) {
-        m_bufferingForSession.erase(session);
-        return;
-    }
-    if (buffering.outstandingBuffersToSend.empty()) {
-        if (isDone()) {
-            m_bufferingForSession.erase(session);
-            outputStreamingLock.unlock();
-            boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk_last(),
-                std::bind(&WebAPI::Session::responded, session, std::placeholders::_1, std::placeholders::_2, true));
-        }
-        return;
-    }
-    buffering.outstandingBuffersToSend.swap(buffering.currentlySentBuffers);
-    buffering.currentlySentBufferRefs.reserve(buffering.currentlySentBuffers.size());
-    for (const auto &currentBuffer : buffering.currentlySentBuffers) {
-        buffering.currentlySentBufferRefs.emplace_back(boost::asio::buffer(*currentBuffer.first, currentBuffer.second));
-    }
-    boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk(buffering.currentlySentBufferRefs),
-        std::bind(&BuildAction::continueStreamingNewOutputToSession, shared_from_this(), session, std::ref(buffering), std::placeholders::_1,
-            std::placeholders::_2));
-}
-
-template <typename OutputType> void BuildAction::appendOutput(OutputType &&output)
-{
-    if (output.empty() || !m_setup) {
-        return;
-    }
-
-    auto lock = m_setup->building.lockToWrite();
-    this->output.append(output);
-    lock.unlock();
-
-    OutputBufferingForSession::BufferPile buffers;
-    for (std::size_t offset = 0; offset < output.size(); offset += buffers.back().second) {
-        const auto bytesToBuffer = std::min(output.size() - offset, outputStreamingBufferPool.bufferSize());
-        auto buffer = buffers.emplace_back(std::pair(outputStreamingBufferPool.newBuffer(), bytesToBuffer));
-        output.copy(buffer.first->data(), bytesToBuffer, offset);
-    }
-
-    auto outputStreamingLock = std::unique_lock<std::mutex>(m_outputStreamingMutex);
-    for (auto &bufferingForSession : m_bufferingForSession) {
-        auto &buffering = bufferingForSession.second;
-        auto &currentlySentBuffers = buffering->currentlySentBuffers;
-        if (currentlySentBuffers.empty() && buffering->existingOutputSent) {
-            auto &session = bufferingForSession.first;
-            auto &currentlySentBufferRefs = buffering->currentlySentBufferRefs;
-            currentlySentBuffers.insert(currentlySentBuffers.end(), buffers.begin(), buffers.end());
-            for (const auto &buffer : buffers) {
-                currentlySentBufferRefs.emplace_back(boost::asio::buffer(buffer.first->data(), buffer.second));
-            }
-            boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk(currentlySentBufferRefs),
-                std::bind(&BuildAction::continueStreamingNewOutputToSession, shared_from_this(), session, std::ref(*buffering), std::placeholders::_1,
-                    std::placeholders::_2));
-        } else {
-            auto &outstandingBuffersToSend = buffering->outstandingBuffersToSend;
-            outstandingBuffersToSend.insert(outstandingBuffersToSend.end(), buffers.begin(), buffers.end());
-        }
-    }
-}
-
-/*!
- * \brief Internally called to append output and spread it to all waiting sessions.
- */
-void BuildAction::appendOutput(std::string &&output)
-{
-    appendOutput<std::string>(std::move(output));
-}
-
 /*!
  * \brief Internally called to append output and spread it to all waiting sessions.
  */
 void BuildAction::appendOutput(std::string_view output)
 {
-    appendOutput<std::string_view>(std::forward<std::string_view>(output));
+    if (output.empty() || !m_setup) {
+        return;
+    }
+
+    auto outputLock = std::unique_lock<std::mutex>(m_outputSessionMutex);
+    if (!m_outputSession) {
+        m_outputSession = std::make_shared<BuildProcessSession>(
+            this, m_setup->building.ioContext, argsToString("Output of build action ", id), argsToString("logs/build-action-", id, ".log"));
+        m_outputSession->prepareLogFile();
+        if (m_outputSession->result.errorCode) {
+            std::cerr << Phrases::ErrorMessage << "Unable to open output logfile for build action " << id << ": " << m_outputSession->result.error
+                      << Phrases::EndFlush;
+            return;
+        }
+        const auto buildingLock = m_setup->building.lockToWrite();
+        logfiles.emplace_back(m_outputSession->logFilePath());
+    }
+    if (!m_outputSession->result.errorCode) {
+        m_outputSession->writeData(output);
+    }
 }
 
 } // namespace LibRepoMgr

@@ -18,7 +18,6 @@ LIBREPOMGR_EXPORT void getUnresolved(const Params &params, ResponseHandler &&han
 LIBREPOMGR_EXPORT void getPackages(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void getBuildActions(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void getBuildActionDetails(const Params &params, ResponseHandler &&handler);
-LIBREPOMGR_EXPORT void getBuildActionOutput(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void getBuildActionLogFile(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void getBuildActionArtefact(const Params &params, ResponseHandler &&handler);
 LIBREPOMGR_EXPORT void postLoadPackages(const Params &params, ResponseHandler &&handler);

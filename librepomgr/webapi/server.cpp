@@ -33,7 +33,6 @@ const Router Server::s_router = {
     { { http::verb::get, "/api/v0/build-action" }, Route{&Routes::getBuildActions} },
     { { http::verb::delete_, "/api/v0/build-action" }, Route{&Routes::deleteBuildActions, UserPermissions::ModifyBuildActions} },
     { { http::verb::get, "/api/v0/build-action/details" }, Route{&Routes::getBuildActionDetails, UserPermissions::ReadBuildActionsDetails} },
-    { { http::verb::get, "/api/v0/build-action/output" }, Route{&Routes::getBuildActionOutput, UserPermissions::ReadBuildActionsDetails} },
     { { http::verb::get, "/api/v0/build-action/logfile" }, Route{&Routes::getBuildActionLogFile, UserPermissions::ReadBuildActionsDetails} },
     { { http::verb::get, "/api/v0/build-action/artefact" }, Route{&Routes::getBuildActionArtefact, UserPermissions::ReadBuildActionsDetails} },
     { { http::verb::post, "/api/v0/build-action" }, Route{&Routes::postBuildAction, UserPermissions::ModifyBuildActions} },
