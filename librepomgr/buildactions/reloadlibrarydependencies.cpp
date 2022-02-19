@@ -78,6 +78,7 @@ void ReloadLibraryDependencies::run()
             if (std::holds_alternative<string>(databaseDependencyOrderRes)) {
                 m_messages.errors.emplace_back(
                     destinationDb->name % ": unable to consider dependencies: " + std::get<std::string>(databaseDependencyOrderRes));
+                continue;
             }
             auto &databaseDependencyOrder = std::get<std::vector<LibPkg::Database *>>(databaseDependencyOrderRes);
             for (auto *const destinationDbOrDependency : databaseDependencyOrder) {
