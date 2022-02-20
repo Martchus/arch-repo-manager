@@ -41,6 +41,12 @@ void ReloadDatabase::run()
 
     auto session
         = WebClient::DatabaseQuerySession::create(m_setup.building.ioContext, [this](WebClient::DatabaseQuerySession::ContainerType &&failedDbs) {
+              // save state for "lastUpdate" timestamps
+              auto configReadLock2 = m_setup.config.lockToRead();
+              m_setup.saveState();
+              configReadLock2.unlock();
+
+              // conclude build action
               if (!m_preparationFailures.empty()) {
                   mergeSecondVectorIntoFirstVector(failedDbs, m_preparationFailures);
               }

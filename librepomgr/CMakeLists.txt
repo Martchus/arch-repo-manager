@@ -71,6 +71,7 @@ set(META_APP_DESCRIPTION "Library for managing custom Arch Linux repositories")
 set(META_VERSION_MAJOR 0)
 set(META_VERSION_MINOR 0)
 set(META_VERSION_PATCH 1)
+set(META_VERSION_CACHE 11)
 set(LINK_TESTS_AGAINST_APP_TARGET ON)
 
 # find c++utilities
@@ -116,6 +117,9 @@ list(APPEND PUBLIC_LIBRARIES pthread)
 
 # apply basic configuration
 include(BasicConfig)
+
+# add cache version to config header
+string(APPEND META_CUSTOM_CONFIG "#define ${META_PROJECT_VARNAME}_CACHE_VERSION \"${META_VERSION_CACHE}\"\n")
 
 # trigger code generator for tests because the tests already contain structs to be (de)serialized
 include(ReflectionGenerator)

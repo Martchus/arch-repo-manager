@@ -555,8 +555,32 @@ void ServiceSetup::printDatabases()
     cerr << Phrases::SubMessage << "AUR (" << config.aur.packageCount() << " packages cached)" << Phrases::End;
 }
 
+std::string_view ServiceSetup::cacheFilePath() const
+{
+    return "cache-v" LIBREPOMGR_CACHE_VERSION ".bin";
+}
+
 void ServiceSetup::restoreState()
 {
+    // restore configuration and maybe build actions from JSON file
+    const auto cacheFilePath = this->cacheFilePath();
+    auto size = std::size_t(0);
+    try {
+        auto cacheFile = std::fstream();
+        cacheFile.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+        cacheFile.open(cacheFilePath.data(), std::ios_base::in | std::ios_base::binary);
+        auto deserializer = ReflectiveRapidJSON::BinaryReflector::BinaryDeserializer(&cacheFile);
+        deserializer.read(config);
+        size = static_cast<std::uint64_t>(cacheFile.tellg());
+        cacheFile.close();
+        std::cerr << Phrases::SuccessMessage << "Restored cache file \"" << cacheFilePath << "\", " << dataSizeToString(size) << Phrases::EndFlush;
+    } catch (const ConversionException &) {
+        std::cerr << Phrases::WarningMessage << "A conversion error occurred when restoring cache file \"" << cacheFilePath << "\"."
+                  << Phrases::EndFlush;
+    } catch (const ios_base::failure &) {
+        std::cerr << Phrases::WarningMessage << "An IO error occurred when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
+    }
+
     // open LMDB storage
     cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
     config.initStorage(dbPath.data(), maxDbs);
@@ -578,6 +602,26 @@ void ServiceSetup::restoreState()
         }
         return false;
     });
+}
+
+std::size_t ServiceSetup::saveState()
+{
+    // write cache file to be able to restore the service state when restarting the service efficiently
+    const auto cacheFilePath = this->cacheFilePath();
+    auto size = std::size_t(0);
+    try {
+        auto cacheFile = std::fstream();
+        cacheFile.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+        cacheFile.open(cacheFilePath.data(), std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
+        auto serializer = ReflectiveRapidJSON::BinaryReflector::BinarySerializer(&cacheFile);
+        serializer.write(config);
+        size = static_cast<std::uint64_t>(cacheFile.tellp());
+        cacheFile.close();
+        std::cerr << Phrases::SuccessMessage << "Wrote cache file \"" << cacheFilePath << "\", " << dataSizeToString(size) << Phrases::EndFlush;
+    } catch (const ios_base::failure &) {
+        std::cerr << Phrases::WarningMessage << "An IO error occurred when dumping the cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
+    }
+    return size;
 }
 
 void ServiceSetup::initStorage()
@@ -626,6 +670,8 @@ void ServiceSetup::run()
         }
 #endif
     }
+
+    saveState();
 
     building.forEachBuildAction([](LibPkg::StorageID, BuildAction &buildAction, bool &save) {
         if (buildAction.isExecuting()) {
