@@ -454,6 +454,7 @@ void BuildAction::appendOutput(std::string_view output)
         const auto buildingLock = m_setup->building.lockToWrite();
         logfiles.emplace_back(m_outputSession->logFilePath());
     }
+    outputLock.unlock();
     if (!m_outputSession->result.errorCode) {
         m_outputSession->writeData(output);
     }
