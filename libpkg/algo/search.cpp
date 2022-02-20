@@ -241,9 +241,9 @@ std::vector<PackageSearchResult> Config::findPackages(
         if (!databasePred(db)) {
             continue;
         }
-        db.allPackages([&](StorageID packageID, const std::shared_ptr<Package> &package) {
+        db.allPackages([&](StorageID packageID, std::shared_ptr<Package> &&package) {
             if (packagePred(db, *package)) {
-                pkgs.emplace_back(db, package, packageID);
+                pkgs.emplace_back(db, std::move(package), packageID);
             }
             return false;
         });
@@ -258,9 +258,9 @@ std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(c
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        db.allPackages([&](StorageID packageID, const std::shared_ptr<Package> &package) {
+        db.allPackages([&](StorageID packageID, std::shared_ptr<Package> &&package) {
             if (pred(db, *package)) {
-                pkgs.emplace_back(db, package, packageID);
+                pkgs.emplace_back(db, std::move(package), packageID);
             }
             return false;
         });

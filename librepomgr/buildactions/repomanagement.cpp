@@ -451,7 +451,7 @@ void CheckForProblems::run()
                 problems.emplace_back(
                     RepositoryProblem{ .desc = "configured local package directory \"" % db->localPkgDir + "\" is not a directory" });
             }
-            db->allPackages([&](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &package) {
+            db->allPackages([&](LibPkg::StorageID, std::shared_ptr<LibPkg::Package> &&package) {
                 if (!package->packageInfo) {
                     problems.emplace_back(RepositoryProblem{ .desc = "no package info present", .pkg = package->name });
                     return false;

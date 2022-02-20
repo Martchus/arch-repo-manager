@@ -246,7 +246,7 @@ void Database::addPackageDependencies(StorageID packageID, const std::shared_ptr
     }
 }
 
-void Database::allPackages(const PackageVisitor &visitor)
+void Database::allPackages(const PackageVisitorMove &visitor)
 {
     auto txn = m_storage->packages.getROTransaction();
     for (auto i = txn.begin<std::shared_ptr>(); i != txn.end(); ++i) {
@@ -272,7 +272,7 @@ std::size_t Database::packageCount() const
     return m_storage->packages.getROTransaction().size();
 }
 
-void Database::providingPackages(const Dependency &dependency, bool reverse, const PackageVisitor &visitor)
+void Database::providingPackages(const Dependency &dependency, bool reverse, const PackageVisitorConst &visitor)
 {
     auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
     auto packagesTxn = m_storage->packages.getROTransaction();
@@ -283,7 +283,7 @@ void Database::providingPackages(const Dependency &dependency, bool reverse, con
             continue;
         }
         for (const auto packageID : providedDependency.relevantPackages) {
-            const auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
+            auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
             if (res.pkg && visitor(packageID, res.pkg)) {
                 return;
             }
@@ -291,13 +291,13 @@ void Database::providingPackages(const Dependency &dependency, bool reverse, con
     }
 }
 
-void Database::providingPackages(const std::string &libraryName, bool reverse, const PackageVisitor &visitor)
+void Database::providingPackages(const std::string &libraryName, bool reverse, const PackageVisitorConst &visitor)
 {
     auto providesTxn = (reverse ? m_storage->requiredLibs : m_storage->providedLibs).getROTransaction();
     auto packagesTxn = m_storage->packages.getROTransaction();
     for (auto [i, end] = providesTxn.equal_range<0>(libraryName); i != end; ++i) {
         for (const auto packageID : i->relevantPackages) {
-            const auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
+            auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
             if (res.pkg && visitor(packageID, res.pkg)) {
                 return;
             }
@@ -502,8 +502,9 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
 LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPkg::Database *> &updateSources, UpdateCheckOptions options)
 {
     auto results = PackageUpdates();
-    allPackages([&](StorageID myPackageID, const std::shared_ptr<Package> &package) {
+    allPackages([&](StorageID myPackageID, std::shared_ptr<Package> &&package) {
         auto regularName = std::string();
+        auto used = false;
         if (options & UpdateCheckOptions::ConsiderRegularPackage) {
             const auto decomposedName = package->decomposeName();
             if ((!decomposedName.targetPrefix.empty() || !decomposedName.vcsSuffix.empty()) && !decomposedName.isVcsPackage()) {
@@ -534,37 +535,42 @@ LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPk
             if (list) {
                 list->emplace_back(
                     PackageSearchResult(*this, package, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
+                used = true;
             }
         }
         if (!foundPackage) {
             results.orphans.emplace_back(PackageSearchResult(*this, package, myPackageID));
+            used = true;
         }
-        if (regularName.empty()) {
-            return false;
+        if (!regularName.empty()) {
+            for (auto *const updateSource : updateSources) {
+                const auto [updatePackageID, updatePackage] = updateSource->findPackageWithID(regularName);
+                if (!updatePackage) {
+                    continue;
+                }
+                const auto versionDiff = package->compareVersion(*updatePackage);
+                std::vector<PackageUpdate> *list = nullptr;
+                switch (versionDiff) {
+                case PackageVersionComparison::SoftwareUpgrade:
+                    list = &results.versionUpdates;
+                    break;
+                case PackageVersionComparison::PackageUpgradeOnly:
+                    list = &results.packageUpdates;
+                    break;
+                case PackageVersionComparison::NewerThanSyncVersion:
+                    list = &results.downgrades;
+                    break;
+                default:;
+                }
+                if (list) {
+                    list->emplace_back(
+                        PackageSearchResult(*this, package, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
+                    used = true;
+                }
+            }
         }
-        for (auto *const updateSource : updateSources) {
-            const auto [updatePackageID, updatePackage] = updateSource->findPackageWithID(regularName);
-            if (!updatePackage) {
-                continue;
-            }
-            const auto versionDiff = package->compareVersion(*updatePackage);
-            std::vector<PackageUpdate> *list = nullptr;
-            switch (versionDiff) {
-            case PackageVersionComparison::SoftwareUpgrade:
-                list = &results.versionUpdates;
-                break;
-            case PackageVersionComparison::PackageUpgradeOnly:
-                list = &results.packageUpdates;
-                break;
-            case PackageVersionComparison::NewerThanSyncVersion:
-                list = &results.downgrades;
-                break;
-            default:;
-            }
-            if (list) {
-                list->emplace_back(
-                    PackageSearchResult(*this, package, myPackageID), PackageSearchResult(*updateSource, updatePackage, updatePackageID));
-            }
+        if (used) {
+            package.reset();
         }
         return false;
     });

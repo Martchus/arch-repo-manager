@@ -27,6 +27,7 @@ struct LIBPKG_EXPORT DatabaseInfo {
 struct LIBPKG_EXPORT PackageSearchResult {
     PackageSearchResult();
     PackageSearchResult(Database &database, const std::shared_ptr<Package> &package, StorageID id);
+    PackageSearchResult(Database &database, std::shared_ptr<Package> &&package, StorageID id);
     PackageSearchResult(Database &database, Package &&package, StorageID id);
     bool operator==(const PackageSearchResult &other) const;
 
@@ -112,7 +113,8 @@ private:
 };
 
 struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Database>, public ReflectiveRapidJSON::BinarySerializable<Database> {
-    using PackageVisitor = std::function<bool(StorageID, const std::shared_ptr<Package> &)>;
+    using PackageVisitorMove = std::function<bool(StorageID, std::shared_ptr<Package> &&)>; // package is invalidated/reused unless moved from!!!
+    using PackageVisitorConst = std::function<bool(StorageID, const std::shared_ptr<Package> &)>;
     using PackageVisitorByName = std::function<bool(std::string_view, const std::function<PackageSpec(void)> &)>;
 
     friend struct PackageUpdater;
@@ -134,11 +136,11 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     std::vector<std::shared_ptr<Package>> findPackages(const std::function<bool(const Database &, const Package &)> &pred);
     void removePackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
     void addPackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
-    void allPackages(const PackageVisitor &visitor);
+    void allPackages(const PackageVisitorMove &visitor);
     void allPackagesByName(const PackageVisitorByName &visitor);
     std::size_t packageCount() const;
-    void providingPackages(const Dependency &dependency, bool reverse, const PackageVisitor &visitor);
-    void providingPackages(const std::string &libraryName, bool reverse, const PackageVisitor &visitor);
+    void providingPackages(const Dependency &dependency, bool reverse, const PackageVisitorConst &visitor);
+    void providingPackages(const std::string &libraryName, bool reverse, const PackageVisitorConst &visitor);
     bool provides(const Dependency &dependency, bool reverse = false) const;
     bool provides(const std::string &libraryName, bool reverse = false) const;
     std::shared_ptr<Package> findPackage(StorageID packageID);
@@ -183,6 +185,13 @@ inline PackageSearchResult::PackageSearchResult()
 inline PackageSearchResult::PackageSearchResult(Database &database, const std::shared_ptr<Package> &package, StorageID id)
     : db(&database)
     , pkg(package)
+    , id(id)
+{
+}
+
+inline PackageSearchResult::PackageSearchResult(Database &database, std::shared_ptr<Package> &&package, StorageID id)
+    : db(&database)
+    , pkg(std::move(package))
     , id(id)
 {
 }

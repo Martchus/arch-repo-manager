@@ -131,7 +131,7 @@ int main(int argc, const char *argv[])
         }
     }
     for (auto &db : cfg.databases) {
-        db.allPackages([&](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &package) {
+        db.allPackages([&](LibPkg::StorageID, std::shared_ptr<LibPkg::Package> &&package) {
             const auto &pkgInfo = package->packageInfo;
             if (!pkgInfo) {
                 return false;
