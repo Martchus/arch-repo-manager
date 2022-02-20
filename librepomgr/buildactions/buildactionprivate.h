@@ -19,7 +19,10 @@
 #include <unordered_map>
 
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/stream_file.hpp>
+#ifndef BOOST_ASIO_HAS_FILE
 #include <boost/asio/posix/stream_descriptor.hpp>
+#endif
 #include <boost/beast/core/file.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/process/extend.hpp>
@@ -112,6 +115,12 @@ template <typename StorageType> inline std::size_t BufferPool<StorageType>::stor
     return m_buffers.size();
 }
 
+#ifdef BOOST_ASIO_HAS_FILE
+using AsioFileStream = boost::asio::stream_file;
+#else
+using AsioFileStream = boost::asio::posix::stream_descriptor;
+#endif
+
 /// \brief The BuildProcessSession class spawns a process associated with a build action.
 /// The process output is make available as a logfile of the build action allowing live-steaming.
 class LIBREPOMGR_EXPORT BuildProcessSession : public std::enable_shared_from_this<BuildProcessSession>, public BaseProcessSession {
@@ -154,9 +163,11 @@ private:
 
         BuildProcessSession &m_session;
         std::atomic<std::size_t> m_bytesToSendFromFile = 0;
+#ifndef BOOST_ASIO_HAS_FILE
         boost::beast::file m_file;
+#endif
         BufferType m_fileBuffer;
-        boost::asio::posix::stream_descriptor m_descriptor;
+        AsioFileStream m_fileStream;
     };
 
     void readMoreFromPipe();
@@ -165,6 +176,7 @@ private:
     void writeNextBufferToLogFile(const boost::system::error_code &error, std::size_t bytesTransferred);
     void writeNextBufferToWebSession(
         const boost::system::error_code &error, std::size_t bytesTransferred, WebAPI::Session &session, BuffersToWrite &sessionInfo);
+    void closeLogFile();
     void close();
     void conclude();
 
@@ -174,8 +186,10 @@ private:
     BufferType m_buffer;
     std::string m_displayName;
     std::string m_logFilePath;
+#ifndef BOOST_ASIO_HAS_FILE
     boost::beast::file m_logFile;
-    boost::asio::posix::stream_descriptor m_logFileDescriptor;
+#endif
+    AsioFileStream m_logFileStream;
     std::mutex m_mutex;
     BuffersToWrite m_logFileBuffers;
     std::unordered_map<std::shared_ptr<WebAPI::Session>, std::unique_ptr<DataForWebSession>> m_registeredWebSessions;
@@ -186,7 +200,7 @@ private:
 
 inline BuildProcessSession::DataForWebSession::DataForWebSession(BuildProcessSession &session)
     : m_session(session)
-    , m_descriptor(session.m_ioContext)
+    , m_fileStream(session.m_ioContext)
 {
 }
 
@@ -203,7 +217,7 @@ inline BuildProcessSession::BuildProcessSession(BuildAction *buildAction, boost:
     , m_bufferPool(bufferSize)
     , m_displayName(std::move(displayName))
     , m_logFilePath(std::move(logFilePath))
-    , m_logFileDescriptor(ioContext)
+    , m_logFileStream(ioContext)
     , m_locks(std::move(locks))
 {
 }
