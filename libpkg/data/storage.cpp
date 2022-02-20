@@ -85,6 +85,10 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
 auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, RWTxn *txn, const std::string &entryName) -> SpecType
 {
+    // do not attempt to fetch empty entries (apprently can lead to "Getting data: MDB_BAD_VALSIZE: Unsupported size of key/DB name/data, or wrong DUPFIXED size")
+    if (entryName.empty()) {
+        return SpecType(0, std::shared_ptr<Entry>());
+    }
     // check for package in cache
     using CacheRef = typename Entries::Ref;
     const auto ref = CacheRef(storage, entryName);
