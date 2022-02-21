@@ -177,9 +177,9 @@ void BuildProcessSession::prepareLogFile()
         return;
     }
     try {
-        m_logFileDescriptor.assign(m_logFile.native_handle());
-        m_logFileDescriptor.non_blocking(true);
-        m_logFileDescriptor.native_non_blocking(true);
+        m_logFileStream.assign(m_logFile.native_handle());
+        m_logFileStream.non_blocking(true);
+        m_logFileStream.native_non_blocking(true);
     } catch (const boost::system::system_error &e) {
         result.errorCode = e.code();
         result.error = CppUtilities::argsToString("unable to prepare descriptor for \"", m_logFilePath, ": ", e.what());
