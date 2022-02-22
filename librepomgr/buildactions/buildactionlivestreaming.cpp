@@ -28,7 +28,7 @@ void BuildProcessSession::DataForWebSession::streamFile(
     auto ec = boost::system::error_code();
     m_fileStream.open(filePath, boost::asio::stream_file::read_only, ec);
 #else
-    auto error = boost::beast::error_code();
+    auto ec = boost::beast::error_code();
     m_file.open(filePath.data(), boost::beast::file_mode::scan, ec);
 #endif
     if (ec) {
