@@ -435,7 +435,7 @@ void CheckForProblems::run()
         const auto srcLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(db->name, "src"));
 
         // check whether files exist
-        auto &problems = result[db->name];
+        auto &problems = result[db->name % '@' + db->arch];
         try {
             if (db->path.empty() || !std::filesystem::is_regular_file(db->path)) {
                 problems.emplace_back(RepositoryProblem{ .desc = "db file \"" % db->path + "\" is not a regular file" });
