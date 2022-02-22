@@ -19,8 +19,8 @@ void BuildProcessSession::BuffersToWrite::clear()
     outstandingBuffersToSend.clear();
 }
 
-void BuildProcessSession::DataForWebSession::streamFile(
-    const std::string &filePath, std::shared_ptr<WebAPI::Session> &&session, std::unique_lock<std::mutex> &&lock)
+void BuildProcessSession::DataForWebSession::streamFile(const std::string &filePath, const std::shared_ptr<BuildProcessSession> &processSession,
+    const std::shared_ptr<WebAPI::Session> &webSession, std::unique_lock<std::mutex> &&lock)
 {
     error = false;
 
@@ -61,13 +61,14 @@ void BuildProcessSession::DataForWebSession::streamFile(
         return;
     }
 #endif
-    m_fileBuffer = m_session.m_bufferPool.newBuffer();
-    m_fileStream.async_read_some(boost::asio::buffer(*m_fileBuffer, sizeof(std::min(fileSize, m_session.m_bufferPool.bufferSize()))),
-        std::bind(&DataForWebSession::writeFileData, this, std::ref(filePath), std::move(session), std::placeholders::_1, std::placeholders::_2));
+    m_fileBuffer = processSession->m_bufferPool.newBuffer();
+    m_fileStream.async_read_some(boost::asio::buffer(*m_fileBuffer, sizeof(std::min(fileSize, processSession->m_bufferPool.bufferSize()))),
+        [this, &filePath, processSession, webSession](
+            auto &error, auto bytesTransferred) { writeFileData(filePath, processSession, webSession, error, bytesTransferred); });
 }
 
-void BuildProcessSession::DataForWebSession::writeFileData(
-    const std::string &filePath, std::shared_ptr<WebAPI::Session> session, const boost::system::error_code &readError, size_t bytesTransferred)
+void BuildProcessSession::DataForWebSession::writeFileData(const std::string &filePath, const std::shared_ptr<BuildProcessSession> &processSession,
+    const std::shared_ptr<WebAPI::Session> &webSession, const boost::system::error_code &readError, size_t bytesTransferred)
 {
     // handle error
     const auto eof = readError == boost::asio::error::eof;
@@ -83,14 +84,14 @@ void BuildProcessSession::DataForWebSession::writeFileData(
         bytesTransferred = m_bytesToSendFromFile;
     }
     const auto bytesLeftToRead = m_bytesToSendFromFile - bytesTransferred;
-    boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk(boost::asio::buffer(*m_fileBuffer, bytesTransferred)),
-        [this, &filePath, session, bytesLeftToRead, moreToRead = !eof && bytesLeftToRead](
+    boost::beast::net::async_write(webSession->socket(), boost::beast::http::make_chunk(boost::asio::buffer(*m_fileBuffer, bytesTransferred)),
+        [this, &filePath, processSession, webSession, bytesLeftToRead, moreToRead = !eof && bytesLeftToRead](
             boost::system::error_code ecWebClient, std::size_t bytesTransferredToWebClient) {
             // handle error
             CPP_UTILITIES_UNUSED(bytesTransferredToWebClient)
             if (ecWebClient) {
                 cerr << Phrases::WarningMessage << "Error sending \"" << filePath << "\" to client: " << ecWebClient.message() << Phrases::EndFlush;
-                std::lock_guard<std::mutex> lock(m_session.m_mutex);
+                std::lock_guard<std::mutex> lock(processSession->m_mutex);
                 clear();
                 error = true;
                 m_bytesToSendFromFile.store(0);
@@ -99,16 +100,18 @@ void BuildProcessSession::DataForWebSession::writeFileData(
             m_bytesToSendFromFile.store(bytesLeftToRead);
             // tell the client it's over if there is nothing more to read
             if (!moreToRead) {
-                if (m_session.m_exited.load()) {
-                    boost::beast::net::async_write(session->socket(), boost::beast::http::make_chunk_last(),
-                        std::bind(&WebAPI::Session::responded, session, std::placeholders::_1, std::placeholders::_2, true));
+                if (processSession->m_exited.load()) {
+                    boost::beast::net::async_write(webSession->socket(), boost::beast::http::make_chunk_last(),
+                        std::bind(&WebAPI::Session::responded, webSession, std::placeholders::_1, std::placeholders::_2, true));
                 }
                 return;
             }
             // continue reading if there's more data
-            m_fileStream.async_read_some(boost::asio::buffer(*m_fileBuffer, sizeof(std::min(bytesLeftToRead, m_session.m_bufferPool.bufferSize()))),
-                std::bind(
-                    &DataForWebSession::writeFileData, this, std::ref(filePath), std::move(session), std::placeholders::_1, std::placeholders::_2));
+            m_fileStream.async_read_some(
+                boost::asio::buffer(*m_fileBuffer, sizeof(std::min(bytesLeftToRead, processSession->m_bufferPool.bufferSize()))),
+                [this, &filePath, processSession, webSession](auto &readError2, auto bytesTransferred2) {
+                    writeFileData(filePath, processSession, webSession, readError2, bytesTransferred2);
+                });
         });
 }
 
@@ -117,9 +120,9 @@ void BuildProcessSession::registerWebSession(std::shared_ptr<WebAPI::Session> &&
     std::unique_lock<std::mutex> lock(m_mutex);
     auto &sessionInfo = m_registeredWebSessions[webSession];
     if (!sessionInfo) {
-        sessionInfo = std::make_unique<DataForWebSession>(*this);
+        sessionInfo = std::make_unique<DataForWebSession>(m_ioContext);
     }
-    sessionInfo->streamFile(m_logFilePath, std::move(webSession), std::move(lock));
+    sessionInfo->streamFile(m_logFilePath, shared_from_this(), std::move(webSession), std::move(lock));
 }
 
 void BuildProcessSession::registerNewDataHandler(std::function<void(BuildProcessSession::BufferType, std::size_t)> &&handler)
@@ -283,8 +286,10 @@ void BuildProcessSession::writeNextBufferToLogFile(const boost::system::error_co
             m_logFileBuffers.currentlySentBufferRefs.emplace_back(boost::asio::buffer(buffer.first.get(), buffer.second));
         }
     }
-    boost::asio::async_write(m_logFileStream, m_logFileBuffers.currentlySentBufferRefs,
-        std::bind(&BuildProcessSession::writeNextBufferToLogFile, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+    if (!m_logFileBuffers.currentlySentBufferRefs.empty()) {
+        boost::asio::async_write(m_logFileStream, m_logFileBuffers.currentlySentBufferRefs,
+            std::bind(&BuildProcessSession::writeNextBufferToLogFile, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+    }
 }
 
 void BuildProcessSession::writeNextBufferToWebSession(
@@ -356,15 +361,14 @@ void BuildProcessSession::conclude()
     m_exited = true;
 
     // detach from build action
-    auto buildAction = m_buildAction.lock();
-    if (!buildAction) {
+    if (!m_buildAction) {
         return;
     }
-    if (const auto outputLock = std::lock_guard<std::mutex>(buildAction->m_outputSessionMutex); buildAction->m_outputSession.get() == this) {
-        buildAction->m_outputSession.reset();
+    if (const auto outputLock = std::lock_guard<std::mutex>(m_buildAction->m_outputSessionMutex); m_buildAction->m_outputSession.get() == this) {
+        m_buildAction->m_outputSession.reset();
     } else {
-        const auto processesLock = std::lock_guard<std::mutex>(buildAction->m_processesMutex);
-        buildAction->m_ongoingProcesses.erase(m_logFilePath);
+        const auto processesLock = std::lock_guard<std::mutex>(m_buildAction->m_processesMutex);
+        m_buildAction->m_ongoingProcesses.erase(m_logFilePath);
     }
 }
 

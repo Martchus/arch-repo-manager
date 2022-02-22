@@ -1,3 +1,4 @@
+
 #include "./buildactionprivate.h"
 
 #include "../webapi/session.h"
@@ -167,7 +168,7 @@ const std::string &InternalBuildAction::findSetting(const std::string_view &sett
 void InternalBuildAction::reportError(std::string &&error)
 {
     const auto buildActionLock = m_setup.building.lockToWrite();
-    m_buildAction->resultData = move(error);
+    m_buildAction->resultData = std::move(error);
     m_buildAction->conclude(BuildActionResult::Failure);
 }
 
@@ -228,10 +229,10 @@ BuildAction &BuildAction::operator=(BuildAction &&other)
     started = other.started;
     finished = other.finished;
     startAfter = std::move(other.startAfter);
-    m_log = std::move(other.m_log);
+    m_log = LogContext(this);
     m_setup = other.m_setup;
     m_aborted = false;
-    m_stopHandler = std::function<void(void)>();
+    m_stopHandler = std::bind(&BuildAction::terminateOngoingBuildProcesses, this);
     m_concludeHandler = std::function<void(void)>();
     m_ongoingProcesses.clear();
     m_outputSession.reset();
@@ -360,11 +361,6 @@ LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
     this->result = result;
     finished = DateTime::gmtNow();
 
-    // tell clients waiting for output that it's over
-    if (const auto outputStreamingLock = std::unique_lock<std::mutex>(m_outputSessionMutex); m_outputSession) {
-        m_outputSession->writeEnd();
-    }
-
     // start globally visible follow-up actions if succeeded
     if (result == BuildActionResult::Success && m_setup) {
         const auto followUps = m_setup->building.followUpBuildActions(id);
@@ -374,6 +370,15 @@ LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
             }
         }
         // note: Not cleaning up the follow-up actions here because at some point I might implement recursive restarting.
+    }
+
+    // detatch build process sessions
+    if (const auto lock = std::unique_lock(m_outputSessionMutex); m_outputSession) {
+        m_outputSession->writeEnd(); // tell clients waiting for output that it's over
+        m_outputSession.reset();
+    }
+    if (const auto lock = std::unique_lock(m_processesMutex)) {
+        m_ongoingProcesses.clear();
     }
 
     // write build action to persistent storage

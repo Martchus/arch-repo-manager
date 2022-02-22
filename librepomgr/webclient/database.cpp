@@ -228,7 +228,8 @@ PackageCachingDataForPackage *PackageCachingSession::getCurrentDataAndSelectNext
 void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&packageCachingSession, std::optional<std::uint64_t> bodyLimit,
     std::size_t maxParallelDownloads)
 {
-    for (std::size_t startedDownloads = 0; startedDownloads < maxParallelDownloads; ++startedDownloads) {
+    for (std::size_t startedDownloads = 0;
+         startedDownloads < maxParallelDownloads && (!packageCachingSession->aborted || !*packageCachingSession->aborted); ++startedDownloads) {
         auto *const cachingData = packageCachingSession->getCurrentDataAndSelectNext();
         if (!cachingData) {
             return;
@@ -243,7 +244,7 @@ void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&pac
                     cachingData->error = tupleToString(msg);
                     log(Phrases::ErrorMessage, msg, '\n');
                 }
-                const auto &response = get<FileResponse>(session.response);
+                const auto &response = std::get<FileResponse>(session.response);
                 const auto &message = response.get();
                 if (message.result() != boost::beast::http::status::ok) {
                     const auto msg = std::make_tuple("Error downloading \"", cachingData->url, "\" to \"", cachingData->destinationFilePath,

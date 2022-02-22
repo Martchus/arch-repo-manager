@@ -153,15 +153,15 @@ private:
         void clear();
     };
     struct DataForWebSession : public BuffersToWrite {
-        explicit DataForWebSession(BuildProcessSession &session);
-        void streamFile(const std::string &filePath, std::shared_ptr<WebAPI::Session> &&session, std::unique_lock<std::mutex> &&lock);
+        explicit DataForWebSession(boost::asio::io_context &ioc);
+        void streamFile(const std::string &filePath, const std::shared_ptr<BuildProcessSession> &processSession,
+            const std::shared_ptr<WebAPI::Session> &webSession, std::unique_lock<std::mutex> &&lock);
         std::size_t bytesToSendFromFile() const;
 
     private:
-        void writeFileData(const std::string &filePath, std::shared_ptr<WebAPI::Session> session, const boost::system::error_code &error,
-            std::size_t bytesTransferred);
+        void writeFileData(const std::string &filePath, const std::shared_ptr<BuildProcessSession> &processSession,
+            const std::shared_ptr<WebAPI::Session> &webSession, const boost::system::error_code &error, std::size_t bytesTransferred);
 
-        BuildProcessSession &m_session;
         std::atomic<std::size_t> m_bytesToSendFromFile = 0;
 #ifndef BOOST_ASIO_HAS_FILE
         boost::beast::file m_file;
@@ -180,7 +180,7 @@ private:
     void close();
     void conclude();
 
-    std::weak_ptr<BuildAction> m_buildAction;
+    std::shared_ptr<BuildAction> m_buildAction;
     boost::process::async_pipe m_pipe;
     BufferPoolType m_bufferPool;
     BufferType m_buffer;
@@ -198,9 +198,8 @@ private:
     std::atomic_bool m_exited = false;
 };
 
-inline BuildProcessSession::DataForWebSession::DataForWebSession(BuildProcessSession &session)
-    : m_session(session)
-    , m_fileStream(session.m_ioContext)
+inline BuildProcessSession::DataForWebSession::DataForWebSession(boost::asio::io_context &ioc)
+    : m_fileStream(ioc)
 {
 }
 
@@ -249,8 +248,9 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
             m_ioContext, group, std::forward<ChildArgs>(childArgs)..., (boost::process::std_out & boost::process::std_err) > m_pipe,
             boost::process::extend::on_success =
                 [session = shared_from_this()](auto &executor) {
-                    if (const auto buildAction = session->m_buildAction.lock()) {
-                        buildAction->appendOutput(CppUtilities::EscapeCodes::Phrases::InfoMessage, "Launched \"", session->m_displayName, "\", PID: ",
+                    if (session->m_buildAction) {
+                        session->m_buildAction->appendOutput(CppUtilities::EscapeCodes::Phrases::InfoMessage, "Launched \"", session->m_displayName,
+                            "\", PID: ",
                             executor
 #ifdef PLATFORM_WINDOWS
                                 .proc_info.dwProcessId

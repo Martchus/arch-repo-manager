@@ -241,10 +241,11 @@ void LibRepoMgr::ReloadLibraryDependencies::downloadPackagesFromMirror()
     }
 
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Downloading ", packagesWhichNeedCaching, " binary packages from mirror ...\n");
-    WebClient::cachePackages(m_buildAction->log(),
-        std::make_shared<WebClient::PackageCachingSession>(m_cachingData, m_setup.building.ioContext, m_setup.webServer.sslContext,
-            std::bind(&ReloadLibraryDependencies::loadPackageInfoFromContents, this)),
-        m_packageDownloadSizeLimit ? std::make_optional(m_packageDownloadSizeLimit) : std::nullopt);
+    auto session = std::make_shared<WebClient::PackageCachingSession>(m_cachingData, m_setup.building.ioContext, m_setup.webServer.sslContext,
+        std::bind(&ReloadLibraryDependencies::loadPackageInfoFromContents, this));
+    session->aborted = &m_buildAction->aborted();
+    WebClient::cachePackages(
+        m_buildAction->log(), std::move(session), m_packageDownloadSizeLimit ? std::make_optional(m_packageDownloadSizeLimit) : std::nullopt);
 }
 
 void ReloadLibraryDependencies::loadPackageInfoFromContents()

@@ -55,6 +55,8 @@ struct PackageCachingSession : public MultiSession<void> {
     explicit PackageCachingSession(
         PackageCachingDataForSession &data, boost::asio::io_context &ioContext, boost::asio::ssl::context &sslContext, HandlerType &&handler);
 
+    const std::atomic_bool *aborted = nullptr;
+
 private:
     void selectNextPackage();
     PackageCachingDataForPackage *getCurrentDataAndSelectNext();

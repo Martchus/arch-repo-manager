@@ -180,6 +180,7 @@ public:
     bool hasSucceeded() const;
     static bool haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> &buildActions);
     bool isAborted() const;
+    const std::atomic_bool &aborted() const;
     LibPkg::StorageID start(ServiceSetup &setup);
     void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
     void abort();
@@ -265,6 +266,11 @@ inline bool BuildAction::hasSucceeded() const
 inline bool BuildAction::isAborted() const
 {
     return m_aborted.load();
+}
+
+inline const std::atomic_bool &BuildAction::aborted() const
+{
+    return m_aborted;
 }
 
 inline LogContext &BuildAction::log()
