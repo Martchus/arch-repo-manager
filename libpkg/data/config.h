@@ -140,18 +140,24 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     Database *findOrCreateDatabase(std::string_view name, std::string_view architecture);
     Database *findOrCreateDatabaseFromDenotation(std::string_view databaseDenotation);
     static std::tuple<std::string_view, std::string_view, std::string_view> parsePackageDenotation(std::string_view packageDenotation);
-    std::vector<PackageSearchResult> findPackages(std::string_view packageDenotation);
-    std::vector<PackageSearchResult> findPackages(std::string_view dbName, std::string_view dbArch, std::string_view packageName);
-    std::vector<PackageSearchResult> findPackages(std::tuple<std::string_view, std::string_view, std::string_view> dbAndPackageName);
-    PackageSearchResult findPackage(const Dependency &dependency);
-    std::vector<PackageSearchResult> findPackages(const Dependency &dependency, bool reverse = false);
-    std::vector<PackageSearchResult> findPackagesProvidingLibrary(const std::string &library, bool reverse = false);
-    std::vector<PackageSearchResult> findPackages(const std::regex &regex);
-    std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &)> &databasePred, std::string_view term);
-    std::vector<PackageSearchResult> findPackages(const Package &package);
+    std::vector<PackageSearchResult> findPackages(std::string_view packageDenotation, std::size_t limit = std::numeric_limits<std::size_t>::max());
     std::vector<PackageSearchResult> findPackages(
-        const std::function<bool(const Database &)> &databasePred, const std::function<bool(const Database &, const Package &)> &packagePred);
-    std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &, const Package &)> &pred);
+        std::string_view dbName, std::string_view dbArch, std::string_view packageName, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    std::vector<PackageSearchResult> findPackages(std::tuple<std::string_view, std::string_view, std::string_view> dbAndPackageName,
+        std::size_t limit = std::numeric_limits<std::size_t>::max());
+    PackageSearchResult findPackage(const Dependency &dependency);
+    std::vector<PackageSearchResult> findPackages(
+        const Dependency &dependency, bool reverse = false, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    std::vector<PackageSearchResult> findPackagesProvidingLibrary(
+        const std::string &library, bool reverse = false, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    std::vector<PackageSearchResult> findPackages(const std::regex &regex, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &)> &databasePred, std::string_view term,
+        std::size_t limit = std::numeric_limits<std::size_t>::max());
+    std::vector<PackageSearchResult> findPackages(const Package &package, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &)> &databasePred,
+        const std::function<bool(const Database &, const Package &)> &packagePred, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    std::vector<PackageSearchResult> findPackages(
+        const std::function<bool(const Database &, const Package &)> &pred, std::size_t limit = std::numeric_limits<std::size_t>::max());
 
     std::vector<Database> databases;
     Database aur = Database("aur");
@@ -181,14 +187,15 @@ inline Status Config::computeStatus() const
     return Status(*this);
 }
 
-inline std::vector<PackageSearchResult> Config::findPackages(std::string_view dbName, std::string_view dbArch, std::string_view packageName)
+inline std::vector<PackageSearchResult> Config::findPackages(
+    std::string_view dbName, std::string_view dbArch, std::string_view packageName, std::size_t limit)
 {
-    return findPackages(std::make_tuple(dbName, dbArch, packageName));
+    return findPackages(std::make_tuple(dbName, dbArch, packageName), limit);
 }
 
-inline std::vector<PackageSearchResult> Config::findPackages(std::string_view packageDenotation)
+inline std::vector<PackageSearchResult> Config::findPackages(std::string_view packageDenotation, std::size_t limit)
 {
-    return findPackages(parsePackageDenotation(packageDenotation));
+    return findPackages(parsePackageDenotation(packageDenotation), limit);
 }
 
 } // namespace LibPkg

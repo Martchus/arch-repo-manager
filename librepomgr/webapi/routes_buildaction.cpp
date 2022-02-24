@@ -23,13 +23,21 @@ void getBuildActions(const Params &params, ResponseHandler &&handler)
     RAPIDJSON_NAMESPACE::Document jsonDoc(RAPIDJSON_NAMESPACE::kArrayType);
     RAPIDJSON_NAMESPACE::Value::Array array(jsonDoc.GetArray());
 
+    const auto start = params.target.asNumber<std::size_t>("start", std::numeric_limits<std::size_t>::max());
+    const auto serverLimit = params.setup.webServer.buildActionsResponseLimit.load();
+    auto limit = params.target.asNumber<std::size_t>("limit");
+    if (!limit || limit > serverLimit) {
+        limit = serverLimit;
+    }
+
     auto buildActionLock = params.setup.building.lockToRead();
     params.setup.building.forEachBuildAction(
         [&array, &jsonDoc](std::size_t count) { array.Reserve(ReflectiveRapidJSON::JsonReflector::rapidJsonSize(count), jsonDoc.GetAllocator()); },
-        [&array, &jsonDoc](LibPkg::StorageID, BuildAction &&buildAction) {
+        [&array, &jsonDoc, limit](LibPkg::StorageID, BuildAction &&buildAction) {
             ReflectiveRapidJSON::JsonReflector::push(BuildActionBasicInfo(buildAction), array, jsonDoc.GetAllocator());
-            return false;
-        });
+            return array.Size() >= limit;
+        },
+        limit, start);
     buildActionLock.unlock();
 
     handler(makeJson(params.request(), jsonDoc, params.target.hasPrettyFlag()));

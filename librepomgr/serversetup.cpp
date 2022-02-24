@@ -90,6 +90,8 @@ void ServiceSetup::WebServerSetup::applyConfig(const std::multimap<std::string, 
     convertValue(multimap, "port", port);
     convertValue(multimap, "threads", threadCount);
     convertValue(multimap, "static_files", staticFilesPath);
+    convertValue(multimap, "package_search_response_limit", packageSearchResponseLimit);
+    convertValue(multimap, "build_actions_response_limit", buildActionsResponseLimit);
     convertValue(multimap, "verify_ssl_certificates", verifySslCertificates);
     convertValue(multimap, "log_ssl_certificate_validation", logSslCertificateValidation);
 
@@ -338,11 +340,16 @@ std::size_t ServiceSetup::BuildSetup::buildActionCount()
 }
 
 void ServiceSetup::BuildSetup::forEachBuildAction(
-    std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func)
+    std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func, std::size_t limit, std::size_t start)
 {
     auto txn = m_storage->buildActions.getROTransaction();
-    count(txn.size());
-    for (auto i = txn.begin(); i != txn.end(); ++i) {
+    const auto total = txn.size();
+    count(std::min(limit, total));
+    const auto reverse = start == std::numeric_limits<std::size_t>::max();
+    for (auto i = reverse ? txn.rbegin()
+                          : txn.lower_bound(static_cast<LibPkg::StorageID>(
+                              start > std::numeric_limits<LibPkg::StorageID>::max() ? std::numeric_limits<LibPkg::StorageID>::max() : start));
+         i != txn.end() && limit; reverse ? --i : ++i, --limit) {
         if (func(i.getID(), std::move(i.value()))) {
             return;
         }

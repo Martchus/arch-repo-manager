@@ -6,6 +6,9 @@
 #include "./session.h"
 #include "./typedefs.h"
 
+#include <c++utilities/conversion/stringbuilder.h>
+#include <c++utilities/conversion/stringconversion.h>
+
 #include <unordered_map>
 
 namespace std {
@@ -51,9 +54,27 @@ struct LIBREPOMGR_EXPORT Url {
     bool hasPrettyFlag() const;
     std::string_view value(std::string_view paramName) const;
     std::vector<std::string> decodeValues(std::string_view paramName) const;
+    template <typename Number> Number asNumber(std::string_view paramName, Number def = Number()) const;
     static std::string decodeValue(std::string_view value);
     static std::string encodeValue(std::string_view value);
 };
+
+template <typename Number> Number Url::asNumber(std::string_view paramName, Number def) const
+{
+    using namespace CppUtilities;
+    const auto values = decodeValues(paramName);
+    if (values.size() > 1) {
+        throw BadRequest("more than one " % paramName + " specified");
+    }
+    if (!values.empty()) {
+        try {
+            return stringToNumber<Number>(values.front());
+        } catch (const ConversionException &) {
+            throw BadRequest(argsToString(paramName, " must be an integer"));
+        }
+    }
+    return def;
+}
 
 inline bool Url::hasPrettyFlag() const
 {

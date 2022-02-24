@@ -150,7 +150,7 @@ void getUnresolved(const Params &params, ResponseHandler &&handler)
 void getPackages(const Params &params, ResponseHandler &&handler)
 {
     // read mode
-    const auto modes(params.target.decodeValues("mode"));
+    const auto modes = params.target.decodeValues("mode");
     if (modes.size() > 1) {
         throw BadRequest("more than one mode specified");
     }
@@ -179,6 +179,13 @@ void getPackages(const Params &params, ResponseHandler &&handler)
             throw BadRequest("mode must be \"name\", \"name-contains\", \"regex\", \"provides\", \"depends\", \"libprovides\" or \"libdepends\"");
         }
         mode = modeIterator->second;
+    }
+
+    // limit
+    auto limit = params.target.asNumber<std::size_t>("limit");
+    const auto serverLimit = params.setup.webServer.packageSearchResponseLimit.load();
+    if (!limit || limit > serverLimit) {
+        limit = serverLimit;
     }
 
     // check for details flag
@@ -214,7 +221,8 @@ void getPackages(const Params &params, ResponseHandler &&handler)
     RAPIDJSON_NAMESPACE::Document document(RAPIDJSON_NAMESPACE::kArrayType);
     RAPIDJSON_NAMESPACE::Document::Array array(document.GetArray());
 
-    const auto pushPackages = [&dbs, &document, &array](auto &&packages) {
+    const auto pushPackages = [&dbs, &document, &array, &limit](auto &&packages) {
+        limit -= packages.size();
         for (const auto &package : packages) {
             if (!dbs.empty()) {
                 const auto *const db = std::get<Database *>(package.db);
@@ -248,15 +256,17 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 } else {
                     neededAurPackages.emplace_back(std::move(packageNameStr));
                 }
+                --limit;
             }
             if (!isDbAur && (!dbs.empty() || !onlyFromAur)) {
-                auto packages = params.setup.config.findPackages(packageDenotation);
+                auto packages = params.setup.config.findPackages(packageDenotation, limit);
                 if (details) {
                     for (const auto &package : packages) {
                         if (dbs.empty() || dbs.find(std::get<LibPkg::Database *>(package.db)->name) != dbs.end()) {
                             ReflectiveRapidJSON::JsonReflector::push(package.pkg, array, document.GetAllocator());
                         }
                     }
+                    limit -= packages.size();
                 } else {
                     pushPackages(std::move(packages));
                 }
@@ -265,7 +275,8 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         }
         case Mode::NameContains:
             pushPackages(params.setup.config.findPackages(
-                [&dbs, onlyFromAur](const LibPkg::Database &db) { return (dbs.empty() && !onlyFromAur) || dbs.find(db.name) != dbs.end(); }, name));
+                [&dbs, onlyFromAur](const LibPkg::Database &db) { return (dbs.empty() && !onlyFromAur) || dbs.find(db.name) != dbs.end(); }, name,
+                limit));
             if (fromAur && !name.empty()) {
                 neededAurPackages.emplace_back(std::move(name));
             }
@@ -273,7 +284,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         case Mode::Regex:
             // assume names are regexes
             try {
-                pushPackages(params.setup.config.findPackages(std::regex(name.data(), name.size())));
+                pushPackages(params.setup.config.findPackages(std::regex(name.data(), name.size()), limit));
             } catch (const std::regex_error &e) {
                 throw BadRequest(argsToString("regex is invalid: ", e.what()));
             }
@@ -281,12 +292,12 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         case Mode::Provides:
         case Mode::Depends:
             // assume names are dependency notation
-            pushPackages(params.setup.config.findPackages(Dependency::fromString(name), mode == Mode::Depends));
+            pushPackages(params.setup.config.findPackages(Dependency::fromString(name), mode == Mode::Depends, limit));
             break;
         case Mode::LibProvides:
         case Mode::LibDepends:
             // assume names are "normalized" library names with platform prefix
-            pushPackages(params.setup.config.findPackagesProvidingLibrary(name, mode == Mode::LibDepends));
+            pushPackages(params.setup.config.findPackagesProvidingLibrary(name, mode == Mode::LibDepends, limit));
             break;
         default:;
         }

@@ -39,7 +39,7 @@ inline std::optional<std::string_view> getLastValueSv(const std::multimap<std::s
     return std::nullopt;
 }
 
-template <typename TargetType, Traits::DisableIf<std::is_integral<TargetType>> * = nullptr>
+template <typename TargetType, Traits::DisableIfAny<std::is_integral<TargetType>, Traits::IsSpecializationOf<TargetType, std::atomic>> * = nullptr>
 void convertValue(const std::multimap<std::string, std::string> &multimap, const std::string &key, TargetType &result);
 
 template <>
@@ -60,7 +60,7 @@ inline void convertValue(const std::multimap<std::string, std::string> &multimap
     }
 }
 
-template <typename TargetType, Traits::EnableIf<std::is_integral<TargetType>> * = nullptr>
+template <typename TargetType, Traits::EnableIfAny<std::is_integral<TargetType>, Traits::IsSpecializationOf<TargetType, std::atomic>> * = nullptr>
 inline void convertValue(const std::multimap<std::string, std::string> &multimap, const std::string &key, TargetType &result)
 {
     using namespace std;
@@ -69,7 +69,11 @@ inline void convertValue(const std::multimap<std::string, std::string> &multimap
 
     if (const char *const value = getLastValue(multimap, key)) {
         try {
-            result = stringToNumber<TargetType>(value);
+            if constexpr (Traits::IsSpecializationOf<TargetType, std::atomic>::value) {
+                result = stringToNumber<typename TargetType::value_type>(value);
+            } else {
+                result = stringToNumber<TargetType>(value);
+            }
         } catch (const ConversionException &) {
             cerr << Phrases::ErrorMessage << "Specified number \"" << value << "\" for key \"" << key << "\" is invalid." << Phrases::End;
             return;

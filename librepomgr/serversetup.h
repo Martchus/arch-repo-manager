@@ -68,6 +68,8 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         unsigned short threadCount = 1;
         boost::asio::io_context ioContext;
         boost::asio::ssl::context sslContext{ boost::asio::ssl::context::sslv23_client };
+        std::atomic_size_t packageSearchResponseLimit = 20000; // sufficient to return a "full architecture"
+        std::atomic_size_t buildActionsResponseLimit = 200;
         bool verifySslCertificates = true;
         bool logSslCertificateValidation = false;
 
@@ -138,7 +140,8 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         void deleteBuildAction(const std::vector<std::shared_ptr<BuildAction>> &actions);
         std::size_t buildActionCount();
         std::size_t runningBuildActionCount();
-        void forEachBuildAction(std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func);
+        void forEachBuildAction(std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func,
+            std::size_t limit, std::size_t start);
         void forEachBuildAction(std::function<bool(LibPkg::StorageID, BuildAction &, bool &)> &&func);
         std::vector<std::shared_ptr<BuildAction>> followUpBuildActions(BuildActionIdType forId);
 

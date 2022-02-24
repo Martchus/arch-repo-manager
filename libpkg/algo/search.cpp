@@ -97,7 +97,8 @@ Database *Config::findOrCreateDatabaseFromDenotation(std::string_view databaseDe
 /*!
  * \brief Returns all packages with the specified database name, database architecture and package name.
  */
-std::vector<PackageSearchResult> Config::findPackages(std::tuple<std::string_view, std::string_view, std::string_view> dbAndPackageName)
+std::vector<PackageSearchResult> Config::findPackages(
+    std::tuple<std::string_view, std::string_view, std::string_view> dbAndPackageName, std::size_t limit)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     const auto &[dbName, dbArch, packageName] = dbAndPackageName;
@@ -114,6 +115,9 @@ std::vector<PackageSearchResult> Config::findPackages(std::tuple<std::string_vie
         }
         if (const auto [id, package] = db.findPackageWithID(name); package) {
             pkgs.emplace_back(db, package, id);
+        }
+        if (pkgs.size() >= limit) {
+            return pkgs;
         }
     }
     return pkgs;
@@ -146,7 +150,7 @@ PackageSearchResult Config::findPackage(const Dependency &dependency)
 /*!
  * \brief Returns all packages satisfying \a dependency or - if \a reverse is true - all packages requiring \a dependency.
  */
-std::vector<PackageSearchResult> Config::findPackages(const Dependency &dependency, bool reverse)
+std::vector<PackageSearchResult> Config::findPackages(const Dependency &dependency, bool reverse, std::size_t limit)
 {
     auto results = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
@@ -155,7 +159,7 @@ std::vector<PackageSearchResult> Config::findPackages(const Dependency &dependen
             if (visited.emplace(packageID).second) {
                 results.emplace_back(db, package, packageID);
             }
-            return false;
+            return results.size() >= limit;
         });
     }
     return results;
@@ -164,7 +168,7 @@ std::vector<PackageSearchResult> Config::findPackages(const Dependency &dependen
 /*!
  * \brief Returns all packages providing \a library or - if \a reverse is true - all packages requiring \a library.
  */
-std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const std::string &library, bool reverse)
+std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const std::string &library, bool reverse, std::size_t limit)
 {
     auto results = std::vector<PackageSearchResult>();
     auto visited = std::unordered_set<StorageID>();
@@ -173,7 +177,7 @@ std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const std:
             if (visited.emplace(packageID).second) {
                 results.emplace_back(db, package, packageID);
             }
-            return false;
+            return results.size() >= limit;
         });
     }
     return results;
@@ -182,7 +186,7 @@ std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const std:
 /*!
  * \brief Returns all packages which names matches \a regex.
  */
-std::vector<PackageSearchResult> Config::findPackages(const std::regex &regex)
+std::vector<PackageSearchResult> Config::findPackages(const std::regex &regex, std::size_t limit)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
@@ -191,13 +195,14 @@ std::vector<PackageSearchResult> Config::findPackages(const std::regex &regex)
                 auto [packageID, package] = getPackage();
                 pkgs.emplace_back(db, package, packageID);
             }
-            return false;
+            return pkgs.size() >= limit;
         });
     }
     return pkgs;
 }
 
-std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &)> &databasePred, std::string_view term)
+std::vector<PackageSearchResult> Config::findPackages(
+    const std::function<bool(const Database &)> &databasePred, std::string_view term, std::size_t limit)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
@@ -209,7 +214,7 @@ std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(c
                 const auto [packageID, package] = getPackage();
                 pkgs.emplace_back(db, package, packageID);
             }
-            return false;
+            return pkgs.size() >= limit;
         });
     }
     return pkgs;
@@ -219,12 +224,15 @@ std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(c
  * \brief Returns all packages considered "the same" as \a package.
  * \remarks See Package::isSame().
  */
-std::vector<PackageSearchResult> Config::findPackages(const Package &package)
+std::vector<PackageSearchResult> Config::findPackages(const Package &package, std::size_t limit)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
         if (const auto [id, pkg] = db.findPackageWithID(package.name); pkg && pkg->isSame(package)) {
             pkgs.emplace_back(db, pkg, id);
+        }
+        if (pkgs.size() >= limit) {
+            return pkgs;
         }
     }
     return pkgs;
@@ -233,8 +241,8 @@ std::vector<PackageSearchResult> Config::findPackages(const Package &package)
 /*!
  * \brief Returns all packages \a packagePred returns true for from all databases \a databasePred returns true for.
  */
-std::vector<PackageSearchResult> Config::findPackages(
-    const std::function<bool(const Database &)> &databasePred, const std::function<bool(const Database &, const Package &)> &packagePred)
+std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &)> &databasePred,
+    const std::function<bool(const Database &, const Package &)> &packagePred, std::size_t limit)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
@@ -245,7 +253,7 @@ std::vector<PackageSearchResult> Config::findPackages(
             if (packagePred(db, *package)) {
                 pkgs.emplace_back(db, std::move(package), packageID);
             }
-            return false;
+            return pkgs.size() >= limit;
         });
     }
     return pkgs;
@@ -254,7 +262,7 @@ std::vector<PackageSearchResult> Config::findPackages(
 /*!
  * \brief Returns all packages \a pred returns true for.
  */
-std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &, const Package &)> &pred)
+std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &, const Package &)> &pred, std::size_t limit)
 {
     auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
@@ -262,7 +270,7 @@ std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(c
             if (pred(db, *package)) {
                 pkgs.emplace_back(db, std::move(package), packageID);
             }
-            return false;
+            return pkgs.size() >= limit;
         });
     }
     return pkgs;
