@@ -77,7 +77,7 @@ void Server::serve(ServiceSetup &setup)
     });
 
     // run the IO service on the requested number of threads
-    const auto additionalThreads = ThreadPool("Additional web server thread", setup.webServer.ioContext, setup.webServer.threadCount - 1);
+    const auto additionalThreads = ThreadPool("Web server", setup.webServer.ioContext, setup.webServer.threadCount - 1);
     setup.webServer.ioContext.run();
 }
 

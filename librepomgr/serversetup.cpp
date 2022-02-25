@@ -25,6 +25,10 @@
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
 
+#ifdef PLATFORM_LINUX
+#include <pthread.h>
+#endif
+
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
@@ -70,10 +74,20 @@ ThreadPool::ThreadPool(const char *name, boost::asio::io_context &ioContext, uns
 {
     threads.reserve(threadCount);
     for (auto i = threadCount; i > 0; --i) {
-        threads.emplace_back([&ioContext, name] {
-            ioContext.run();
-            std::cout << argsToString(formattedPhraseString(Phrases::SubMessage), name, " terminates", formattedPhraseString(Phrases::End));
-        });
+#ifdef PLATFORM_LINUX
+        pthread_setname_np(
+#endif
+            threads
+                .emplace_back([&ioContext, name] {
+                    ioContext.run();
+                    std::cout << argsToString(
+                        formattedPhraseString(Phrases::SubMessage), name, " thread terminates", formattedPhraseString(Phrases::End));
+                })
+#ifdef PLATFORM_LINUX
+                .native_handle(),
+            name)
+#endif
+            ;
     }
 }
 
@@ -208,7 +222,7 @@ bool ServiceSetup::WebServerSetup::logCertificateValidation(bool preVerified, bo
 
 ServiceSetup::BuildSetup::Worker::Worker(ServiceSetup::BuildSetup &setup)
     : boost::asio::executor_work_guard<boost::asio::io_context::executor_type>(boost::asio::make_work_guard(setup.ioContext))
-    , ThreadPool("Worker thread", setup.ioContext, setup.threadCount)
+    , ThreadPool("Worker", setup.ioContext, setup.threadCount)
     , setup(setup)
 {
 }
