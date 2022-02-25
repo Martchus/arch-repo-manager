@@ -827,9 +827,21 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
             }
             enqueueDownloads(downloadsSession, 1);
         });
+    auto additionalFlags = std::vector<std::string>();
+    auto lock = lockToRead();
+    if (const auto &sourceInfo = m_buildPreparation.buildData[packageName].sourceInfo) {
+        for (const auto &source : sourceInfo->sources) {
+            if (source.path.find(".git?signed") != std::string::npos) {
+                // skip the GPG check at this point as makepkg won't actually clone the repository here
+                additionalFlags.emplace_back("--skippgpcheck");
+                break;
+            }
+        }
+    }
+    lock.unlock();
     m_buildAction->log()(Phrases::InfoMessage, "Making source package for ", packageName, " via ", m_makePkgPath.string(), '\n',
         ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
-    processSession->launch(boost::process::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source");
+    processSession->launch(boost::process::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     return InvocationResult::Ok;
 }
 
