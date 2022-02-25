@@ -302,7 +302,8 @@ void WebAPITests::testPostingBuildActionsFromTask()
             }
 
             return false;
-        });
+        },
+        20, 0);
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE("response ok", boost::beast::http::status::ok, response->result());
 }
