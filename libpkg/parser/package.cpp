@@ -272,16 +272,19 @@ void addPackageInfo(
     else_if_field("replaces")
     {
         package.replaces.emplace_back(Dependency::fromString(value, valueSize));
-        //} else_if_field("source") {
-        // currently not interesting
-        //package.sourceInfo->sources.emplace_back(value, valueSize);
-        //} else_if_field("size") {
-        //
+    }
+    else_if_field("source")
+    {
+        package.sourceInfo->sources.emplace_back().path = valueString;
+    }
+    else_if_field("size")
+    {
+        package.packageInfo->size = stringToNumber<decltype(package.packageInfo->size)>(valueString);
     }
     else_if_field("builddate")
     {
         ensure_pkg_info;
-        package.packageInfo->buildDate = DateTime::fromTimeStampGmt(stringToNumber<time_t>(valueString));
+        package.packageInfo->buildDate = DateTime::fromTimeStampGmt(stringToNumber<std::time_t>(valueString));
     }
     else_if_field("packager")
     {
