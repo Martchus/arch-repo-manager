@@ -188,7 +188,7 @@ PackageVersion PackageVersion::fromString(const char *versionString, size_t vers
 
 #define if_field(x) if (!strncmp(field, x, fieldSize))
 #define else_if_field(x) else if (!strncmp(field, x, fieldSize))
-#define valueString string(value, valueSize)
+#define valueString std::string_view(value, valueSize)
 #define ensure_pkg_info                                                                                                                              \
     if (!package.packageInfo)                                                                                                                        \
     package.packageInfo = make_unique<PackageInfo>()
