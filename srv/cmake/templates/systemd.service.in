@@ -8,5 +8,9 @@ ExecStart=@SYSTEMD_SERVICE_EXEC@
 KillSignal=SIGQUIT
 Restart=on-failure
 
+# for io_uring
+LimitMEMLOCK=67108864
+LimitMEMLOCKSoft=67108864
+
 [Install]
 WantedBy=multi-user.target
