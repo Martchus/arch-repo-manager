@@ -460,14 +460,6 @@ int main(int argc, const char *argv[])
     auto singleBuildActionIdArg = ConfigValueArgument("id", 'i', "specifies the build action ID", { "ID" });
     singleBuildActionIdArg.setImplicit(true);
     singleBuildActionIdArg.setRequired(true);
-    auto streamOutputBuildActionArg = OperationArgument("output", 'o', "stream overall build action output");
-    streamOutputBuildActionArg.setCallback([&path, &printer, &chunkHandler, &singleBuildActionIdArg](const ArgumentOccurrence &) {
-        path = "/api/v0/build-action/output?";
-        printer = printRawData;
-        chunkHandler = printChunk;
-        appendAsQueryParam(path, singleBuildActionIdArg, "id");
-    });
-    streamOutputBuildActionArg.setSubArguments({ &singleBuildActionIdArg });
     auto streamLogfileBuildActionArg = OperationArgument("logfile", 'f', "stream build action logfile");
     auto buildActionFilePathArg = ConfigValueArgument("path", 'p', "specifies the file path", { "path" });
     buildActionFilePathArg.setRequired(true);
@@ -551,9 +543,8 @@ int main(int argc, const char *argv[])
         appendAsQueryParam(path, buildActionIdArg, "id");
     });
     stopBuildActionArg.setSubArguments({ &buildActionIdArg });
-    actionArg.setSubArguments(
-        { &listActionsArg, &showBuildActionArg, &streamOutputBuildActionArg, &streamLogfileBuildActionArg, &streamArtefactBuildActionArg,
-            &createBuildActionArg, &deleteBuildActionArg, &cloneBuildActionArg, &startBuildActionArg, &stopBuildActionArg });
+    actionArg.setSubArguments({ &listActionsArg, &showBuildActionArg, &streamLogfileBuildActionArg, &streamArtefactBuildActionArg,
+        &createBuildActionArg, &deleteBuildActionArg, &cloneBuildActionArg, &startBuildActionArg, &stopBuildActionArg });
     auto apiArg = OperationArgument("api", '\0', "Invoke a generic API request:");
     auto pathArg = ConfigValueArgument("path", '\0', "specifies the route's path without prefix", { "path/of/route?foo=bar&bar=foo" });
     pathArg.setImplicit(true);
