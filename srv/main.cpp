@@ -23,7 +23,8 @@ int main(int argc, const char *argv[])
     SET_APPLICATION_INFO;
 
     // define default server setup
-    ServiceSetup setup;
+    auto exitCode = 0;
+    auto setup = ServiceSetup();
 
     // read cli args
     ArgumentParser parser;
@@ -33,17 +34,17 @@ int main(int argc, const char *argv[])
     ConfigValueArgument forceLoadingDBsArg("force-loading-dbs", 'f', "forces loading DBs, even if DB files have not been modified since last parse");
     runArg.setSubArguments({ &configFileArg, &forceLoadingDBsArg });
     runArg.setImplicit(true);
-    runArg.setCallback([&setup, &configFileArg, &forceLoadingDBsArg](const ArgumentOccurrence &) {
+    runArg.setCallback([&setup, &exitCode, &configFileArg, &forceLoadingDBsArg](const ArgumentOccurrence &) {
         if (const auto configFilePath = configFileArg.firstValue()) {
             setup.configFilePath = configFilePath;
         }
         setup.building.forceLoadingDbs = forceLoadingDBsArg.isPresent();
-        setup.run();
+        exitCode = setup.run();
     });
     HelpArgument helpArg(parser);
     NoColorArgument noColorArg;
     parser.setMainArguments({ &runArg, &noColorArg, &helpArg });
     parser.setDefaultArgument(&runArg);
     parser.parseArgs(argc, argv);
-    return 0;
+    return exitCode;
 }

@@ -53,7 +53,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     void restoreState();
     std::size_t saveState();
     void initStorage();
-    void run();
+    int run();
     ServiceStatus computeStatus() const;
 
     // variables relevant for the web server; only changed when (re)loading config

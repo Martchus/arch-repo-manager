@@ -651,7 +651,7 @@ void ServiceSetup::initStorage()
     config.markAllDatabasesToBeDiscarded();
 }
 
-void ServiceSetup::run()
+int ServiceSetup::run()
 {
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     try {
@@ -662,8 +662,10 @@ void ServiceSetup::run()
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
         cerr << Phrases::SubError << e.what() << endl;
+        return -1;
     } catch (...) {
         cerr << Phrases::SubError << "An unknown error occurred." << endl;
+        return -2;
     }
 #endif
 
@@ -686,22 +688,37 @@ void ServiceSetup::run()
 #ifndef CPP_UTILITIES_DEBUG_BUILD
         } catch (const std::exception &e) {
             cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+            return -3;
         } catch (...) {
             cerr << Phrases::ErrorMessage << "Server terminated due to an unknown error." << Phrases::EndFlush;
+            return -4;
         }
 #endif
     }
 
-    saveState();
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    try {
+#endif
+        saveState();
+        building.forEachBuildAction([](LibPkg::StorageID, BuildAction &buildAction, bool &save) {
+            if (buildAction.isExecuting()) {
+                buildAction.status = BuildActionStatus::Finished;
+                buildAction.result = BuildActionResult::Aborted;
+                save = true;
+            }
+            return false;
+        });
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    } catch (const std::exception &e) {
+        cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        return -5;
+    } catch (...) {
+        cerr << Phrases::ErrorMessage << "Unknown error occurred when terminating server." << Phrases::EndFlush;
+        return -6;
+    }
+#endif
 
-    building.forEachBuildAction([](LibPkg::StorageID, BuildAction &buildAction, bool &save) {
-        if (buildAction.isExecuting()) {
-            buildAction.status = BuildActionStatus::Finished;
-            buildAction.result = BuildActionResult::Aborted;
-            save = true;
-        }
-        return false;
-    });
+    return 0;
 }
 
 void ServiceSetup::Locks::clear()
