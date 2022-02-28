@@ -634,17 +634,17 @@ void PackageUpdaterPrivate::update(const PackageCache::StoreResult &res, const s
 void PackageUpdaterPrivate::update(const StorageID packageID, bool removed, const std::shared_ptr<Package> &package)
 {
     addDependency(packageID, Dependency(package->name, package->version), removed, affectedProvidedDeps);
-    for (const auto &dependeny : package->provides) {
-        addDependency(packageID, dependeny, removed, affectedProvidedDeps);
+    for (const auto &dependency : package->provides) {
+        addDependency(packageID, dependency, removed, affectedProvidedDeps);
     }
     for (const auto &lib : package->libprovides) {
         addLibrary(packageID, lib, removed, affectedProvidedLibs);
     }
-    for (const auto &dependeny : package->dependencies) {
-        addDependency(packageID, dependeny, removed, affectedRequiredDeps);
+    for (const auto &dependency : package->dependencies) {
+        addDependency(packageID, dependency, removed, affectedRequiredDeps);
     }
-    for (const auto &dependeny : package->optionalDependencies) {
-        addDependency(packageID, dependeny, removed, affectedRequiredDeps);
+    for (const auto &dependency : package->optionalDependencies) {
+        addDependency(packageID, dependency, removed, affectedRequiredDeps);
     }
     for (const auto &lib : package->libdepends) {
         addLibrary(packageID, lib, removed, affectedRequiredLibs);

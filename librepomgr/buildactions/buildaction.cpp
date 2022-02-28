@@ -372,7 +372,7 @@ LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
         // note: Not cleaning up the follow-up actions here because at some point I might implement recursive restarting.
     }
 
-    // detatch build process sessions
+    // detach build process sessions
     if (const auto lock = std::unique_lock(m_outputSessionMutex); m_outputSession) {
         m_outputSession->writeEnd(); // tell clients waiting for output that it's over
         m_outputSession.reset();

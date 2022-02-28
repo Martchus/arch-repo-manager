@@ -224,7 +224,7 @@ void DataTests::testPackageSearch()
     auto [db, pkg, packageID] = m_config.findPackage(Dependency("foo"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("expected package for dependency returned", m_pkgId1, packageID);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("find package returns the package from the first database", &m_config.databases.front(), std::get<Database *>(db));
-    // FIXME: check whether packge is actually (value) equivalent
+    // FIXME: check whether package is actually (value) equivalent
 
     pkgs = m_config.findPackages("bar"sv);
     CPPUNIT_ASSERT_EQUAL(1_st, pkgs.size());
@@ -243,12 +243,12 @@ void DataTests::testPackageSearch()
     pkgs = m_config.findPackages(Dependency("foo", "5.8-1", DependencyMode::GreatherEqual));
     CPPUNIT_ASSERT_EQUAL(1_st, pkgs.size());
     CPPUNIT_ASSERT_EQUAL(m_pkgId2, pkgs.front().id);
-    // FIXME: check whether packge is actually (value) equivalent
+    // FIXME: check whether package is actually (value) equivalent
 
     pkgs = m_config.findPackages(Dependency("bar", "5.5-1", DependencyMode::Equal));
     CPPUNIT_ASSERT_EQUAL(1_st, pkgs.size());
     CPPUNIT_ASSERT_EQUAL(m_pkgId2, pkgs.front().id);
-    // FIXME: check whether packge is actually (value) equivalent
+    // FIXME: check whether package is actually (value) equivalent
 
     pkgs = m_config.findPackages(Dependency("bar", "5.8-1", DependencyMode::Equal));
     CPPUNIT_ASSERT_EQUAL(0_st, pkgs.size());

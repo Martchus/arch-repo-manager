@@ -248,7 +248,7 @@ void ParserTests::testParsingSplitPackageSrcInfoWithDifferentArchs()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("base archs", std::vector{ "x86_64"s }, jre->sourceInfo->archs);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("jre archs (empty, base applies)", std::vector<std::string>{}, jre->archs);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk archs (empty, base applies)", std::vector<std::string>{}, jdk->archs);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk-doc archs (overidden)", std::vector{ "any"s }, doc->archs);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk-doc archs (overridden)", std::vector{ "any"s }, doc->archs);
 }
 
 void ParserTests::testParsingPkgInfo()
