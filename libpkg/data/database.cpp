@@ -489,6 +489,11 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
             continue;
         }
 
+        // skip DLLs known to be provided by Windows (but can not be detected as provides of mingw-w64-crt)
+        if (requiredLib.name.find("api-ms-win") != std::string::npos && requiredLib.name.ends_with(".dll")) {
+            continue;
+        }
+
         // add packages to list of unresolved packages
         for (const auto &affectedPackageID : requiredLib.relevantPackages) {
             const auto affectedPackage = findPackage(affectedPackageID);
