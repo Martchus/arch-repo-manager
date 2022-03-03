@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 
@@ -185,11 +186,17 @@ void Binary::load(const char *filePath)
     case BinaryType::Pe:
         name = fileName(filePath);
         break;
+    case BinaryType::Elf:
+        if (auto ec = std::error_code();
+            name.empty() && std::string_view(filePath).ends_with(".so") && std::filesystem::is_regular_file(filePath, ec) && !ec) {
+            name = fileName(filePath);
+        }
+        break;
     default:;
     }
 }
 
-void Binary::load(const string &fileContent, const string &fileName)
+void Binary::load(const string &fileContent, const string &fileName, bool isRegularFile)
 {
     stringstream fileStream(ios_base::in | ios_base::out | ios_base::binary);
     fileStream.exceptions(ios_base::failbit | ios_base::badbit);
@@ -198,6 +205,11 @@ void Binary::load(const string &fileContent, const string &fileName)
     switch (type) {
     case BinaryType::Pe:
         name = fileName;
+        break;
+    case BinaryType::Elf:
+        if (name.empty() && isRegularFile && fileName.ends_with(".so")) {
+            name = fileName;
+        }
         break;
     default:;
     }

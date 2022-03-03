@@ -83,7 +83,7 @@ inline VirtualAddressMapping::VirtualAddressMapping()
 
 struct LIBPKG_EXPORT Binary {
     void load(const char *filePath);
-    void load(const std::string &fileContent, const std::string &fileName);
+    void load(const std::string &fileContent, const std::string &fileName, bool isRegularFile = false);
     std::string addPrefix(const std::string &dependencyName) const;
 
     BinaryType type = BinaryType::Invalid;

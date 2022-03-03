@@ -778,7 +778,7 @@ void Package::addDepsAndProvidesFromContainedFile(const ArchiveFile &file, std::
 {
     try {
         Binary binary;
-        binary.load(file.content, file.name);
+        binary.load(file.content, file.name, file.type == ArchiveFileType::Regular);
         if (!binary.name.empty()) {
             if (binary.type == BinaryType::Ar && binary.subType == BinarySubType::WindowsImportLibrary) {
                 dllsReferencedByImportLibs.emplace(binary.addPrefix(binary.name));
