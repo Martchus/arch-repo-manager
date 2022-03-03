@@ -468,6 +468,9 @@ void CheckForProblems::run()
                             .desc = "signature file for package \"" % package->packageInfo->fileName + "\" not present", .pkg = package->name });
                     }
                 }
+                if (package->packageInfo->arch == "any" && (!package->libdepends.empty() || !package->libprovides.empty())) {
+                    problems.emplace_back(RepositoryProblem{ .desc = "\"any\"-arch package but binary present", .pkg = package->name });
+                }
                 return false;
             });
         } catch (const std::filesystem::filesystem_error &e) {
