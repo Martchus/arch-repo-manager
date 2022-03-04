@@ -469,7 +469,20 @@ void CheckForProblems::run()
                     }
                 }
                 if (package->packageInfo->arch == "any" && (!package->libdepends.empty() || !package->libprovides.empty())) {
-                    problems.emplace_back(RepositoryProblem{ .desc = "\"any\"-arch package but binary present", .pkg = package->name });
+                    auto crossOnly = true;
+                    for (const auto &libnames : { package->libdepends, package->libprovides }) {
+                        for (const auto &libname : libnames) {
+                            // ignore Windows and Android libs
+                            if (!libname.starts_with("pe-") && !libname.starts_with("android-")) {
+                                crossOnly = false;
+                                goto break2;
+                            }
+                        }
+                    }
+                break2:
+                    if (!crossOnly) {
+                        problems.emplace_back(RepositoryProblem{ .desc = "\"any\"-arch package but binary present", .pkg = package->name });
+                    }
                 }
                 return false;
             });
