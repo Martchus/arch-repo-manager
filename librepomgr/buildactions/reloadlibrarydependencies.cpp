@@ -27,7 +27,7 @@ void ReloadLibraryDependencies::run()
 {
     // read configuration
     const auto flags = static_cast<ReloadLibraryDependenciesFlags>(m_buildAction->flags);
-    const auto force = flags & ReloadLibraryDependenciesFlags::ForceReload;
+    m_force = flags & ReloadLibraryDependenciesFlags::ForceReload;
     const auto skipDependencies = flags & ReloadLibraryDependenciesFlags::SkipDependencies;
     auto &metaInfo = m_setup.building.metaInfo;
     auto metaInfoLock = metaInfo.lockToRead();
@@ -47,14 +47,14 @@ void ReloadLibraryDependencies::run()
 
     // initialize
     m_remainingPackages = 0;
-    auto configReadLock = init(BuildActionAccess::ReadConfig, RequiredDatabases::MaybeDestination, RequiredParameters::None);
+    auto configReadLock = init(BuildActionAccess::ReadConfig, RequiredDatabases::MaybeDestination, RequiredParameters::MaybePackages);
     if (std::holds_alternative<std::monostate>(configReadLock)) {
         return;
     }
 
     // use cache directory from global configuration
     auto buildLock = m_setup.building.lockToRead();
-    const auto cacheDir = m_setup.building.packageCacheDir + '/';
+    m_cacheDir = m_setup.building.packageCacheDir + '/';
     m_packageDownloadSizeLimit = m_setup.building.packageDownloadSizeLimit;
     buildLock.unlock();
 
@@ -104,96 +104,37 @@ void ReloadLibraryDependencies::run()
     for (auto *const db : relevantDbs) {
         const auto isDestinationDb = m_destinationDbs.empty() || m_destinationDbs.find(db) != m_destinationDbs.end();
         auto &relevantDbInfo = m_relevantPackagesByDatabase.emplace_back(DatabaseToConsider{ .name = db->name, .arch = db->arch });
-        db->allPackages([&](LibPkg::StorageID packageID, const std::shared_ptr<LibPkg::Package> &package) {
-            // allow aborting the build action
-            if (reportAbortedIfAborted()) {
-                return true;
-            }
-            // skip if package should be excluded
-            if (!packageExcludeRegexValue.empty() && std::regex_match(package->name, packageExcludeRegex)) {
-                m_messages.notes.emplace_back(db->name % '/' % package->name + ": matches exclude regex");
-                return false;
-            }
-            // skip if the package info is missing (we need the binary package's file name here)
-            const auto &packageInfo = package->packageInfo;
-            if (!packageInfo) {
-                m_messages.errors.emplace_back(db->name % '/' % package->name + ": no package info");
-                return false;
-            }
-            // skip the package if it is not part of the destination DB or required by a package of the destination DB
-            if (!isDestinationDb && relevantPkgs.find(packageID) == relevantPkgs.end()) {
-                if (m_skippingNote.tellp()) {
-                    m_skippingNote << ", ";
+        if (m_buildAction->packageNames.empty()) {
+            db->allPackages([&](LibPkg::StorageID packageID, const std::shared_ptr<LibPkg::Package> &package) {
+                // allow aborting the build action
+                if (reportAbortedIfAborted()) {
+                    return true;
                 }
-                m_skippingNote << db->name << '/' << package->name;
-                return false;
-            }
-            // find the package on disk; otherwise add an URL to download it from the configured mirror
-            std::string path, url, cachePath;
-            std::error_code ec;
-            const auto &fileName = packageInfo->fileName;
-            const auto &arch = packageInfo->arch;
-            if (!db->localPkgDir.empty()) {
-                path = db->localPkgDir % '/' + fileName;
-            } else if (std::filesystem::file_size(cachePath = cacheDir + fileName, ec) && !ec) {
-                path = std::move(cachePath);
-            } else if (std::filesystem::file_size(cachePath = cacheDir % arch % '/' + fileName, ec) && !ec) {
-                path = std::move(cachePath);
-            } else {
-                for (const auto &possibleCachePath : m_setup.config.packageCacheDirs) {
-                    if (std::filesystem::file_size(path = possibleCachePath % '/' + fileName, ec) && !ec) {
-                        break;
-                    }
-                    path.clear();
-                }
-            }
-            if (path.empty() && !db->mirrors.empty()) {
-                const auto &mirror = db->mirrors.front(); // just use the first mirror for now
-                if (startsWith(mirror, "file:")) {
-                    std::error_code ecCanonical;
-                    const auto canonPath = std::filesystem::canonical(
-                        argsToString(std::string_view(mirror.data() + 5, mirror.size() - 5), '/', fileName), ecCanonical);
-                    if (!ecCanonical) {
-                        path = canonPath.string();
-                    }
-                } else {
-                    path = std::move(cachePath);
-                    url = mirror % (endsWith(mirror, "/") ? std::string() : "/") + fileName;
-                }
-            }
-            if (path.empty()) {
-                m_messages.errors.emplace_back(db->name % '/' % package->name + ": binary package not found and no mirror configured");
-                return false;
-            }
-            // skip if the package info has already been loaded from package contents and the present binary package is not newer
-            auto lastModified = DateTime();
-            if (url.empty()) {
-                lastModified = LibPkg::lastModified(path);
-                if (!force && package->origin == LibPkg::PackageOrigin::PackageContents && package->timestamp >= lastModified) {
-                    m_messages.notes.emplace_back(db->name % '/' % package->name % ": skipping because \"" % path % "\" is newer ("
-                            % package->timestamp.toString() % " >= " % lastModified.toString()
-                        + ")\n");
+                // skip if package should be excluded
+                if (!packageExcludeRegexValue.empty() && std::regex_match(package->name, packageExcludeRegex)) {
+                    m_messages.notes.emplace_back(db->name % '/' % package->name + ": matches exclude regex");
                     return false;
                 }
+                return addRelevantPackage(packageID, package, db, isDestinationDb, relevantDbInfo, relevantPkgs);
+            });
+        } else {
+            for (const auto &packageDenotation : m_buildAction->packageNames) {
+                const auto [dbName, dbArch, packageName] = LibPkg::Config::parsePackageDenotation(packageDenotation);
+                if ((!dbName.empty() && dbName != db->name) || (!dbArch.empty() && dbArch != db->arch)) {
+                    continue;
+                }
+                auto [packageID, package] = db->findPackageWithID(std::string(packageName)); // FIXME: allow passing string_view here
+                if (!package) {
+                    continue;
+                }
+                addRelevantPackage(packageID, package, db, isDestinationDb, relevantDbInfo, relevantPkgs);
             }
-            // add the full path to the binary package to relevant packages
-            auto &relevantPkg = relevantDbInfo.packages.emplace_back(
-                PackageToConsider{ .path = std::move(path), .url = std::move(url), .lastModified = lastModified });
-            // create a temporary package object to hold the info parsed from the .PKGINFO file
-            relevantPkg.info.name = package->name;
-            // -> assign certain fields which are used by addDepsAndProvidesFromOtherPackage() to check whether the packages are matching
-            relevantPkg.info.version = package->version;
-            relevantPkg.info.packageInfo = std::make_unique<LibPkg::PackageInfo>();
-            relevantPkg.info.packageInfo->buildDate = package->packageInfo->buildDate;
-            // -> gather source info such as make and check dependencies as well
-            relevantPkg.info.sourceInfo = std::make_shared<LibPkg::SourceInfo>();
-            ++m_remainingPackages;
-            return false;
-        });
+        }
         if (reportAbortedIfAborted()) {
             return;
         }
     }
+
     configReadLock = std::monostate{};
 
     m_buildAction->appendOutput(Phrases::SubMessage, "Found ", m_remainingPackages.load(), "\n");
@@ -212,6 +153,87 @@ void ReloadLibraryDependencies::run()
     }
 
     downloadPackagesFromMirror();
+}
+
+bool ReloadLibraryDependencies::addRelevantPackage(LibPkg::StorageID packageID, const std::shared_ptr<LibPkg::Package> &package,
+    const LibPkg::Database *db, bool isDestinationDb, DatabaseToConsider &relevantDbInfo,
+    std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &relevantPkgs)
+{
+    // skip if the package info is missing (we need the binary package's file name here)
+    const auto &packageInfo = package->packageInfo;
+    if (!packageInfo) {
+        m_messages.errors.emplace_back(db->name % '/' % package->name + ": no package info");
+        return false;
+    }
+    // skip the package if it is not part of the destination DB or required by a package of the destination DB
+    if (!isDestinationDb && relevantPkgs.find(packageID) == relevantPkgs.end()) {
+        if (m_skippingNote.tellp()) {
+            m_skippingNote << ", ";
+        }
+        m_skippingNote << db->name << '/' << package->name;
+        return false;
+    }
+    // find the package on disk; otherwise add an URL to download it from the configured mirror
+    std::string path, url, cachePath;
+    std::error_code ec;
+    const auto &fileName = packageInfo->fileName;
+    const auto &arch = packageInfo->arch;
+    if (!db->localPkgDir.empty()) {
+        path = db->localPkgDir % '/' + fileName;
+    } else if (std::filesystem::file_size(cachePath = m_cacheDir + fileName, ec) && !ec) {
+        path = std::move(cachePath);
+    } else if (std::filesystem::file_size(cachePath = m_cacheDir % arch % '/' + fileName, ec) && !ec) {
+        path = std::move(cachePath);
+    } else {
+        for (const auto &possibleCachePath : m_setup.config.packageCacheDirs) {
+            if (std::filesystem::file_size(path = possibleCachePath % '/' + fileName, ec) && !ec) {
+                break;
+            }
+            path.clear();
+        }
+    }
+    if (path.empty() && !db->mirrors.empty()) {
+        const auto &mirror = db->mirrors.front(); // just use the first mirror for now
+        if (startsWith(mirror, "file:")) {
+            std::error_code ecCanonical;
+            const auto canonPath
+                = std::filesystem::canonical(argsToString(std::string_view(mirror.data() + 5, mirror.size() - 5), '/', fileName), ecCanonical);
+            if (!ecCanonical) {
+                path = canonPath.string();
+            }
+        } else {
+            path = std::move(cachePath);
+            url = mirror % (endsWith(mirror, "/") ? std::string() : "/") + fileName;
+        }
+    }
+    if (path.empty()) {
+        m_messages.errors.emplace_back(db->name % '/' % package->name + ": binary package not found and no mirror configured");
+        return false;
+    }
+    // skip if the package info has already been loaded from package contents and the present binary package is not newer
+    auto lastModified = DateTime();
+    if (url.empty()) {
+        lastModified = LibPkg::lastModified(path);
+        if (!m_force && package->origin == LibPkg::PackageOrigin::PackageContents && package->timestamp >= lastModified) {
+            m_messages.notes.emplace_back(db->name % '/' % package->name % ": skipping because \"" % path % "\" is newer ("
+                    % package->timestamp.toString() % " >= " % lastModified.toString()
+                + ")\n");
+            return false;
+        }
+    }
+    // add the full path to the binary package to relevant packages
+    auto &relevantPkg
+        = relevantDbInfo.packages.emplace_back(PackageToConsider{ .path = std::move(path), .url = std::move(url), .lastModified = lastModified });
+    // create a temporary package object to hold the info parsed from the .PKGINFO file
+    relevantPkg.info.name = package->name;
+    // -> assign certain fields which are used by addDepsAndProvidesFromOtherPackage() to check whether the packages are matching
+    relevantPkg.info.version = package->version;
+    relevantPkg.info.packageInfo = std::make_unique<LibPkg::PackageInfo>();
+    relevantPkg.info.packageInfo->buildDate = package->packageInfo->buildDate;
+    // -> gather source info such as make and check dependencies as well
+    relevantPkg.info.sourceInfo = std::make_shared<LibPkg::SourceInfo>();
+    ++m_remainingPackages;
+    return false;
 }
 
 void LibRepoMgr::ReloadLibraryDependencies::downloadPackagesFromMirror()
@@ -306,7 +328,7 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
                             currentPkg.info.addInfoFromPkgInfoFile(file.content);
                             return;
                         }
-                        currentPkg.info.addDepsAndProvidesFromContainedFile(file, dllsReferencedByImportLibs);
+                        currentPkg.info.addDepsAndProvidesFromContainedFile(directoryPath, file, dllsReferencedByImportLibs);
                     },
                     [&currentPkg](std::string &&directoryPath) {
                         if (directoryPath.empty()) {

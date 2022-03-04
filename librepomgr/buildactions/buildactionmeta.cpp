@@ -128,7 +128,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .directory = false,
             .sourceDb = false,
             .destinationDb = true,
-            .packageNames = false,
+            .packageNames = true,
         },
         BuildActionTypeMetaInfo{
             .id = BuildActionType::PrepareBuild,

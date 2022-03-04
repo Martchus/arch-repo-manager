@@ -409,6 +409,9 @@ private:
         std::vector<PackageToConsider> packages;
     };
 
+    bool addRelevantPackage(LibPkg::StorageID packageID, const std::shared_ptr<LibPkg::Package> &package, const LibPkg::Database *db,
+        bool isDestinationDb, DatabaseToConsider &relevantDbInfo,
+        std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &relevantPkgs);
     void downloadPackagesFromMirror();
     void loadPackageInfoFromContents();
     void conclude();
@@ -419,6 +422,8 @@ private:
     std::atomic_size_t m_remainingPackages;
     WebClient::PackageCachingDataForSession m_cachingData;
     std::uint64_t m_packageDownloadSizeLimit;
+    std::string m_cacheDir;
+    bool m_force = false;
 };
 
 struct LIBREPOMGR_EXPORT CheckForProblems : public InternalBuildAction {
