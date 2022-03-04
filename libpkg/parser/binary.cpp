@@ -1,3 +1,5 @@
+#define CPP_UTILITIES_PATHHELPER_STRING_VIEW
+
 #include "./binary.h"
 
 #include <c++utilities/conversion/stringbuilder.h>
@@ -176,19 +178,20 @@ ostream &operator<<(ostream &o, const BinaryClass &mode)
     return o;
 }
 
-void Binary::load(const char *filePath)
+void Binary::load(std::string_view filePath)
 {
     ifstream file;
     file.exceptions(ios_base::failbit | ios_base::badbit);
-    file.open(filePath, ios_base::in | ios_base::binary);
+    file.open(filePath.data(), ios_base::in | ios_base::binary);
     parse(file);
     switch (type) {
     case BinaryType::Pe:
+        // use name of library file as there's no soname filed in PEs
         name = fileName(filePath);
         break;
     case BinaryType::Elf:
-        if (auto ec = std::error_code();
-            name.empty() && std::string_view(filePath).ends_with(".so") && std::filesystem::is_regular_file(filePath, ec) && !ec) {
+        // use name of regular file as library name if no soname could be determined
+        if (auto ec = std::error_code(); name.empty() && filePath.ends_with(".so") && std::filesystem::is_regular_file(filePath, ec) && !ec) {
             name = fileName(filePath);
         }
         break;
@@ -196,7 +199,7 @@ void Binary::load(const char *filePath)
     }
 }
 
-void Binary::load(const string &fileContent, const string &fileName, bool isRegularFile)
+void Binary::load(const string &fileContent, const string &fileName, const string &directoryPath, bool isRegularFile)
 {
     stringstream fileStream(ios_base::in | ios_base::out | ios_base::binary);
     fileStream.exceptions(ios_base::failbit | ios_base::badbit);
@@ -204,11 +207,19 @@ void Binary::load(const string &fileContent, const string &fileName, bool isRegu
     parse(fileStream, &fileContent);
     switch (type) {
     case BinaryType::Pe:
+        // use name of library file as there's no soname filed in PEs
         name = fileName;
         break;
     case BinaryType::Elf:
+        // use name of regular file as library name if no soname could be determined
         if (name.empty() && isRegularFile && fileName.ends_with(".so")) {
             name = fileName;
+        }
+        // add prefix to Android libs to avoid confusion with normal GNU/Linux ELFs
+        // note: Relying on the path is not nice. Have Android libs any special header to be distinguishable?
+        if (directoryPath.starts_with("opt/android-libs")
+            || (directoryPath.starts_with("opt/android-ndk") && directoryPath.find("/sysroot/") != std::string::npos)) {
+            extraPrefix = "android-";
         }
         break;
     default:;
@@ -232,17 +243,17 @@ std::string Binary::addPrefix(const std::string &dependencyName) const
 {
     switch (type) {
     case BinaryType::Elf:
-        return argsToString("elf-", architecture, ':', ':', dependencyName);
+        return argsToString(extraPrefix, "elf-", architecture, ':', ':', dependencyName);
     case BinaryType::Pe:
-        return argsToString("pe-", architecture, ':', ':', toLower(dependencyName));
+        return argsToString(extraPrefix, "pe-", architecture, ':', ':', toLower(dependencyName));
     case BinaryType::Ar:
         switch (subType) {
         case BinarySubType::WindowsImportLibrary:
-            return argsToString("pe-", architecture, ':', ':', toLower(dependencyName));
+            return argsToString(extraPrefix, "pe-", architecture, ':', ':', toLower(dependencyName));
         default:;
         }
     default:
-        return "unknown::" + dependencyName;
+        return argsToString(extraPrefix, "unknown::", dependencyName);
     }
 }
 

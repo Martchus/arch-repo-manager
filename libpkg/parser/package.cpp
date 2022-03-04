@@ -750,7 +750,7 @@ void Package::addInfoFromPkgInfoFile(const string &info)
 static const regex pythonVersionRegex("usr/lib/python(2|3)\\.([0-9]*)(\\..*)?/site-packages");
 static const regex perlVersionRegex("usr/lib/perl5/5\\.([0-9]*)(\\..*)?/vendor_perl");
 
-void Package::addDepsAndProvidesFromContainedDirectory(const string &directoryPath)
+void Package::addDepsAndProvidesFromContainedDirectory(const std::string &directoryPath)
 {
     // check for Python modules
     thread_local smatch match;
@@ -774,11 +774,12 @@ void Package::addDepsAndProvidesFromContainedDirectory(const string &directoryPa
     }
 }
 
-void Package::addDepsAndProvidesFromContainedFile(const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs)
+void Package::addDepsAndProvidesFromContainedFile(
+    const std::string &directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs)
 {
     try {
         Binary binary;
-        binary.load(file.content, file.name, file.type == ArchiveFileType::Regular);
+        binary.load(file.content, file.name, directoryPath, file.type == ArchiveFileType::Regular);
         if (!binary.name.empty()) {
             if (binary.type == BinaryType::Ar && binary.subType == BinarySubType::WindowsImportLibrary) {
                 dllsReferencedByImportLibs.emplace(binary.addPrefix(binary.name));
@@ -826,7 +827,7 @@ void Package::addDepsAndProvidesFromContents(const FileMap &contents)
     for (const auto &[directoryPath, files] : contents) {
         addDepsAndProvidesFromContainedDirectory(directoryPath);
         for (const auto &file : files) {
-            addDepsAndProvidesFromContainedFile(file, dllsReferencedByImportLibs);
+            addDepsAndProvidesFromContainedFile(directoryPath, file, dllsReferencedByImportLibs);
         }
     }
     processDllsReferencedByImportLibs(std::move(dllsReferencedByImportLibs));
@@ -850,7 +851,7 @@ std::shared_ptr<Package> Package::fromPkgFile(const string &path)
                 }
                 return;
             }
-            tmpPackageForLibraryDeps.addDepsAndProvidesFromContainedFile(file, dllsReferencedByImportLibs);
+            tmpPackageForLibraryDeps.addDepsAndProvidesFromContainedFile(directoryPath, file, dllsReferencedByImportLibs);
         },
         [&tmpPackageForLibraryDeps](std::string &&directoryPath) {
             if (directoryPath.empty()) {

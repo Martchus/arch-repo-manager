@@ -58,7 +58,7 @@ void BinaryParserTests::tearDown()
 void BinaryParserTests::testParsingElf()
 {
     Binary bin;
-    bin.load(testFilePath("c++utilities/libc++utilities.so.4.5.0").data());
+    bin.load(testFilePath("c++utilities/libc++utilities.so.4.5.0"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Elf, bin.type);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("class", BinaryClass::Class64Bit, bin.binaryClass);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("sub type", BinarySubType::SharedObject, bin.subType);
@@ -72,7 +72,7 @@ void BinaryParserTests::testParsingElf()
 void BinaryParserTests::testParsingPe()
 {
     Binary bin;
-    bin.load(testFilePath("c++utilities/c++utilities.dll").data());
+    bin.load(testFilePath("c++utilities/c++utilities.dll"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Pe, bin.type);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "x86_64"s, bin.architecture);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "c++utilities.dll"s, bin.name);
@@ -84,7 +84,7 @@ void BinaryParserTests::testParsingPe()
 void BinaryParserTests::testParsingAr()
 {
     Binary bin;
-    bin.load(testFilePath("mingw-w64-crt/libkernel32.a").data());
+    bin.load(testFilePath("mingw-w64-crt/libkernel32.a"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Ar, bin.type);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "x86_64"s, bin.architecture);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "KERNEL32.dll"s, bin.name);

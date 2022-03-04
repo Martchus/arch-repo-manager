@@ -82,13 +82,14 @@ inline VirtualAddressMapping::VirtualAddressMapping()
 }
 
 struct LIBPKG_EXPORT Binary {
-    void load(const char *filePath);
-    void load(const std::string &fileContent, const std::string &fileName, bool isRegularFile = false);
+    void load(std::string_view filePath);
+    void load(const std::string &fileContent, const std::string &fileName, const std::string &directoryPath, bool isRegularFile = false);
     std::string addPrefix(const std::string &dependencyName) const;
 
     BinaryType type = BinaryType::Invalid;
     BinarySubType subType = BinarySubType::None;
     std::string name;
+    std::string_view extraPrefix;
     BinaryClass binaryClass = BinaryClass::Invalid;
     bool isBigEndian = false;
     std::string architecture;

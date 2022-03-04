@@ -385,7 +385,8 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     PackageNameData decomposeName() const;
     void addInfoFromPkgInfoFile(const std::string &info);
     void addDepsAndProvidesFromContainedDirectory(const std::string &directoryPath);
-    void addDepsAndProvidesFromContainedFile(const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
+    void addDepsAndProvidesFromContainedFile(
+        const std::string &directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
     void addDepsAndProvidesFromContents(const FileMap &contents);
     std::vector<std::string> processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);

@@ -105,9 +105,8 @@ void checkSyncthingTrayPackageSoDependencies(const Package &package)
 {
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::PackageContents, package.origin);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("file name"s, "syncthingtray-0.6.2-1-x86_64.pkg.tar.xz"s, package.packageInfo->fileName);
-    const set<string> sonames(
-        { "elf-x86_64::libsyncthingwidgets.so.0.6.2", "elf-x86_64::libsyncthingmodel.so.0.6.2", "elf-x86_64::libsyncthingconnector.so.0.6.2",
-          "elf-x86_64::libsyncthingfileitemaction.so" });
+    const set<string> sonames({ "elf-x86_64::libsyncthingwidgets.so.0.6.2", "elf-x86_64::libsyncthingmodel.so.0.6.2",
+        "elf-x86_64::libsyncthingconnector.so.0.6.2", "elf-x86_64::libsyncthingfileitemaction.so" });
     CPPUNIT_ASSERT_EQUAL_MESSAGE("library provides from sonames"s, sonames, package.libprovides);
     const set<string> required({ "elf-x86_64::libqtutilities.so.5", "elf-x86_64::libsyncthingmodel.so.0.6.2", "elf-x86_64::libKF5KIOWidgets.so.5",
         "elf-x86_64::libsyncthingconnector.so.0.6.2", "elf-x86_64::libsyncthingwidgets.so.0.6.2", "elf-x86_64::libKF5KIOCore.so.5",
