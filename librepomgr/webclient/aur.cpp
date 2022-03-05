@@ -53,9 +53,11 @@ void searchAurPackages(LogContext &log, ServiceSetup &setup, const std::string &
                 // parse and cache the AUR packages
                 auto packages = Package::fromAurRpcJson(body.data(), body.size(), PackageOrigin::AurRpcSearch);
                 auto lock = setup.config.lockToWrite();
+                auto updater = LibPkg::PackageUpdater(setup.config.aur);
                 for (auto &[packageID, package] : packages) {
-                    packageID = setup.config.aur.updatePackage(package);
+                    packageID = updater.update(package);
                 }
+                updater.commit();
                 lock.unlock();
                 multiSession->addResponses(packages);
             } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
