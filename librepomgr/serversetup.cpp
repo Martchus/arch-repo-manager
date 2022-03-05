@@ -30,6 +30,7 @@
 
 #ifdef PLATFORM_LINUX
 #include <pthread.h>
+#include <sys/resource.h>
 #endif
 
 #include <algorithm>
@@ -568,6 +569,40 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
     cerr << Phrases::SubMessage << "Ccache directory: " << building.ccacheDir << Phrases::End;
 }
 
+#ifdef PLATFORM_LINUX
+static void printLimitValue(auto value, bool size)
+{
+    if (value == RLIM_INFINITY) {
+        cerr << "infinity";
+    } else if (size) {
+        cerr << dataSizeToString(value);
+    } else {
+        cerr << value;
+    }
+}
+
+static void printLimit(auto field, std::string_view fieldName, bool size = false)
+{
+    auto limit = rlimit();
+    getrlimit(field, &limit);
+    cerr << Phrases::SubMessage << fieldName << ": ";
+    printLimitValue(limit.rlim_cur, size);
+    cerr << " / ";
+    printLimitValue(limit.rlim_max, size);
+    cerr << Phrases::End;
+}
+#endif
+
+void ServiceSetup::printLimits()
+{
+#ifdef PLATFORM_LINUX
+    cerr << Phrases::InfoMessage << "Limits (soft / hard):" << Phrases::End;
+    printLimit(RLIMIT_NOFILE, "NOFILE (Number of open files)");
+    printLimit(RLIMIT_MEMLOCK, "MEMLOCK (Locked-in-memory address space)", true);
+    printLimit(RLIMIT_LOCKS, "LOCKS (Maximum number of file locks)");
+#endif
+}
+
 void ServiceSetup::printDatabases()
 {
     cerr << Phrases::SuccessMessage << "Found " << config.databases.size() << " databases:" << Phrases::End;
@@ -659,6 +694,7 @@ int ServiceSetup::run()
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     try {
 #endif
+        printLimits();
         loadConfigFiles(true);
         config.discardDatabases();
         config.loadAllPackages(building.loadFilesDbs, building.forceLoadingDbs);

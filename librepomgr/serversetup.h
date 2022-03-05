@@ -48,6 +48,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::size_t packageCacheLimit = 1000;
 
     void loadConfigFiles(bool doFirstTimeSetup);
+    void printLimits();
     void printDatabases();
     std::string_view cacheFilePath() const;
     void restoreState();
