@@ -25,6 +25,9 @@
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
 
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
+
 #ifdef PLATFORM_LINUX
 #include <pthread.h>
 #endif
@@ -686,6 +689,10 @@ int ServiceSetup::run()
             WebAPI::Server::serve(*this);
             cout << Phrases::SuccessMessage << "Web server stopped." << Phrases::EndFlush;
 #ifndef CPP_UTILITIES_DEBUG_BUILD
+        } catch (const boost::exception &e) {
+            cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << boost::diagnostic_information(e)
+                 << Phrases::EndFlush;
+            return -3;
         } catch (const std::exception &e) {
             cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
             return -3;

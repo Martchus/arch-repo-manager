@@ -31,6 +31,9 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
+
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -601,6 +604,21 @@ int main(int argc, const char *argv[])
         std::bind(&handleResponse, std::ref(url), std::placeholders::_1, std::placeholders::_2, rawArg.isPresent() ? printRawData : printer,
             std::ref(returnCode)),
         std::string(), config.userName, config.password, verb, std::nullopt, chunkHandler);
-    ioContext.run();
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    try {
+#endif
+        ioContext.run();
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    } catch (const boost::exception &e) {
+        cerr << Phrases::ErrorMessage << "Unhandled exception: " << Phrases::End << "  " << boost::diagnostic_information(e) << Phrases::EndFlush;
+        return -3;
+    } catch (const std::exception &e) {
+        cerr << Phrases::ErrorMessage << "Unhandled exception: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        return -3;
+    } catch (...) {
+        cerr << Phrases::ErrorMessage << "Terminated due to unknown error." << Phrases::EndFlush;
+        return -4;
+    }
+#endif
     return returnCode;
 }
