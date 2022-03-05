@@ -57,7 +57,7 @@ template <typename StorageEntryType> void StorageCacheEntries<StorageEntryType>:
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
 auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &storage, ROTxn *txn, StorageID storageID) -> SpecType
 {
-    // check for package in cache
+    // check for package in cache, should be ok even if the db is being updated
     const auto ref = typename StorageEntryByID<typename Entries::StorageEntry>::result_type{ storageID, &storage };
     auto lock = std::unique_lock(m_mutex);
     if (auto *const existingCacheEntry = m_entries.find(ref)) {
@@ -67,13 +67,16 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
     lock.unlock();
     auto entry = std::make_shared<Entry>();
     if (auto id = txn ? txn->get(storageID, *entry) : storage.packages.getROTransaction().get(storageID, *entry)) {
-        using CacheEntry = typename Entries::StorageEntry;
-        using CacheRef = typename Entries::Ref;
-        auto newCacheEntry = CacheEntry(CacheRef(storage, entry), id);
-        newCacheEntry.entry = entry;
-        lock = std::unique_lock(m_mutex);
-        m_entries.insert(std::move(newCacheEntry));
-        lock.unlock();
+        // try to acquire update lock to avoid update existing cache entries while db is being updated
+        if (const auto updateLock = std::unique_lock(storage.updateMutex, std::try_to_lock)) {
+            using CacheEntry = typename Entries::StorageEntry;
+            using CacheRef = typename Entries::Ref;
+            auto newCacheEntry = CacheEntry(CacheRef(storage, entry), id);
+            newCacheEntry.entry = entry;
+            lock = std::unique_lock(m_mutex);
+            m_entries.insert(std::move(newCacheEntry));
+            lock.unlock();
+        }
         return SpecType(id, entry);
     }
     return SpecType(0, std::shared_ptr<Entry>());
@@ -92,7 +95,7 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
     if (entryName.empty()) {
         return SpecType(0, std::shared_ptr<Entry>());
     }
-    // check for package in cache
+    // check for package in cache, should be ok even if the db is being updated
     using CacheRef = typename Entries::Ref;
     const auto ref = CacheRef(storage, entryName);
     auto lock = std::unique_lock(m_mutex);
@@ -103,12 +106,15 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
     // check for package in storage, populate cache entry
     auto entry = std::make_shared<Entry>();
     if (auto id = txn ? txn->template get<0>(entryName, *entry) : storage.packages.getROTransaction().template get<0>(entryName, *entry)) {
-        using CacheEntry = typename Entries::StorageEntry;
-        auto newCacheEntry = CacheEntry(CacheRef(storage, entry), id);
-        newCacheEntry.entry = entry;
-        lock = std::unique_lock(m_mutex);
-        m_entries.insert(std::move(newCacheEntry));
-        lock.unlock();
+        // try to acquire update lock to avoid update existing cache entries while db is being updated
+        if (const auto updateLock = std::unique_lock(storage.updateMutex, std::try_to_lock)) {
+            using CacheEntry = typename Entries::StorageEntry;
+            auto newCacheEntry = CacheEntry(CacheRef(storage, entry), id);
+            newCacheEntry.entry = entry;
+            lock = std::unique_lock(m_mutex);
+            m_entries.insert(std::move(newCacheEntry));
+            lock.unlock();
+        }
         return SpecType(id, entry);
     }
     return SpecType(0, std::shared_ptr<Entry>());

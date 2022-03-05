@@ -10,6 +10,7 @@
 #include <c++utilities/chrono/datetime.h>
 #include <c++utilities/misc/flagenumclass.h>
 
+#include <atomic>
 #include <filesystem>
 #include <optional>
 #include <unordered_set>
@@ -100,7 +101,7 @@ struct LIBPKG_EXPORT UnresolvedDependencies : public ReflectiveRapidJSON::JsonSe
 struct PackageUpdaterPrivate;
 
 struct LIBPKG_EXPORT PackageUpdater {
-    explicit PackageUpdater(Database &database);
+    explicit PackageUpdater(Database &database, bool clear = false);
     ~PackageUpdater();
 
     PackageSpec findPackageWithID(const std::string &packageName);
@@ -110,6 +111,22 @@ struct LIBPKG_EXPORT PackageUpdater {
 private:
     Database &m_database;
     std::unique_ptr<PackageUpdaterPrivate> m_d;
+};
+
+struct AtomicDateTime : public std::atomic<CppUtilities::DateTime> {
+    AtomicDateTime(CppUtilities::DateTime value = CppUtilities::DateTime())
+        : std::atomic<CppUtilities::DateTime>(value)
+    {
+    }
+    AtomicDateTime(AtomicDateTime &&other)
+        : std::atomic<CppUtilities::DateTime>(other.load())
+    {
+    }
+    AtomicDateTime &operator=(AtomicDateTime &&other)
+    {
+        store(other.load());
+        return *this;
+    }
 };
 
 struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Database>, public ReflectiveRapidJSON::BinarySerializable<Database> {
@@ -134,8 +151,6 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     void loadPackages(FileMap &&databaseFiles, CppUtilities::DateTime lastModified);
     static bool isFileRelevant(const char *filePath, const char *fileName, mode_t);
     std::vector<std::shared_ptr<Package>> findPackages(const std::function<bool(const Database &, const Package &)> &pred);
-    void removePackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
-    void addPackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
     void allPackages(const PackageVisitorMove &visitor);
     void allPackagesByName(const PackageVisitorByName &visitor);
     std::size_t packageCount() const;
@@ -158,6 +173,11 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     PackageLocation locatePackage(const std::string &packageName) const;
     std::string filesPathFromRegularPath() const;
 
+private:
+    void removePackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
+    void addPackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
+
+public:
     std::string name;
     std::string path;
     std::string filesPath;
@@ -168,7 +188,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     std::vector<std::string> dependencies;
     std::string localPkgDir;
     std::string localDbDir;
-    CppUtilities::DateTime lastUpdate;
+    AtomicDateTime lastUpdate;
     bool syncFromMirror = false;
     bool toBeDiscarded = false;
 
@@ -245,6 +265,14 @@ template <>
 LIBPKG_EXPORT void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult &reflectable,
     const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors);
 
+// declare custom (de)serialization for AtomicDateTime
+template <>
+LIBPKG_EXPORT void push<LibPkg::AtomicDateTime>(
+    const LibPkg::AtomicDateTime &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator);
+template <>
+LIBPKG_EXPORT void pull<LibPkg::AtomicDateTime>(LibPkg::AtomicDateTime &reflectable,
+    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors);
+
 } // namespace JsonReflector
 
 namespace BinaryReflector {
@@ -255,6 +283,13 @@ LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSearchResult>(
 template <>
 LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::PackageSearchResult>(
     BinaryDeserializer &deserializer, LibPkg::PackageSearchResult &packageSearchResult, BinaryVersion version);
+
+template <>
+LIBPKG_EXPORT void writeCustomType<LibPkg::AtomicDateTime>(
+    BinarySerializer &serializer, const LibPkg::AtomicDateTime &packageSearchResult, BinaryVersion version);
+template <>
+LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::AtomicDateTime>(
+    BinaryDeserializer &deserializer, LibPkg::AtomicDateTime &packageSearchResult, BinaryVersion version);
 
 } // namespace BinaryReflector
 

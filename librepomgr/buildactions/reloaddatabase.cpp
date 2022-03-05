@@ -85,7 +85,7 @@ void ReloadDatabase::run()
                     if (!force) {
                         auto configReadLock2 = m_setup.config.lockToRead();
                         auto *const destinationDb = m_setup.config.findDatabase(dbName, dbArch);
-                        if (const auto lastUpdate = destinationDb->lastUpdate; lastModified <= lastUpdate) {
+                        if (const auto lastUpdate = destinationDb->lastUpdate.load(); lastModified <= lastUpdate) {
                             configReadLock2.unlock();
                             m_buildAction->appendOutput(Phrases::InfoMessage, "Skip loading database \"", dbName, '@', dbArch,
                                 "\" from local file \"", dbPath, "\"; last modification time <= last update (", lastModified.toString(), '<', '=',
@@ -98,7 +98,7 @@ void ReloadDatabase::run()
                     dbFileLock.lock().unlock();
                     m_buildAction->appendOutput(
                         Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch, "\" from local file \"", dbPath, "\"\n");
-                    const auto configLock = m_setup.config.lockToWrite();
+                    const auto configLock = m_setup.config.lockToRead();
                     auto *const destinationDb = m_setup.config.findDatabase(dbName, dbArch);
                     if (!destinationDb) {
                         m_buildAction->appendOutput(
@@ -123,7 +123,7 @@ void ReloadDatabase::run()
 
     // clear AUR cache
     if (m_toAur) {
-        auto lock = m_setup.config.lockToWrite();
+        auto lock = m_setup.config.lockToRead();
         m_setup.config.aur.clearPackages();
         lock.unlock();
         m_buildAction->log()(Phrases::InfoMessage, "Cleared AUR cache\n");

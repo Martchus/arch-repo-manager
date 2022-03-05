@@ -52,7 +52,7 @@ void searchAurPackages(LogContext &log, ServiceSetup &setup, const std::string &
             try {
                 // parse and cache the AUR packages
                 auto packages = Package::fromAurRpcJson(body.data(), body.size(), PackageOrigin::AurRpcSearch);
-                auto lock = setup.config.lockToWrite();
+                auto lock = setup.config.lockToRead();
                 auto updater = LibPkg::PackageUpdater(setup.config.aur);
                 for (auto &[packageID, package] : packages) {
                     packageID = updater.update(package);
@@ -100,7 +100,7 @@ std::shared_ptr<AurQuerySession> queryAurPackagesInternal(LogContext &log, Servi
                 try {
                     // parse and cache the AUR packages
                     auto packagesFromAur = Package::fromAurRpcJson(body.data(), body.size());
-                    auto lock = setup.config.lockToWrite();
+                    auto lock = setup.config.lockToRead();
                     auto updater = PackageUpdater(setup.config.aur);
                     for (auto &[packageID, package] : packagesFromAur) {
                         packageID = updater.update(package);

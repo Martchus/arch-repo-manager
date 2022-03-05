@@ -591,7 +591,7 @@ void CleanRepository::run()
             const auto lastModified = LibPkg::lastModified(dbFile);
             if (lastModified != db->lastUpdate) {
                 m_messages.errors.emplace_back("The db file's last modification (" % lastModified.toString() % ") does not match the last db update ("
-                        % db->lastUpdate.toString()
+                        % db->lastUpdate.load().toString()
                     + ").");
                 fatalError = true;
             }

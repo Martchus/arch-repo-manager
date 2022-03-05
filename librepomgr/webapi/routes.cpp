@@ -357,7 +357,7 @@ void postLoadPackages(const Params &params, ResponseHandler &&handler)
 {
     const auto withFiles = params.target.hasFlag("with-files");
     const auto force = params.target.hasFlag("force");
-    auto lock = params.setup.config.lockToWrite();
+    auto lock = params.setup.config.lockToRead();
     params.setup.config.loadAllPackages(withFiles, force);
     lock.unlock();
     handler(makeText(params.request(), "packages loaded"));

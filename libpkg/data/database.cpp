@@ -25,12 +25,14 @@ struct PackageUpdaterPrivate {
     using AffectedDeps = std::unordered_multimap<std::string, AffectedPackagesWithDependencyDetail>;
     using AffectedLibs = std::unordered_map<std::string, AffectedPackages>;
 
-    explicit PackageUpdaterPrivate(DatabaseStorage &storage);
+    explicit PackageUpdaterPrivate(DatabaseStorage &storage, bool clear);
     void update(const PackageCache::StoreResult &res, const std::shared_ptr<Package> &package);
     void update(const StorageID packageID, bool removed, const std::shared_ptr<Package> &package);
     void submit(const std::string &dependencyName, AffectedDeps::mapped_type &affected, DependencyStorage::RWTransaction &txn);
     void submit(const std::string &libraryName, AffectedLibs::mapped_type &affected, LibraryDependencyStorage::RWTransaction &txn);
 
+    bool clear = false;
+    std::unique_lock<std::mutex> lock;
     PackageStorage::RWTransaction packagesTxn;
     AffectedDeps affectedProvidedDeps;
     AffectedDeps affectedRequiredDeps;
@@ -95,10 +97,12 @@ void Database::resetConfiguration()
 
 void Database::clearPackages()
 {
-    lastUpdate = DateTime();
-    if (m_storage) {
-        m_storage->packageCache.clear(*m_storage);
+    if (!m_storage) {
+        return;
     }
+    const auto lock = std::unique_lock(m_storage->updateMutex);
+    m_storage->packageCache.clear(*m_storage);
+    lastUpdate = DateTime();
 }
 
 std::vector<std::shared_ptr<Package>> Database::findPackages(const std::function<bool(const Database &, const Package &)> &pred)
@@ -340,6 +344,7 @@ PackageSpec Database::findPackageWithID(const std::string &packageName)
 
 void Database::removePackage(const std::string &packageName)
 {
+    const auto lock = std::unique_lock(m_storage->updateMutex);
     const auto [packageID, package] = m_storage->packageCache.retrieve(*m_storage, packageName);
     if (package) {
         removePackageDependencies(packageID, package);
@@ -349,6 +354,7 @@ void Database::removePackage(const std::string &packageName)
 
 StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
 {
+    const auto lock = std::unique_lock(m_storage->updateMutex);
     const auto res = m_storage->packageCache.store(*m_storage, package, false);
     if (!res.updated) {
         return res.id;
@@ -362,6 +368,7 @@ StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
 
 StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
 {
+    const auto lock = std::unique_lock(m_storage->updateMutex);
     const auto res = m_storage->packageCache.store(*m_storage, package, true);
     if (res.oldEntry) {
         removePackageDependencies(res.id, res.oldEntry);
@@ -377,8 +384,7 @@ void Database::replacePackages(const std::vector<std::shared_ptr<Package>> &newP
             package->addDepsAndProvidesFromOtherPackage(*existingPackage);
         }
     }
-    clearPackages();
-    auto updater = PackageUpdater(*this);
+    auto updater = PackageUpdater(*this, true);
     for (const auto &package : newPackages) {
         updater.update(package);
     }
@@ -623,15 +629,21 @@ std::string Database::filesPathFromRegularPath() const
     return ext == std::string::npos ? path : argsToString(std::string_view(path.data(), ext), ".files");
 }
 
-PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage)
-    : packagesTxn(storage.packages.getRWTransaction())
+PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage, bool clear)
+    : clear(clear)
+    , lock(storage.updateMutex)
+    , packagesTxn(storage.packages.getRWTransaction())
 {
+    if (clear) {
+        storage.packageCache.clearCacheOnly(storage);
+        packagesTxn.clear();
+    }
 }
 
 void PackageUpdaterPrivate::update(const PackageCache::StoreResult &res, const std::shared_ptr<Package> &package)
 {
     update(res.id, false, package);
-    if (res.oldEntry) {
+    if (!clear && res.oldEntry) {
         update(res.id, true, res.oldEntry);
     }
 }
@@ -731,9 +743,9 @@ void PackageUpdaterPrivate::addLibrary(StorageID packageID, const std::string &l
     }
 }
 
-PackageUpdater::PackageUpdater(Database &database)
+PackageUpdater::PackageUpdater(Database &database, bool clear)
     : m_database(database)
-    , m_d(std::make_unique<PackageUpdaterPrivate>(*m_database.m_storage))
+    , m_d(std::make_unique<PackageUpdaterPrivate>(*m_database.m_storage, clear))
 {
 }
 
@@ -748,42 +760,57 @@ LibPkg::PackageSpec LibPkg::PackageUpdater::findPackageWithID(const std::string 
 
 StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
 {
-    const auto res = m_database.m_storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package);
+    const auto &storage = m_database.m_storage;
+    const auto res = storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package);
     m_d->update(res, package);
     return res.id;
 }
 
 void PackageUpdater::commit()
 {
+    const auto &storage = m_database.m_storage;
     m_d->packagesTxn.commit();
     {
-        auto txn = m_database.m_storage->providedDeps.getRWTransaction();
+        auto txn = storage->providedDeps.getRWTransaction();
+        if (m_d->clear) {
+            txn.clear();
+        }
         for (auto &[dependencyName, affected] : m_d->affectedProvidedDeps) {
             m_d->submit(dependencyName, affected, txn);
         }
         txn.commit();
     }
     {
-        auto txn = m_database.m_storage->requiredDeps.getRWTransaction();
+        auto txn = storage->requiredDeps.getRWTransaction();
+        if (m_d->clear) {
+            txn.clear();
+        }
         for (auto &[dependencyName, affected] : m_d->affectedRequiredDeps) {
             m_d->submit(dependencyName, affected, txn);
         }
         txn.commit();
     }
     {
-        auto txn = m_database.m_storage->providedLibs.getRWTransaction();
+        auto txn = storage->providedLibs.getRWTransaction();
+        if (m_d->clear) {
+            txn.clear();
+        }
         for (auto &[libraryName, affected] : m_d->affectedProvidedLibs) {
             m_d->submit(libraryName, affected, txn);
         }
         txn.commit();
     }
     {
-        auto txn = m_database.m_storage->requiredLibs.getRWTransaction();
+        auto txn = storage->requiredLibs.getRWTransaction();
+        if (m_d->clear) {
+            txn.clear();
+        }
         for (auto &[libraryName, affected] : m_d->affectedRequiredLibs) {
             m_d->submit(libraryName, affected, txn);
         }
         txn.commit();
     }
+    m_d->lock.unlock();
 }
 
 } // namespace LibPkg
@@ -793,7 +820,7 @@ namespace ReflectiveRapidJSON {
 namespace JsonReflector {
 
 template <>
-LIBPKG_EXPORT void push<LibPkg::PackageSearchResult>(
+void push<LibPkg::PackageSearchResult>(
     const LibPkg::PackageSearchResult &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
 {
     // customize serialization of PackageSearchResult to render as if it was pkg itself with an additional db property
@@ -830,7 +857,7 @@ LIBPKG_EXPORT void push<LibPkg::PackageSearchResult>(
 }
 
 template <>
-LIBPKG_EXPORT void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult &reflectable,
+void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult &reflectable,
     const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors)
 {
     if (!value.IsObject()) {
@@ -862,12 +889,28 @@ LIBPKG_EXPORT void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult
     ReflectiveRapidJSON::JsonReflector::pull(dbInfo.arch, "dbArch", obj, errors);
 }
 
+template <>
+void push<LibPkg::AtomicDateTime>(
+    const LibPkg::AtomicDateTime &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+{
+    push<CppUtilities::DateTime>(reflectable.load(), value, allocator);
+}
+
+template <>
+void pull<LibPkg::AtomicDateTime>(LibPkg::AtomicDateTime &reflectable,
+    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors)
+{
+    auto d = CppUtilities::DateTime();
+    pull<CppUtilities::DateTime>(d, value, errors);
+    reflectable.store(d);
+}
+
 } // namespace JsonReflector
 
 namespace BinaryReflector {
 
 template <>
-LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSearchResult>(
+void writeCustomType<LibPkg::PackageSearchResult>(
     BinarySerializer &serializer, const LibPkg::PackageSearchResult &packageSearchResult, BinaryVersion version)
 {
     if (const auto *const dbInfo = std::get_if<LibPkg::DatabaseInfo>(&packageSearchResult.db)) {
@@ -881,12 +924,26 @@ LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSearchResult>(
 }
 
 template <>
-LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::PackageSearchResult>(
+BinaryVersion readCustomType<LibPkg::PackageSearchResult>(
     BinaryDeserializer &deserializer, LibPkg::PackageSearchResult &packageSearchResult, BinaryVersion version)
 {
     deserializer.read(packageSearchResult.db.emplace<LibPkg::DatabaseInfo>().name, version);
     deserializer.read(packageSearchResult.pkg, version);
     return 0;
+}
+
+template <> void writeCustomType<LibPkg::AtomicDateTime>(BinarySerializer &serializer, const LibPkg::AtomicDateTime &dateTime, BinaryVersion version)
+{
+    writeCustomType<CppUtilities::DateTime>(serializer, dateTime.load(), version);
+}
+
+template <>
+BinaryVersion readCustomType<LibPkg::AtomicDateTime>(BinaryDeserializer &deserializer, LibPkg::AtomicDateTime &dateTime, BinaryVersion version)
+{
+    auto d = CppUtilities::DateTime();
+    auto v = readCustomType<CppUtilities::DateTime>(deserializer, d, version);
+    dateTime.store(d);
+    return v;
 }
 
 } // namespace BinaryReflector

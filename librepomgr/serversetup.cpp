@@ -608,7 +608,7 @@ void ServiceSetup::printDatabases()
     cerr << Phrases::SuccessMessage << "Found " << config.databases.size() << " databases:" << Phrases::End;
     for (const auto &db : config.databases) {
         cerr << Phrases::SubMessage << db.name << "@" << db.arch << ": " << db.packageCount() << " packages, last updated on "
-             << db.lastUpdate.toString(DateTimeOutputFormat::DateAndTime) << Phrases::End << "     - path: " << db.path
+             << db.lastUpdate.load().toString(DateTimeOutputFormat::DateAndTime) << Phrases::End << "     - path: " << db.path
              << "\n     - local db dir: " << db.localDbDir << "\n     - local package dir: " << db.localPkgDir << '\n';
     }
     cerr << Phrases::SubMessage << "AUR (" << config.aur.packageCount() << " packages cached)" << Phrases::End;

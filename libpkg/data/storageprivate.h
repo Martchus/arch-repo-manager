@@ -4,6 +4,8 @@
 #include "./package.h"
 #include "./storagegeneric.h"
 
+#include <mutex>
+
 namespace LibPkg {
 
 using PackageStorage = LMDBSafe::TypedDBI<Package, LMDBSafe::index_on<Package, std::string, &Package::name>>;
@@ -50,6 +52,7 @@ struct DatabaseStorage {
     DependencyStorage requiredDeps;
     LibraryDependencyStorage providedLibs;
     LibraryDependencyStorage requiredLibs;
+    std::mutex updateMutex; // must be acquired to update packages, concurrent reads should still be possible
 
 private:
     std::shared_ptr<LMDBSafe::MDBEnv> m_env;

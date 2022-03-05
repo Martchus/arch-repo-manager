@@ -100,7 +100,7 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
                       session3.skip = true;
                       return;
                   }
-                  const auto lastUpdate = destinationDb->lastUpdate;
+                  const auto lastUpdate = destinationDb->lastUpdate.load();
                   configReadLock.unlock();
                   if (lastModified > lastUpdate) {
                       return;
@@ -138,7 +138,7 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
             } else if (!force) {
                 auto configReadLock = setup.config.lockToRead();
                 if (auto *const destinationDb = setup.config.findDatabase(dbName, dbArch)) {
-                    if (const auto lastUpdate = destinationDb->lastUpdate; lastModified <= lastUpdate) {
+                    if (const auto lastUpdate = destinationDb->lastUpdate.load(); lastModified <= lastUpdate) {
                         configReadLock.unlock();
                         log(Phrases::InfoMessage, "Skip loading database \"", dbName, '@', dbArch,
                             "\" from mirror response; last modification time <= last update (", lastModified.toString(),
@@ -157,9 +157,10 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
                 auto packages = Package::fromDatabaseFile(std::move(files));
 
                 // insert packages
-                auto lock = setup.config.lockToWrite();
+                auto lock = setup.config.lockToRead();
                 auto db = setup.config.findDatabase(dbName, dbArch);
                 if (!db) {
+                    lock.unlock();
                     log(Phrases::ErrorMessage, "Retrieved database file for \"", dbName, '@', dbArch, "\" but it no longer exists; discarding\n");
                     return;
                 }
