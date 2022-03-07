@@ -47,6 +47,7 @@ enum class BuildActionType : std::uint64_t {
     CleanRepository,
     DummyBuildAction,
     CustomCommand,
+    LastType = CustomCommand,
 };
 
 using BuildActionFlagType = std::uint64_t;

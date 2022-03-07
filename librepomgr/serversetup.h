@@ -55,6 +55,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::size_t saveState();
     void initStorage();
     int run();
+    int fixDb();
     ServiceStatus computeStatus() const;
 
     // variables relevant for the web server; only changed when (re)loading config
@@ -141,6 +142,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         void deleteBuildAction(const std::vector<std::shared_ptr<BuildAction>> &actions);
         std::size_t buildActionCount();
         std::size_t runningBuildActionCount();
+        void rebuildDb();
         void forEachBuildAction(std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func,
             std::size_t limit, std::size_t start);
         void forEachBuildAction(std::function<bool(LibPkg::StorageID, BuildAction &, bool &)> &&func);

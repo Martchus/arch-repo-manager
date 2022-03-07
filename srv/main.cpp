@@ -41,9 +41,17 @@ int main(int argc, const char *argv[])
         setup.building.forceLoadingDbs = forceLoadingDBsArg.isPresent();
         exitCode = setup.run();
     });
+    OperationArgument fixDb("fix-db", '\0', "fixes the database files");
+    fixDb.setSubArguments({ &configFileArg });
+    fixDb.setCallback([&setup, &exitCode, &configFileArg](const ArgumentOccurrence &) {
+        if (const auto configFilePath = configFileArg.firstValue()) {
+            setup.configFilePath = configFilePath;
+        }
+        exitCode = setup.fixDb();
+    });
     HelpArgument helpArg(parser);
     NoColorArgument noColorArg;
-    parser.setMainArguments({ &runArg, &noColorArg, &helpArg });
+    parser.setMainArguments({ &runArg, &fixDb, &noColorArg, &helpArg });
     parser.setDefaultArgument(&runArg);
     parser.parseArgs(argc, argv);
     return exitCode;

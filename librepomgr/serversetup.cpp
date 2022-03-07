@@ -357,6 +357,41 @@ std::size_t ServiceSetup::BuildSetup::buildActionCount()
     return m_storage->buildActions.getROTransaction().size();
 }
 
+void ServiceSetup::BuildSetup::rebuildDb()
+{
+    auto txn = m_storage->buildActions.getRWTransaction();
+    auto processed = std::size_t();
+    auto ok = std::size_t();
+    txn.rebuild([count = txn.size(), &processed, &ok](StorageID id, BuildAction *buildAction) mutable {
+        std::cerr << "Processing build action " << ++processed << " / " << count << '\n';
+        if (!buildAction) {
+            std::cerr << "Deleting build action " << id << ": unable to deserialize\n";
+            return false;
+        }
+        if (buildAction->id > std::numeric_limits<StorageID>::max()) {
+            std::cerr << "Deleting build action " << id << ": object ID " << buildAction->id << " is out of range\n";
+            return false;
+        }
+        if (buildAction->id != id) {
+            std::cerr << "Deleting build action " << id << ": ID mismatch (object ID is " << buildAction->id << ")\n";
+            return false;
+        }
+        if (buildAction->type == BuildActionType::Invalid || buildAction->type > BuildActionType::LastType) {
+            std::cerr << "Deleting build action " << id << ": type is invalid\n";
+            return false;
+        }
+        ++ok;
+        return true;
+    });
+    if (ok < processed) {
+        std::cerr << "Discarding " << (processed - ok) << " invalid build actions.\n";
+    } else {
+        std::cerr << "All " << ok << " build actions are valid.\n";
+    }
+    std::cerr << "Committing changes.\n";
+    txn.commit();
+}
+
 void ServiceSetup::BuildSetup::forEachBuildAction(
     std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func, std::size_t limit, std::size_t start)
 {
@@ -761,6 +796,26 @@ int ServiceSetup::run()
     }
 #endif
 
+    return 0;
+}
+
+int ServiceSetup::fixDb()
+{
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    try {
+#endif
+        loadConfigFiles(true);
+        building.initStorage(building.dbPath.data());
+        building.rebuildDb();
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    } catch (const std::exception &e) {
+        cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        return -5;
+    } catch (...) {
+        cerr << Phrases::ErrorMessage << "Unknown error occurred when terminating server." << Phrases::EndFlush;
+        return -6;
+    }
+#endif
     return 0;
 }
 
