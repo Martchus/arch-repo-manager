@@ -32,7 +32,7 @@
     font-weight: normal;
     font-size: 90%;
 }
-#package-search-section table, #build-action-section > table {
+#package-search-section table, #build-action-section table {
     width: 100%;
 }
 #package-search-form input, #package-search-form select {
