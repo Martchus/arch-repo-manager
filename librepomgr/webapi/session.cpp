@@ -68,7 +68,7 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
     if (const auto routing(router.find(RouteId{ method, std::string(path) })); routing != router.cend()) {
         const Route &route = routing->second;
         const auto requiredPermissions = route.permissions;
-        if (requiredPermissions != UserPermissions::None) {
+        if (requiredPermissions != UserPermissions::None && requiredPermissions != UserPermissions::DefaultPermissions) {
             const auto authInfo = request.find(boost::beast::http::field::authorization);
             if (authInfo == request.end()) {
                 respond(Render::makeAuthRequired(request));

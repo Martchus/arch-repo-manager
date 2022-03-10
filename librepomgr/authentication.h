@@ -7,17 +7,19 @@
 namespace LibRepoMgr {
 
 enum class UserPermissions : std::uint64_t {
-    None = 0x0,
-    ReadBuildActionsDetails = 0x1,
-    ModifyBuildActions = ReadBuildActionsDetails | 0x2,
-    PerformAdminActions = 0x4,
-    TryAgain = 0x8,
+    None = 0,
+    ReadBuildActionsDetails = (1 << 0),
+    DownloadArtefacts = (1 << 1),
+    ModifyBuildActions = ReadBuildActionsDetails | DownloadArtefacts | (1 << 2),
+    PerformAdminActions = (1 << 3),
+    TryAgain = (1 << 4),
     DefaultPermissions = ReadBuildActionsDetails,
 };
 
 constexpr UserPermissions operator|(UserPermissions lhs, UserPermissions rhs)
 {
-    return static_cast<UserPermissions>(static_cast<int>(lhs) | static_cast<int>(rhs));
+    return static_cast<UserPermissions>(
+        static_cast<std::underlying_type_t<UserPermissions>>(lhs) | static_cast<std::underlying_type_t<UserPermissions>>(rhs));
 }
 
 struct UserInfo {

@@ -34,7 +34,7 @@ const Router Server::s_router = {
     { { http::verb::delete_, "/api/v0/build-action" }, Route{&Routes::deleteBuildActions, UserPermissions::ModifyBuildActions} },
     { { http::verb::get, "/api/v0/build-action/details" }, Route{&Routes::getBuildActionDetails, UserPermissions::ReadBuildActionsDetails} },
     { { http::verb::get, "/api/v0/build-action/logfile" }, Route{&Routes::getBuildActionLogFile, UserPermissions::ReadBuildActionsDetails} },
-    { { http::verb::get, "/api/v0/build-action/artefact" }, Route{&Routes::getBuildActionArtefact, UserPermissions::ReadBuildActionsDetails} },
+    { { http::verb::get, "/api/v0/build-action/artefact" }, Route{&Routes::getBuildActionArtefact, UserPermissions::DownloadArtefacts} },
     { { http::verb::post, "/api/v0/build-action" }, Route{&Routes::postBuildAction, UserPermissions::ModifyBuildActions} },
     { { http::verb::post, "/api/v0/build-action/clone" }, Route{&Routes::postCloneBuildActions, UserPermissions::ModifyBuildActions} },
     { { http::verb::post, "/api/v0/build-action/start" }, Route{&Routes::postStartBuildActions, UserPermissions::ModifyBuildActions} },

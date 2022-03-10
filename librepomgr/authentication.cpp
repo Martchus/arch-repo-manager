@@ -26,6 +26,8 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
         if (part.empty()) {
         } else if (part == "read_build_actions_details") {
             result = result | UserPermissions::ReadBuildActionsDetails;
+        } else if (part == "download_artefacts") {
+            result = result | UserPermissions::DownloadArtefacts;
         } else if (part == "modify_build_actions") {
             result = result | UserPermissions::ModifyBuildActions;
         } else if (part == "perform_admin_actions") {
