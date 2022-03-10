@@ -180,8 +180,11 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &sto
     // check for package in cache
     using CacheEntry = typename Entries::StorageEntry;
     using CacheRef = typename Entries::Ref;
-    const auto ref = CacheRef(storage, entry);
     auto res = StorageCache::StoreResult();
+    if (entry->name.empty()) {
+        return res;
+    }
+    const auto ref = CacheRef(storage, entry);
     auto lock = std::unique_lock(m_mutex);
     auto *cacheEntry = m_entries.find(ref);
     if (cacheEntry) {

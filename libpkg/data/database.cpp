@@ -183,6 +183,9 @@ void Database::removePackageDependencies(StorageID packageID, const std::shared_
 static void addDependency(DependencyStorage::RWTransaction &txn, StorageID packageID, const std::string &dependencyName,
     const std::string &dependencyVersion, DependencyMode dependencyMode = DependencyMode::Any)
 {
+    if (dependencyName.empty()) {
+        return;
+    }
     for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
         auto &existingDependency = i.value();
         if (static_cast<const Dependency &>(existingDependency).version != dependencyVersion) {
@@ -201,6 +204,9 @@ static void addDependency(DependencyStorage::RWTransaction &txn, StorageID packa
 
 static void addLibDependency(LibraryDependencyStorage::RWTransaction &txn, StorageID packageID, const std::string &dependencyName)
 {
+    if (dependencyName.empty()) {
+        return;
+    }
     for (auto [i, end] = txn.equal_range<0>(dependencyName); i != end; ++i) {
         auto &existingDependency = i.value();
         const auto [i2, newID] = existingDependency.relevantPackages.emplace(packageID);
@@ -354,6 +360,9 @@ void Database::removePackage(const std::string &packageName)
 
 StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
 {
+    if (package->name.empty()) {
+        return 0;
+    }
     const auto lock = std::unique_lock(m_storage->updateMutex);
     const auto res = m_storage->packageCache.store(*m_storage, package, false);
     if (!res.updated) {
@@ -368,6 +377,9 @@ StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
 
 StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
 {
+    if (package->name.empty()) {
+        return 0;
+    }
     const auto lock = std::unique_lock(m_storage->updateMutex);
     const auto res = m_storage->packageCache.store(*m_storage, package, true);
     if (res.oldEntry) {
@@ -642,6 +654,9 @@ PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage, bool clea
 
 void PackageUpdaterPrivate::update(const PackageCache::StoreResult &res, const std::shared_ptr<Package> &package)
 {
+    if (!res.id) {
+        return;
+    }
     update(res.id, false, package);
     if (!clear && res.oldEntry) {
         update(res.id, true, res.oldEntry);
@@ -721,6 +736,9 @@ PackageUpdaterPrivate::AffectedDeps::iterator PackageUpdaterPrivate::findDepende
 
 void PackageUpdaterPrivate::addDependency(StorageID packageID, const Dependency &dependency, bool removed, AffectedDeps &affected)
 {
+    if (dependency.name.empty()) {
+        return;
+    }
     auto iterator = findDependency(dependency, affected);
     if (iterator == affected.end()) {
         iterator = affected.insert(AffectedDeps::value_type(dependency.name, AffectedDeps::mapped_type()));
@@ -736,6 +754,9 @@ void PackageUpdaterPrivate::addDependency(StorageID packageID, const Dependency 
 
 void PackageUpdaterPrivate::addLibrary(StorageID packageID, const std::string &libraryName, bool removed, AffectedLibs &affected)
 {
+    if (libraryName.empty()) {
+        return;
+    }
     if (auto &affectedPackages = affected[libraryName]; !removed) {
         affectedPackages.newPackages.emplace(packageID);
     } else {
