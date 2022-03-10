@@ -732,7 +732,7 @@ std::vector<std::shared_ptr<Package>> Package::fromDatabaseFile(FileMap &&databa
 bool Package::isPkgInfoFileOrBinary(const char *filePath, const char *fileName, mode_t mode)
 {
     return !strcmp(fileName, ".PKGINFO") || mode == S_IXUSR || strstr(filePath, "usr/bin") == filePath || strstr(filePath, "usr/lib") == filePath
-        || strstr(fileName, ".so") > fileName || strstr(fileName, ".dll") > fileName || strstr(fileName, ".a");
+        || strstr(fileName, ".so") > fileName || strstr(fileName, ".dll") > fileName || strstr(fileName, ".a") > fileName;
 }
 
 bool LibPkg::Package::isLicense(const char *filePath, const char *fileName, mode_t mode)
