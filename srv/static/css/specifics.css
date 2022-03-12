@@ -52,6 +52,41 @@
 #build-action-settings {
     width: fit-content;
 }
+.build-action-state {
+    border: 0px solid #eee;
+    border-radius: 100px;
+    background-color: #eee;
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    padding: 2px;
+    text-align: center;
+    margin-right: 5px;
+}
+.build-action-state-Created, .build-action-state-Enqueued {
+    background-color: #67A2B7;
+}
+.build-action-state-AwaitingConfirmation {
+    background-color: #9167b7;
+}
+.build-action-state-Running {
+    background-color: #8BDFFF;
+}
+.build-action-state-Finished, .build-action-result-None {
+    background-color: #aaaaaa;
+}
+.build-action-result-Success {
+    background-color: #59DF24;
+}
+.build-action-result-Failure {
+    background-color: #FF4E46;
+}
+.build-action-result-ConfirmationDeclined {
+    background-color: #aaaaaa;
+}
+.build-action-result-Aborted {
+    background-color: #AF1E11;
+}
 
 /* common styling for certain forms */
 .form-row {

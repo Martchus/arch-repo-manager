@@ -310,8 +310,8 @@ function showBuildActions(ajaxRequest)
     const container = GenericRendering.renderTableFromJsonArray({
         rows: responseJson,
         rowsPerPage: 10,
-        columnHeaders: ['', 'ID', 'Task', 'Type', 'Status', 'Result', 'Created', 'Started', 'Runtime', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Actions'],
-        columnAccessors: ['checkbox', 'id', 'taskName', 'type', 'status', 'result', 'created', 'started', 'finished', 'directory', 'sourceDbs', 'destinationDbs', 'packageNames', 'actions'],
+        columnHeaders: ['', 'ID', 'Task', 'Type', 'Created', 'Started', 'Runtime', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Actions'],
+        columnAccessors: ['checkbox', 'id', 'taskName', 'type', 'created', 'started', 'finished', 'directory', 'sourceDbs', 'destinationDbs', 'packageNames', 'actions'],
         columnSortAccessors: [null, null, null, null, null, null, '_cc'],
         customRenderer: {
             checkbox: function(value, row) {
@@ -321,10 +321,29 @@ function showBuildActions(ajaxRequest)
             },
             actions: renderBuildActionActions,
             id: function(value, row) {
-                return GenericRendering.renderLink(value, row, function() {
+                const stateElement = document.createElement('span');
+                stateElement.classList.add('build-action-state');
+                const tooltipLines = [];
+                if (row.status !== undefined) {
+                    const statusInfo = globalInfo.buildActionStates[row.status];
+                    tooltipLines.push('Status: ' + Utils.getProperty(statusInfo, 'name', 'Invalid/unknown'));
+                    if (statusInfo && statusInfo.name) {
+                        stateElement.classList.add('build-action-status-' + statusInfo.name.replace(' ', ''));
+                    }
+                }
+                if (row.result !== undefined) {
+                    const resultInfo = globalInfo.buildActionResults[row.result];
+                    tooltipLines.push('Result: ' + Utils.getProperty(resultInfo, 'name', 'Invalid/unknown'));
+                    if (resultInfo && resultInfo.name) {
+                        stateElement.classList.add('build-action-result-' + resultInfo.name.replace(' ', ''));
+                    }
+                }
+                stateElement.title = tooltipLines.join('\n');
+                stateElement.appendChild(GenericRendering.renderLink(value, row, function() {
                     queryBuildActionDetails(row.id);
                     return false;
-                }, 'Show details', undefined, '#build-action-details-section?' + row.id);
+                }, undefined, undefined, '#build-action-details-section?' + row.id));
+                return stateElement;
             },
             taskName: function (value) {
                 if (!value) {
