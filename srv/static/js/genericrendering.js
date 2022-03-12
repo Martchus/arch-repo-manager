@@ -83,25 +83,25 @@ export function formatTimeAgoString(date)
     const seconds = Math.floor((new Date() - date) / 1000);
     let interval = Math.floor(seconds / 31536000);
     if (interval > 1) {
-        return interval + ' years ago';
+        return interval + ' y ago';
     }
     interval = Math.floor(seconds / 2592000);
     if (interval > 1) {
-        return interval + ' months ago';
+        return interval + ' m ago';
     }
     interval = Math.floor(seconds / 86400);
     if (interval > 1) {
-        return interval + ' days ago';
+        return interval + ' d ago';
     }
     interval = Math.floor(seconds / 3600);
     if (interval > 1) {
-        return interval + ' hours ago';
+        return interval + ' h ago';
     }
     interval = Math.floor(seconds / 60);
     if (interval > 1) {
-        return interval + ' minutes ago';
+        return interval + ' min ago';
     }
-    return Math.floor(seconds) + ' seconds ago';
+    return Math.floor(seconds) + ' s ago';
 }
 
 /// \brief Returns a Date object from the specified time stamp.
@@ -138,7 +138,7 @@ export function renderTimeSpan(startTimeStamp, endTimeStamp)
 {
     const startDate = dateFromTimeStamp(startTimeStamp);
     if (startDate.getFullYear() === 1) {
-        return document.createTextNode('not started yet');
+        return document.createTextNode('not yet');
     }
     let endDate = dateFromTimeStamp(endTimeStamp);
     if (endDate.getFullYear() === 1) {
