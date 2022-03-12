@@ -8,7 +8,7 @@ const status = {repoNames: undefined};
 
 export function queryGlobalStatus()
 {
-    AjaxHelper.queryRoute('GET', '/status', handleGlobalStatusUpdate);
+    AjaxHelper.queryRoute('GET', '/status', handleGlobalStatusUpdate, 'global');
     return true;
 }
 

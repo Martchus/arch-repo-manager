@@ -34,13 +34,13 @@ export function initBuildActionsForm()
 
 function queryBuildActions()
 {
-    AjaxHelper.queryRoute('GET', '/build-action', showBuildActions);
+    AjaxHelper.queryRoute('GET', '/build-action', showBuildActions, 'build-action');
     return true;
 }
 
 function queryBuildActionDetails(ids)
 {
-    AjaxHelper.queryRoute('GET', '/build-action/details?' + AjaxHelper.makeIdParams(ids), showBuildActionDetails);
+    AjaxHelper.queryRoute('GET', '/build-action/details?' + AjaxHelper.makeIdParams(ids), showBuildActionDetails, 'build-action-details');
     return true;
 }
 

@@ -1,12 +1,34 @@
 export const apiPrefix = 'api/v0';
 let authError = false;
+let ongoingRequests = {};
 
 /// \brief Makes an AJAX query with basic error handling.
-export function queryRoute(method, path, callback)
+export function queryRoute(method, path, callback, type)
 {
+    if (type) {
+        const ongoingRequest = ongoingRequests[type];
+        if (ongoingRequest) {
+            ongoingRequest.abort();
+        }
+        const navElement = document.getElementById(type + '-nav-link');
+        if (navElement) {
+            navElement.classList.add('progress');
+        }
+    }
+
     const ajaxRequest = new XMLHttpRequest();
     ajaxRequest.onreadystatechange = function() {
         if (this.readyState === 4) {
+            if (type) {
+                if (ongoingRequests[type] !== ajaxRequest) {
+                    return;
+                }
+                delete ongoingRequests[type];
+                const navElement = document.getElementById(type + '-nav-link');
+                if (navElement) {
+                    navElement.classList.remove('progress');
+                }
+            }
             const status = this.status;
             authError = status === 403;
             switch (status) {
@@ -30,6 +52,9 @@ export function queryRoute(method, path, callback)
     }
     ajaxRequest.open(...args);
     ajaxRequest.send();
+    if (type) {
+        ongoingRequests[type] = ajaxRequest;
+    }
     return ajaxRequest;
 }
 
@@ -44,8 +69,9 @@ export function startFormQueryEx(formId, handler)
 {
     const form = document.getElementById(formId);
     const params = makeFormQueryParameter(form);
+    const queryType = formId.endsWith('-form') ? formId.substr(0, formId.length - 5) : formId;
     return {
-        ajaxRequest: queryRoute(form.method, form.getAttribute('action') + params, handler),
+        ajaxRequest: queryRoute(form.method, form.getAttribute('action') + params, handler, queryType),
         form: form,
         params, params,
     };

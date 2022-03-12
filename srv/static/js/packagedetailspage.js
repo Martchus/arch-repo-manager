@@ -25,7 +25,7 @@ export function initPackageDetails(sectionElement, sectionData, newPackages)
     };
     AjaxHelper.queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(packageStr), function(ajaxRequest) {
         showPackageDetails(ajaxRequest, packageObj);
-    });
+    }, 'package-details');
     return true;
 }
 
@@ -38,7 +38,7 @@ export function queryPackageDetails(value, row)
 {
     AjaxHelper.queryRoute('GET', '/packages?details=1&name=' + encodeURIComponent(makePackageID(row)), function(ajaxRequest) {
         showPackageDetails(ajaxRequest, row);
-    });
+    }, 'package-details');
 }
 
 function switchToPackageDetails(packageID)

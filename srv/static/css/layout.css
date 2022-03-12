@@ -48,6 +48,7 @@ header nav li {
 }
 header nav ul li a, header nav ul li a:link, header nav ul li a:visited {
     display: inline-block;
+    position: relative;
     box-sizing: border-box;
     text-decoration: none;
     padding-left: 20px;
@@ -61,6 +62,39 @@ header nav ul li a, header nav ul li a:link, header nav ul li a:visited {
 header nav ul li a:hover, header nav ul li.active a {
     color: #fff;
     text-decoration: none;
+}
+header nav ul li.progress a:after {
+    content: '';
+    box-sizing: border-box;
+    position: absolute;
+    left: 0px;
+    bottom: 0px;
+    height: 5px;
+    width: 100%;
+    background: #08c;
+    animation: loading 2s infinite;
+}
+@keyframes loading {
+    0% {
+        margin-left: 0%;
+        width: 30%;
+    }
+    15% {
+        margin-left: 35%;
+        width: 50%;
+    }
+    50% {
+        margin-left: 70%;
+        width: 30%;
+    }
+    65% {
+        margin-left: 15%;
+        width: 50%;
+    }
+    100% {
+        margin-left: 0%;
+        width: 30%;
+    }
 }
 header nav li.active {
     background-color: #000;
