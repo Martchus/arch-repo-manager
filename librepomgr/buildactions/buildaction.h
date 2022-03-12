@@ -327,6 +327,7 @@ struct LIBREPOMGR_EXPORT BuildActionBasicInfo : public ReflectiveRapidJSON::Json
     explicit BuildActionBasicInfo(const BuildAction &buildAction)
         : id(buildAction.id)
         , taskName(buildAction.taskName)
+        , templateName(buildAction.templateName)
         , directory(buildAction.directory)
         , packageNames(buildAction.packageNames)
         , sourceDbs(buildAction.sourceDbs)
@@ -345,6 +346,7 @@ struct LIBREPOMGR_EXPORT BuildActionBasicInfo : public ReflectiveRapidJSON::Json
 
     const BuildAction::IdType id;
     const std::string &taskName;
+    const std::string &templateName;
     const std::string &directory;
     const std::vector<std::string> &packageNames;
     const std::vector<std::string> &sourceDbs, &destinationDbs;

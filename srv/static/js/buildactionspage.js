@@ -357,7 +357,13 @@ function showBuildActions(ajaxRequest)
             result: function(value) {
                 return GenericRendering.renderNoneInGrey(Utils.getProperty(globalInfo.buildActionResults[value], 'name', 'Invalid/unknown'));
             },
-            type: function(value) {
+            type: function(value, row) {
+                let templateName = row.templateName;
+                if (templateName) {
+                    templateName = templateName[0].toUpperCase() + templateName.substring(1);
+                    templateName = templateName.replace(/-/g, ' ');
+                    return document.createTextNode(templateName);
+                }
                 return document.createTextNode(Utils.getProperty(globalInfo.buildActionTypes[value], 'name', 'Invalid/debugging'));
             },
             created: GenericRendering.renderShortTimeStamp,
@@ -482,14 +488,24 @@ function renderBuildActionDetailsTable(buildActionDetails)
 {
     return GenericRendering.renderTableFromJsonObject({
         data: buildActionDetails,
-        displayLabels: ['ID', 'Task', 'Type', 'Status', 'Result', 'Result data', 'Created', 'Started', 'Finished', 'Start after', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Flags', 'Settings', 'Log files', 'Artefacts'],
-        fieldAccessors: ['id', 'taskName', 'type', 'status', 'result', 'resultData', 'created', 'started', 'finished', 'startAfter', 'directory', 'sourceDbs', 'destinationDbs', 'packageNames', 'flags', 'settings', 'logfiles', 'artefacts'],
+        displayLabels: ['ID', 'Task', 'Type', 'Template', 'Status', 'Result', 'Result data', 'Created', 'Started', 'Finished', 'Start after', 'Directory', 'Source repo', 'Destination repo', 'Packages', 'Flags', 'Settings', 'Log files', 'Artefacts'],
+        fieldAccessors: ['id', 'taskName', 'type', 'templateName', 'status', 'result', 'resultData', 'created', 'started', 'finished', 'startAfter', 'directory', 'sourceDbs', 'destinationDbs', 'packageNames', 'flags', 'settings', 'logfiles', 'artefacts'],
         customRenderer: {
             taskName: function (value) {
                 if (!value) {
                     return GenericRendering.renderNoneInGrey();
                 }
                 return document.createTextNode(Utils.getProperty(globalInfo.presets.tasks[value], 'name', value));
+            },
+            templateName: function (value) {
+                const rawTemplateName = value;
+                if (value) {
+                    value = value[0].toUpperCase() + value.substring(1);
+                    value = value.replace(/-/g, ' ');
+                }
+                var element = GenericRendering.renderNoneInGrey(value);
+                element.title = rawTemplateName;
+                return element;
             },
             status: function(value) {
                 return document.createTextNode(Utils.getProperty(globalInfo.buildActionStates[value], 'name', 'Invalid/unknown'));
