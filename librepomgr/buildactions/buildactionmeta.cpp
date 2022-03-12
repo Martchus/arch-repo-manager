@@ -336,7 +336,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
         BuildActionTypeMetaInfo{
             .id = BuildActionType::CustomCommand,
             .category = "Misc",
-            .name = "Execute custom Bash command",
+            .name = "Execute command",
             .type = "custom-command",
             .flags = {},
             .settings = {
