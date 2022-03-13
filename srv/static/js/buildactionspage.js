@@ -339,10 +339,14 @@ function showBuildActions(ajaxRequest)
                     }
                 }
                 stateElement.title = tooltipLines.join('\n');
-                stateElement.appendChild(GenericRendering.renderLink(value, row, function() {
+                const idLink = GenericRendering.renderLink(value, row, function() {
                     queryBuildActionDetails(row.id);
                     return false;
-                }, undefined, undefined, '#build-action-details-section?' + row.id));
+                }, undefined, undefined, '#build-action-details-section?' + row.id);
+                if (value >= 100) {
+                    idLink.style.fontSize = '80%';
+                }
+                stateElement.appendChild(idLink);
                 return stateElement;
             },
             taskName: function (value) {
