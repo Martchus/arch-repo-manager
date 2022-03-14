@@ -224,6 +224,11 @@ LicenseResult Config::computeLicenseInfo(const std::vector<string> &dependencyDe
     }
 
     // extract common licenses
+    if (db->localPkgDir.empty()) {
+        result.success = false;
+        result.notes.emplace_back("No local package dir for database \"" % db->name + "\" (containing \"licenses\" package) configured.");
+        return result;
+    }
     const auto path = db->localPkgDir % '/' + licensesPackage->packageInfo->fileName;
     decltype(extractFiles(path, &Package::isLicense)) licensesDirs;
     try {
