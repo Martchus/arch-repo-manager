@@ -63,16 +63,16 @@
     text-align: center;
     margin-right: 5px;
 }
-.build-action-state-Created, .build-action-state-Enqueued {
+.build-action-status-Created, .build-action-status-Enqueued {
     background-color: #67A2B7;
 }
-.build-action-state-AwaitingConfirmation {
+.build-action-status-AwaitingConfirmation {
     background-color: #9167b7;
 }
-.build-action-state-Running {
+.build-action-status-Running {
     background-color: #8BDFFF;
 }
-.build-action-state-Finished, .build-action-result-None {
+.build-action-status-Finished {
     background-color: #aaaaaa;
 }
 .build-action-result-Success {
