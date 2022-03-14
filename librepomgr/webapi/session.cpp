@@ -102,19 +102,7 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
     // handle requests to static files (intended for development only; use NGINX in production)
     if (!m_setup.webServer.staticFilesPath.empty() && (path.find("../") == string::npos || path.find("..\\") == string::npos)) {
         const auto filePath = argsToString(m_setup.webServer.staticFilesPath, params.target.path);
-        const auto *mimeType = "text/plain";
-        if (endsWith(params.target.path, ".html")) {
-            mimeType = "text/html";
-        } else if (endsWith(params.target.path, ".json")) {
-            mimeType = "application/json";
-        } else if (endsWith(params.target.path, ".js")) {
-            mimeType = "text/javascript";
-        } else if (endsWith(params.target.path, ".css")) {
-            mimeType = "text/css";
-        } else if (endsWith(params.target.path, ".svg")) {
-            mimeType = "image/svg+xml";
-        }
-        respond(filePath.data(), mimeType, params.target.path);
+        respond(filePath.data(), determineMimeType(params.target.path).data(), params.target.path);
         return;
     }
 
@@ -177,6 +165,27 @@ void Session::responded(boost::system::error_code ec, std::size_t bytesTransferr
 
     // read another request
     receive();
+}
+
+std::string_view Session::determineMimeType(std::string_view path, std::string_view fallback)
+{
+    if (path.ends_with(".html")) {
+        return "text/html";
+    } else if (path.ends_with(".json")) {
+        return "application/json";
+    } else if (path.ends_with(".js")) {
+        return "text/javascript";
+    } else if (path.ends_with(".css")) {
+        return "text/css";
+    } else if (path.ends_with(".svg")) {
+        return "image/svg+xml";
+    } else if (path.ends_with(".txt") || path.ends_with(".log") || path.ends_with("PKGBUILD")) {
+        return "text/plain";
+    } else if (path.ends_with(".md")) {
+        return "text/plain"; // using text/markdown leads to download prompt in Firefox
+    } else {
+        return fallback;
+    }
 }
 
 void Session::close()

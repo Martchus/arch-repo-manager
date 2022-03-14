@@ -29,6 +29,7 @@ public:
     boost::asio::ip::tcp::socket &socket();
     void received(boost::system::error_code ec, std::size_t bytesTransferred);
     void responded(boost::system::error_code ec, std::size_t bytesTransferred, bool shouldClose);
+    static std::string_view determineMimeType(std::string_view path, std::string_view fallback = "text/plain");
 
 private:
     boost::asio::ip::tcp::socket m_socket;

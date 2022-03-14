@@ -122,11 +122,16 @@ static std::string readNameParam(const Params &params, ResponseHandler &&handler
     return nameParams.front();
 }
 
-static void getBuildActionFile(const Params &params, std::vector<std::string> BuildAction::*fileList, ResponseHandler &&handler)
+static void getBuildActionFile(
+    const Params &params, std::vector<std::string> BuildAction::*fileList, ResponseHandler &&handler, bool determineMimeType)
 {
     const auto name = readNameParam(params, std::move(handler));
     if (name.empty()) {
         return;
+    }
+    auto mimeType = std::string_view("application/octet-stream");
+    if (determineMimeType) {
+        mimeType = Session::determineMimeType(name, mimeType);
     }
     auto buildActionsSearchResult = findBuildActions(params, std::move(handler), false, 1);
     if (!buildActionsSearchResult.ok) {
@@ -136,7 +141,7 @@ static void getBuildActionFile(const Params &params, std::vector<std::string> Bu
     auto &buildAction = buildActionsSearchResult.actions.front();
     for (const auto &logFile : (*buildAction).*fileList) {
         if (name == logFile) {
-            buildAction->streamFile(params, name, "application/octet-stream");
+            buildAction->streamFile(params, name, mimeType);
             return;
         }
     }
@@ -145,12 +150,12 @@ static void getBuildActionFile(const Params &params, std::vector<std::string> Bu
 
 void getBuildActionLogFile(const Params &params, ResponseHandler &&handler)
 {
-    getBuildActionFile(params, &BuildAction::logfiles, std::move(handler));
+    getBuildActionFile(params, &BuildAction::logfiles, std::move(handler), false);
 }
 
 void getBuildActionArtefact(const Params &params, ResponseHandler &&handler)
 {
-    getBuildActionFile(params, &BuildAction::artefacts, std::move(handler));
+    getBuildActionFile(params, &BuildAction::artefacts, std::move(handler), true);
 }
 
 void postBuildAction(const Params &params, ResponseHandler &&handler)
