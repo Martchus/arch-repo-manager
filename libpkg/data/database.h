@@ -144,7 +144,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
 
     void initStorage(StorageDistribution &storage);
     void deducePathsFromLocalDirs();
-    void resetConfiguration();
+    void resetConfiguration(bool keepLocalPaths = false);
     void clearPackages();
     void loadPackagesFromConfiguredPaths(bool withFiles = false, bool force = false);
     void loadPackages(const std::string &databaseData, CppUtilities::DateTime lastModified);

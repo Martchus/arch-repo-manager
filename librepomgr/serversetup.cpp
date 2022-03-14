@@ -521,6 +521,9 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
         config.setPackageCacheLimit(packageCacheLimit);
     }
 
+    // avoid stale values
+    config.packageCacheDirs.clear();
+
     // read pacman config
     try {
         config.loadPacmanConfig(pacmanConfigFilePath.data());
@@ -545,7 +548,7 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
             continue;
         }
         // find existing database or create a new one; clear mirrors and other data from existing DBs
-        auto *const db = config.findOrCreateDatabaseFromDenotation(std::string_view(iniSection.data() + 9, iniSection.size() - 9));
+        auto *const db = config.findOrCreateDatabaseFromDenotation(std::string_view(iniSection.data() + 9, iniSection.size() - 9), true);
         db->toBeDiscarded = false;
         dbDefinitions.clear();
         dbDefinitions["$repo"] = db->name;
@@ -595,6 +598,10 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
 
     // log the most important config values
     cerr << Phrases::InfoMessage << "Working directory: " << workingDirectory << Phrases::End;
+    cerr << Phrases::InfoMessage << "Package cache dirs:" << Phrases::End;
+    for (const auto &dir : config.packageCacheDirs) {
+        cerr << Phrases::SubMessage << dir << Phrases::End;
+    }
     cerr << Phrases::InfoMessage << "Build configuration:" << Phrases::End;
     cerr << Phrases::SubMessage << "Package cache directory: " << building.packageCacheDir << Phrases::End;
     cerr << Phrases::SubMessage << "Package download limit: " << dataSizeToString(building.packageDownloadSizeLimit) << Phrases::End;

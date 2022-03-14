@@ -51,11 +51,11 @@ Database *Config::createDatabase(std::string &&name)
  * \brief Returns the database with the specified \a name and \a architecture or creates a new one if it doesn't exist.
  * \remarks Resets the database's configuration. You'll end up with a blank database in any case.
  */
-Database *Config::findOrCreateDatabase(std::string &&name, std::string_view architecture)
+Database *Config::findOrCreateDatabase(std::string &&name, std::string_view architecture, bool keepLocalPaths)
 {
     auto *db = findDatabase(name, architecture);
     if (db) {
-        db->resetConfiguration();
+        db->resetConfiguration(keepLocalPaths);
     } else {
         db = createDatabase(std::move(name));
     }
@@ -69,11 +69,11 @@ Database *Config::findOrCreateDatabase(std::string &&name, std::string_view arch
  * \brief Returns the database with the specified \a name and \a architecture or creates a new one if it doesn't exist.
  * \remarks Resets the database's configuration. You'll end up with a blank database in any case.
  */
-Database *Config::findOrCreateDatabase(std::string_view name, std::string_view architecture)
+Database *Config::findOrCreateDatabase(std::string_view name, std::string_view architecture, bool keepLocalPaths)
 {
     auto *db = findDatabase(name, architecture);
     if (db) {
-        db->resetConfiguration();
+        db->resetConfiguration(keepLocalPaths);
     } else {
         db = createDatabase(std::string(name));
     }
@@ -88,10 +88,10 @@ Database *Config::findOrCreateDatabase(std::string_view name, std::string_view a
  * \remarks Resets the database's configuration. You'll end up with a blank database in any case.
  * \sa parseDatabaseDenotation() for the format of \a databaseDenotation
  */
-Database *Config::findOrCreateDatabaseFromDenotation(std::string_view databaseDenotation)
+Database *Config::findOrCreateDatabaseFromDenotation(std::string_view databaseDenotation, bool keepLocalPaths)
 {
     const auto dbInfo = parseDatabaseDenotation(databaseDenotation);
-    return findOrCreateDatabase(dbInfo.first, dbInfo.second);
+    return findOrCreateDatabase(dbInfo.first, dbInfo.second, keepLocalPaths);
 }
 
 /*!

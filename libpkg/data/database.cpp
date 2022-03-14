@@ -81,7 +81,7 @@ void LibPkg::Database::deducePathsFromLocalDirs()
     }
 }
 
-void Database::resetConfiguration()
+void Database::resetConfiguration(bool keepLocalPaths)
 {
     path.clear();
     filesPath.clear();
@@ -90,8 +90,10 @@ void Database::resetConfiguration()
     signatureLevel = SignatureLevel::Default;
     arch = "x86_64";
     dependencies.clear();
-    localPkgDir.clear();
-    localDbDir.clear();
+    if (!keepLocalPaths) {
+        localPkgDir.clear();
+        localDbDir.clear();
+    }
     syncFromMirror = false;
 }
 
