@@ -407,7 +407,8 @@ void BuildAction::terminateOngoingBuildProcesses()
     }
 }
 
-void BuildAction::streamFile(const WebAPI::Params &params, const std::string &filePath, std::string_view fileMimeType)
+void BuildAction::streamFile(
+    const WebAPI::Params &params, const std::string &filePath, boost::beast::string_view fileMimeType, boost::beast::string_view contentDisposition)
 {
     auto buildProcess = std::shared_ptr<BuildProcessSession>();
     if (const auto outputLock = std::unique_lock<std::mutex>(m_outputSessionMutex); m_outputSession && m_outputSession->logFilePath() == filePath) {
@@ -418,12 +419,12 @@ void BuildAction::streamFile(const WebAPI::Params &params, const std::string &fi
     }
     if (!buildProcess) {
         // simply send the file if there's no ongoing process writing to it anymore
-        params.session.respond(filePath.data(), fileMimeType.data(), params.target.path);
+        params.session.respond(filePath.data(), fileMimeType, contentDisposition, params.target.path);
         return;
     }
 
     // stream the output of the ongoing process
-    auto chunkResponse = WebAPI::Render::makeChunkResponse(params.request(), fileMimeType.data());
+    auto chunkResponse = WebAPI::Render::makeChunkResponse(params.request(), fileMimeType, contentDisposition);
     boost::beast::http::async_write_header(params.session.socket(), chunkResponse->serializer,
         [chunkResponse, filePath, buildProcess, session = params.session.shared_from_this()](
             const boost::system::error_code &error, std::size_t) mutable {

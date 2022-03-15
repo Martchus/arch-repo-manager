@@ -146,7 +146,7 @@ std::shared_ptr<Response> makeServerError(const Request &request, std::string_vi
     return res;
 }
 
-std::shared_ptr<Response> makeData(const Request &request, const string &buffer, const char *mimeType)
+std::shared_ptr<Response> makeData(const Request &request, const string &buffer, boost::beast::string_view mimeType)
 {
     const auto res = make_shared<Response>(http::status::ok, request.version());
     res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -158,7 +158,7 @@ std::shared_ptr<Response> makeData(const Request &request, const string &buffer,
     return res;
 }
 
-std::shared_ptr<Response> makeData(const Request &request, string &&buffer, const char *mimeType)
+std::shared_ptr<Response> makeData(const Request &request, string &&buffer, boost::beast::string_view mimeType)
 {
     const auto res = make_shared<Response>(http::status::ok, request.version());
     res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -170,11 +170,13 @@ std::shared_ptr<Response> makeData(const Request &request, string &&buffer, cons
     return res;
 }
 
-std::shared_ptr<Response> makeData(const Request &request, rapidjson::StringBuffer &&buffer, const char *mimeType)
+std::shared_ptr<Response> makeData(const Request &request, rapidjson::StringBuffer &&buffer, boost::beast::string_view mimeType)
 {
     const auto res = make_shared<Response>(http::status::ok, request.version());
     res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res->set(http::field::content_type, mimeType);
+    if (!mimeType.empty()) {
+        res->set(http::field::content_type, mimeType);
+    }
     res->set(http::field::access_control_allow_origin, "*");
     res->keep_alive(request.keep_alive());
     res->body().assign(buffer.GetString(), buffer.GetSize());
@@ -182,11 +184,17 @@ std::shared_ptr<Response> makeData(const Request &request, rapidjson::StringBuff
     return res;
 }
 
-std::shared_ptr<FileResponse> makeFile(const Request &request, const char *filePath, const char *mimeType, boost::beast::error_code &ec)
+std::shared_ptr<FileResponse> makeFile(const Request &request, const char *filePath, boost::beast::string_view mimeType,
+    boost::beast::string_view contentDisposition, boost::beast::error_code &ec)
 {
     const auto fileResponse = std::make_shared<FileResponse>();
     fileResponse->set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    fileResponse->set(http::field::content_type, mimeType);
+    if (!mimeType.empty()) {
+        fileResponse->set(http::field::content_type, mimeType);
+    }
+    if (!contentDisposition.empty()) {
+        fileResponse->set(http::field::content_disposition, contentDisposition);
+    }
     fileResponse->set(http::field::access_control_allow_origin, "*");
     fileResponse->keep_alive(request.keep_alive());
     fileResponse->body().open(filePath, file_mode::scan, ec);
@@ -202,10 +210,16 @@ inline ChunkResponse::ChunkResponse()
     response.chunked(true);
 }
 
-std::shared_ptr<ChunkResponse> makeChunkResponse(const Request &request, const char *mimeType)
+std::shared_ptr<ChunkResponse> makeChunkResponse(
+    const Request &request, boost::beast::string_view mimeType, boost::beast::string_view contentDisposition)
 {
     const auto chunkResponse = std::make_shared<ChunkResponse>();
-    chunkResponse->response.set(boost::beast::http::field::content_type, mimeType);
+    if (!mimeType.empty()) {
+        chunkResponse->response.set(boost::beast::http::field::content_type, mimeType);
+    }
+    if (!contentDisposition.empty()) {
+        chunkResponse->response.set(boost::beast::http::field::content_disposition, contentDisposition);
+    }
     chunkResponse->response.keep_alive(request.keep_alive());
     return chunkResponse;
 }

@@ -102,7 +102,7 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
     // handle requests to static files (intended for development only; use NGINX in production)
     if (!m_setup.webServer.staticFilesPath.empty() && (path.find("../") == string::npos || path.find("..\\") == string::npos)) {
         const auto filePath = argsToString(m_setup.webServer.staticFilesPath, params.target.path);
-        respond(filePath.data(), determineMimeType(params.target.path).data(), params.target.path);
+        respond(filePath.data(), determineMimeType(params.target.path).data(), boost::beast::string_view(), params.target.path);
         return;
     }
 
@@ -128,11 +128,12 @@ void Session::respond(std::shared_ptr<Response> &&response)
     m_res = move(response);
 }
 
-void Session::respond(const char *localFilePath, const char *mimeType, std::string_view urlPath)
+void Session::respond(
+    const char *localFilePath, boost::beast::string_view mimeType, boost::beast::string_view contentDisposition, std::string_view urlPath)
 {
     // make response with file body
     auto ec = boost::beast::error_code{};
-    auto response = Render::makeFile(m_parser->get(), localFilePath, mimeType, ec);
+    auto response = Render::makeFile(m_parser->get(), localFilePath, mimeType, contentDisposition, ec);
     if (ec.failed()) {
         respond(Render::makeNotFound(m_parser->get(), urlPath));
         return;
@@ -167,7 +168,7 @@ void Session::responded(boost::system::error_code ec, std::size_t bytesTransferr
     receive();
 }
 
-std::string_view Session::determineMimeType(std::string_view path, std::string_view fallback)
+boost::beast::string_view Session::determineMimeType(std::string_view path, boost::beast::string_view fallback)
 {
     if (path.ends_with(".html")) {
         return "text/html";

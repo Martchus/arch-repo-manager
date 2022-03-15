@@ -195,7 +195,8 @@ public:
     std::shared_ptr<BuildProcessSession> makeBuildProcess(
         std::string &&displayName, std::string &&logFilePath, ProcessHandler &&handler, AssociatedLocks &&locks = AssociatedLocks());
     void terminateOngoingBuildProcesses();
-    void streamFile(const WebAPI::Params &params, const std::string &filePath, std::string_view fileMimeType);
+    void streamFile(const WebAPI::Params &params, const std::string &filePath, boost::beast::string_view fileMimeType,
+        boost::beast::string_view contentDisposition = boost::beast::string_view());
     ServiceSetup *setup();
 
 protected:

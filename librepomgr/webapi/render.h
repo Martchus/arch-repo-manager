@@ -31,14 +31,16 @@ std::shared_ptr<Response> makeNotFound(const Request &request, std::string_view 
 std::shared_ptr<Response> makeAuthRequired(const Request &request);
 std::shared_ptr<Response> makeForbidden(const Request &request);
 std::shared_ptr<Response> makeServerError(const Request &request, std::string_view what);
-std::shared_ptr<Response> makeData(const Request &request, const std::string &data, const char *mimeType);
-std::shared_ptr<Response> makeData(const Request &request, std::string &&data, const char *mimeType);
-std::shared_ptr<Response> makeData(const Request &request, RAPIDJSON_NAMESPACE::StringBuffer &&buffer, const char *mimeType);
+std::shared_ptr<Response> makeData(const Request &request, const std::string &data, boost::beast::string_view mimeType);
+std::shared_ptr<Response> makeData(const Request &request, std::string &&data, boost::beast::string_view mimeType);
+std::shared_ptr<Response> makeData(const Request &request, RAPIDJSON_NAMESPACE::StringBuffer &&buffer, boost::beast::string_view mimeType);
 std::shared_ptr<Response> makeText(const Request &request, const std::string &text);
 std::shared_ptr<Response> makeText(const Request &request, std::string &&text);
 std::shared_ptr<Response> makeJson(const Request &request, std::string &&json);
-std::shared_ptr<FileResponse> makeFile(const Request &request, const char *filePath, const char *mimeType, boost::beast::error_code &ec);
-std::shared_ptr<ChunkResponse> makeChunkResponse(const Request &request, const char *mimeType);
+std::shared_ptr<FileResponse> makeFile(const Request &request, const char *filePath, boost::beast::string_view mimeType,
+    boost::beast::string_view contentDisposition, boost::beast::error_code &ec);
+std::shared_ptr<ChunkResponse> makeChunkResponse(
+    const Request &request, boost::beast::string_view mimeType, boost::beast::string_view contentDisposition);
 
 inline std::shared_ptr<Response> makeText(const Request &request, const std::string &text)
 {

@@ -22,14 +22,15 @@ public:
 
     void receive();
     void respond(std::shared_ptr<Response> &&response);
-    void respond(const char *localFilePath, const char *mimeType, std::string_view urlPath);
+    void respond(
+        const char *localFilePath, boost::beast::string_view mimeType, boost::beast::string_view contentDisposition, std::string_view urlPath);
     void close();
     const Request &request() const;
     void assignEmptyRequest();
     boost::asio::ip::tcp::socket &socket();
     void received(boost::system::error_code ec, std::size_t bytesTransferred);
     void responded(boost::system::error_code ec, std::size_t bytesTransferred, bool shouldClose);
-    static std::string_view determineMimeType(std::string_view path, std::string_view fallback = "text/plain");
+    static boost::beast::string_view determineMimeType(std::string_view path, boost::beast::string_view fallback = "text/plain");
 
 private:
     boost::asio::ip::tcp::socket m_socket;

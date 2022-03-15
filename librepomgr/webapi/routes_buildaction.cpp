@@ -1,3 +1,5 @@
+#define CPP_UTILITIES_PATHHELPER_STRING_VIEW
+
 #include "./params.h"
 #include "./render.h"
 #include "./routes.h"
@@ -5,6 +7,7 @@
 #include "../serversetup.h"
 
 #include <c++utilities/conversion/stringbuilder.h>
+#include <c++utilities/io/path.h>
 
 #include <algorithm>
 #include <variant>
@@ -129,9 +132,16 @@ static void getBuildActionFile(
     if (name.empty()) {
         return;
     }
-    auto mimeType = std::string_view("application/octet-stream");
+    auto mimeType = boost::beast::string_view("application/octet-stream");
+    auto contentDisposition = std::string();
     if (determineMimeType) {
-        mimeType = Session::determineMimeType(name, mimeType);
+        if (const auto detectedMimeType = Session::determineMimeType(name, boost::beast::string_view()); !detectedMimeType.empty()) {
+            mimeType = detectedMimeType;
+        } else {
+            auto fileName = CppUtilities::fileName(name);
+            findAndReplace(fileName, "\"", "");
+            contentDisposition = "attachment; filename=\"" % fileName + "\"";
+        }
     }
     auto buildActionsSearchResult = findBuildActions(params, std::move(handler), false, 1);
     if (!buildActionsSearchResult.ok) {
@@ -141,7 +151,7 @@ static void getBuildActionFile(
     auto &buildAction = buildActionsSearchResult.actions.front();
     for (const auto &logFile : (*buildAction).*fileList) {
         if (name == logFile) {
-            buildAction->streamFile(params, name, mimeType);
+            buildAction->streamFile(params, name, mimeType, contentDisposition);
             return;
         }
     }
