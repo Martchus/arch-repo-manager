@@ -4,6 +4,7 @@
 
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/io/misc.h>
+#include <c++utilities/io/path.h>
 
 using namespace CppUtilities;
 
@@ -17,13 +18,22 @@ MakeLicenseInfo::MakeLicenseInfo(ServiceSetup &setup, const std::shared_ptr<Buil
 void MakeLicenseInfo::run()
 {
     // determine output file path
-    if (m_buildAction->directory.empty()) {
-        reportError("Unable to create working directory: no directory name specified");
+    auto &metaInfo = m_setup.building.metaInfo;
+    auto metaInfoLock = metaInfo.lockToRead();
+    const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::MakeLicenseInfo);
+    const auto outputFilePathSetting = typeInfo.settings[static_cast<std::size_t>(MakeLicenseInfoSettings::OutputFilePath)].param;
+    metaInfoLock.unlock();
+    auto outputFilePath = findSetting(outputFilePathSetting);
+    auto outputDir = std::string();
+    if (!outputFilePath.empty()) {
+        outputDir = directory(outputFilePath);
+    } else if (!m_buildAction->directory.empty()) {
+        const auto setupReadLock = m_setup.lockToRead();
+        outputDir = m_setup.building.workingDirectory % "/license-info/" + m_buildAction->directory;
+    } else {
+        reportError("Unable to create working directory: no directory name or output file path specified");
         return;
     }
-    auto setupReadLock = m_setup.lockToRead();
-    auto outputDir = m_setup.building.workingDirectory % "/license-info/" + m_buildAction->directory;
-    setupReadLock.unlock();
 
     // validate params and acquire read lock
     auto configReadLock = init(BuildActionAccess::ReadConfig, RequiredDatabases::None, RequiredParameters::Packages);
@@ -34,7 +44,9 @@ void MakeLicenseInfo::run()
     auto result = m_setup.config.computeLicenseInfo(m_buildAction->packageNames);
     std::get<std::shared_lock<std::shared_mutex>>(configReadLock).unlock();
     auto wroteOutputFile = false;
-    auto outputFilePath = outputDir % '/' % m_buildAction->id + "-summary.md";
+    if (outputFilePath.empty()) {
+        outputFilePath = outputDir % '/' % m_buildAction->id + "-summary.md";
+    }
     try {
         std::filesystem::create_directories(outputDir);
         writeFile(outputFilePath, result.licenseSummary);

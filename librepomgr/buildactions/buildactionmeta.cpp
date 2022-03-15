@@ -254,7 +254,13 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .name = "Make license info",
             .type = "make-license-info",
             .flags = {},
-            .settings = {},
+            .settings = {
+                BuildActionSettingMetaInfo{
+                    .name = "Output file path",
+                    .desc = "The path of the output file",
+                    .param = "output-file-path",
+                },
+            },
             .directory = true,
             .sourceDb = false,
             .destinationDb = false,
