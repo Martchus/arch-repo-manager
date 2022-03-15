@@ -134,7 +134,7 @@ void Config::loadPacmanConfig(const char *pacmanConfigPath)
             if (db->localDbDir.empty()) {
                 db->localDbDir = pacmanDatabasePath + "sync";
             }
-            if (db->localPkgDir.empty()) {
+            if (db->localPkgDir.empty() && !packageCacheDirs.empty()) {
                 db->localPkgDir = packageCacheDirs.front();
             }
             // ensure the database is not being discarded
