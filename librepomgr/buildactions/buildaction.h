@@ -196,7 +196,6 @@ public:
         std::string &&displayName, std::string &&logFilePath, ProcessHandler &&handler, AssociatedLocks &&locks = AssociatedLocks());
     void terminateOngoingBuildProcesses();
     void streamFile(const WebAPI::Params &params, const std::string &filePath, std::string_view fileMimeType);
-    void streamOutput(const WebAPI::Params &params, std::size_t offset = 0);
     ServiceSetup *setup();
 
 protected:
