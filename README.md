@@ -372,3 +372,8 @@ cd srv/static/node_modules
 npm install xterm
 npm install --save xterm-addon-search
 ```
+
+## License
+All code is licensed under [GPL-2-or-later](LICENSE). This does *not* apply to
+code contained in Git repositories included as Git submodule (which contain
+their own README and licensing information).
