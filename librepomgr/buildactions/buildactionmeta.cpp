@@ -255,7 +255,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .type = "make-license-info",
             .flags = {},
             .settings = {},
-            .directory = false,
+            .directory = true,
             .sourceDb = false,
             .destinationDb = false,
             .packageNames = true,

@@ -63,6 +63,7 @@ std::string Config::addLicenseInfo(LicenseResult &result, PackageSearchResult &s
         { "glib2", "GLib" },
         { "numix-icon-theme", "Numix icon theme" },
         { "breeze-icons", "Breeze icons (from KDE)" },
+        { "boost", "Boost" },
         { "go", "Go" },
         { "syncthing", "Syncthing" },
         { "syncthingtray", "Syncthing Tray" },
@@ -79,6 +80,9 @@ std::string Config::addLicenseInfo(LicenseResult &result, PackageSearchResult &s
     } else if (startsWith(packageID, "qt5-")) {
         packageID = "Qt 5";
         regularPackageName = "qt5-base";
+    } else if (startsWith(packageID, "qt6-")) {
+        packageID = "Qt 6";
+        regularPackageName = "qt6-base";
     }
 
     // skip package if custom license has already been added
@@ -89,9 +93,12 @@ std::string Config::addLicenseInfo(LicenseResult &result, PackageSearchResult &s
 
     // check whether the package has a standard license and/or a custom license
     bool hasCustomLicense = package->licenses.empty();
-    if (packageID == "Qt 5") {
+    if (packageID == "Qt 5" || packageID == "Qt 6") {
         // consider Qt's licenses custom as it has special variants of the standard licenses FDL, GPL and LGPL
         hasCustomLicense = true;
+    } else if (packageID == "GCC") {
+        // override GCC license, it is GPL3 and not GPL2 and above; besides, we don't care about the documentation here
+        result.commonLicenses["GPL3"].relevantPackages.emplace(packageID);
     } else {
         // read the package's license field (see https://wiki.archlinux.org/index.php/PKGBUILD#license)
         for (const auto &license : package->licenses) {
@@ -101,13 +108,20 @@ std::string Config::addLicenseInfo(LicenseResult &result, PackageSearchResult &s
                 hasCustomLicense = true;
                 continue;
             }
-
             // map Arch Linux generic way to say e.g. "GPL2 and above" to a concrete license e.g. "GPL2"
             auto concreteLicense = license;
             if (license == "GPL") {
-                concreteLicense = "GPL2";
-            } else if (license == "LGPL" || license == "LGPL2") {
-                concreteLicense = "LGPL2.1";
+                concreteLicense = "GPL2 or any later version";
+            } else if (license == "GPL2") {
+                concreteLicense = "GPL2 only";
+            } else if (license == "GPL3") {
+                concreteLicense = "GPL3 or any later version";
+            } else if (license == "LGPL") {
+                concreteLicense = "LGPL2 or any later version";
+            } else if (license == "LGPL2") {
+                concreteLicense = "LGPL2 only";
+            } else if (license == "LGPL3") {
+                concreteLicense = "LGPL3 or any later version";
             } else if (license == "FDL") {
                 concreteLicense = "FDL1.2";
             } else if (license == "AGPL") {
@@ -230,7 +244,7 @@ LicenseResult Config::computeLicenseInfo(const std::vector<string> &dependencyDe
         return result;
     }
     const auto path = db->localPkgDir % '/' + licensesPackage->packageInfo->fileName;
-    decltype(extractFiles(path, &Package::isLicense)) licensesDirs;
+    auto licensesDirs = FileMap();
     try {
         licensesDirs = extractFiles(path, &Package::isLicense);
         if (licensesDirs.empty()) {
@@ -253,7 +267,14 @@ LicenseResult Config::computeLicenseInfo(const std::vector<string> &dependencyDe
     for (auto &commonLicense : result.commonLicenses) {
         const auto &licenseName = commonLicense.first;
         auto &license = commonLicense.second;
-        const auto dir = licensesDirs.find("usr/share/licenses/common/" + licenseName);
+        auto dir = licensesDirs.find("usr/share/licenses/common/" + licenseName);
+        if (dir == licensesDirs.end() || dir->second.empty()) {
+            if (const auto whiteSpace = licenseName.find(' '); whiteSpace != std::string::npos) {
+                const auto plainLicense = std::string_view(licenseName.data(), whiteSpace);
+                const auto licenseSuffix = std::string_view(plainLicense == "LGPL2" ? ".1" : "");
+                dir = licensesDirs.find(argsToString("usr/share/licenses/common/", plainLicense, licenseSuffix));
+            }
+        }
         if (dir == licensesDirs.end() || dir->second.empty()) {
             result.success = false;
             result.notes.emplace_back("Unable to find license dir for common license " + licenseName);
