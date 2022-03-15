@@ -30,6 +30,7 @@ void ReloadConfiguration::run()
     }
     {
         const auto configReadLock = m_setup.config.lockToRead();
+        m_setup.saveState();
         m_setup.printDatabases();
     }
 }
