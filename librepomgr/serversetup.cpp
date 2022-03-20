@@ -656,6 +656,20 @@ void ServiceSetup::printDatabases()
     cerr << Phrases::SubMessage << "AUR (" << config.aur.packageCount() << " packages cached)" << Phrases::End;
 }
 
+void ServiceSetup::printIoUringUsage()
+{
+    cout << Phrases::InfoMessage << "Using io_uring: ";
+#ifdef BOOST_ASIO_HAS_IO_URING
+    cout << "yes";
+#ifdef BOOST_ASIO_DISABLE_EPOLL
+    cout << ", epoll disabled";
+#endif
+#else
+    cout << "no";
+#endif
+    cout << Phrases::End;
+}
+
 std::string_view ServiceSetup::cacheFilePath() const
 {
     return "cache-v" LIBREPOMGR_CACHE_VERSION ".bin";
@@ -737,6 +751,7 @@ int ServiceSetup::run()
     try {
 #endif
         printLimits();
+        printIoUringUsage();
         loadConfigFiles(true);
         config.discardDatabases();
         config.loadAllPackages(building.loadFilesDbs, building.forceLoadingDbs);
