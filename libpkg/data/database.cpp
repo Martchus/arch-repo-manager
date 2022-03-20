@@ -286,6 +286,9 @@ std::size_t Database::packageCount() const
 
 void Database::providingPackages(const Dependency &dependency, bool reverse, const PackageVisitorConst &visitor)
 {
+    if (dependency.name.empty()) {
+        return;
+    }
     auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
     auto packagesTxn = m_storage->packages.getROTransaction();
     for (auto [i, end] = providesTxn.equal_range<0>(dependency.name); i != end; ++i) {
@@ -305,6 +308,9 @@ void Database::providingPackages(const Dependency &dependency, bool reverse, con
 
 void Database::providingPackages(const std::string &libraryName, bool reverse, const PackageVisitorConst &visitor)
 {
+    if (libraryName.empty()) {
+        return;
+    }
     auto providesTxn = (reverse ? m_storage->requiredLibs : m_storage->providedLibs).getROTransaction();
     auto packagesTxn = m_storage->packages.getROTransaction();
     for (auto [i, end] = providesTxn.equal_range<0>(libraryName); i != end; ++i) {
@@ -319,6 +325,9 @@ void Database::providingPackages(const std::string &libraryName, bool reverse, c
 
 bool Database::provides(const Dependency &dependency, bool reverse) const
 {
+    if (dependency.name.empty()) {
+        return false;
+    }
     auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
     for (auto [i, end] = providesTxn.equal_range<0>(dependency.name); i != end; ++i) {
         const Dependency &providedDependency = i.value();
@@ -331,6 +340,9 @@ bool Database::provides(const Dependency &dependency, bool reverse) const
 
 bool Database::provides(const std::string &libraryName, bool reverse) const
 {
+    if (libraryName.empty()) {
+        return false;
+    }
     auto providesTxn = (reverse ? m_storage->requiredLibs : m_storage->providedLibs).getROTransaction();
     return providesTxn.find<0>(libraryName) != providesTxn.end();
 }
