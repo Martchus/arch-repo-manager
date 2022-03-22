@@ -331,7 +331,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
               auto configLock = params.setup.config.lockToRead();
               auto documentArray = document->GetArray();
               if (details) {
-                  for (auto &package : queriedAurPackages) {
+                  for (auto &[packageID, package] : queriedAurPackages) {
                       ReflectiveRapidJSON::JsonReflector::push(std::move(package), documentArray, document->GetAllocator());
                   }
               } else if (!queriedAurPackages.empty()) {
