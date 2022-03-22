@@ -235,8 +235,8 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         }
     };
 
-    std::vector<PackageSearchResult> aurPackages;
-    std::vector<std::string> neededAurPackages;
+    auto aurPackages = std::vector<PackageSearchResult>();
+    auto neededAurPackages = std::vector<std::string>();
     auto lock = params.setup.config.lockToRead();
     auto &aurDb = params.setup.config.aur;
 
@@ -326,7 +326,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
     auto handleAurResponse
         = [handler{ std::move(handler) }, params{ std::move(params) }, document{ make_shared<RAPIDJSON_NAMESPACE::Document>(std::move(document)) },
               details](WebClient::AurQuerySession::ContainerType &&queriedAurPackages) mutable {
-              std::vector<PackageSearchResult> aurPackageSearchResults;
+              auto aurPackageSearchResults = std::vector<PackageSearchResult>();
               aurPackageSearchResults.reserve(queriedAurPackages.size());
               auto configLock = params.setup.config.lockToRead();
               auto documentArray = document->GetArray();
