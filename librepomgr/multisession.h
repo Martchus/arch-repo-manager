@@ -14,7 +14,7 @@ namespace LibRepoMgr {
 template <typename SessionResponse> class MultiSession {
 public:
     using ContainerType = std::vector<SessionResponse>;
-    using HandlerType = std::function<void(ContainerType &&)>;
+    using HandlerType = std::move_only_function<void(ContainerType &&)>;
     using SharedPointerType = std::shared_ptr<MultiSession<SessionResponse>>;
 
     explicit MultiSession(boost::asio::io_context &ioContext, HandlerType &&handler);

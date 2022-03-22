@@ -324,24 +324,24 @@ void getPackages(const Params &params, ResponseHandler &&handler)
     // retrieve packages from AUR
     auto log = LogContext();
     auto handleAurResponse
-        = [handler{ std::move(handler) }, params{ std::move(params) }, document{ make_shared<RAPIDJSON_NAMESPACE::Document>(std::move(document)) },
+        = [handler{ std::move(handler) }, params{ std::move(params) }, document{ std::move(document) },
               details](WebClient::AurQuerySession::ContainerType &&queriedAurPackages) mutable {
               auto aurPackageSearchResults = std::vector<PackageSearchResult>();
               aurPackageSearchResults.reserve(queriedAurPackages.size());
               auto configLock = params.setup.config.lockToRead();
-              auto documentArray = document->GetArray();
+              auto documentArray = document.GetArray();
               if (details) {
                   for (auto &[packageID, package] : queriedAurPackages) {
-                      ReflectiveRapidJSON::JsonReflector::push(std::move(package), documentArray, document->GetAllocator());
+                      ReflectiveRapidJSON::JsonReflector::push(std::move(package), documentArray, document.GetAllocator());
                   }
               } else if (!queriedAurPackages.empty()) {
                   for (auto &[packageID, package] : queriedAurPackages) {
                       ReflectiveRapidJSON::JsonReflector::push(
-                          PackageSearchResult{ params.setup.config.aur, std::move(package), packageID }, documentArray, document->GetAllocator());
+                          PackageSearchResult{ params.setup.config.aur, std::move(package), packageID }, documentArray, document.GetAllocator());
                   }
               }
               configLock.unlock();
-              handler(makeJson(params.request(), *document, params.target.hasPrettyFlag()));
+              handler(makeJson(params.request(), document, params.target.hasPrettyFlag()));
           };
     if (mode == Mode::Name) {
         WebClient::queryAurPackages(log, params.setup, neededAurPackages, params.setup.webServer.ioContext, std::move(handleAurResponse));
