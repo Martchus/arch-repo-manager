@@ -57,8 +57,6 @@ cp /usr/share/buildservice-git/skel/presets-example.json /etc/buildservice-git/p
 systemctl enable --now buildservice-git.service
 ```
 
-Note that the `-git` package is used at this point because there are no releases yet.
-
 ### Setting up a working directory
 The server needs a place to temporarily store PKGBUILDs, cache files and other stuff.
 Just create a directory at any place with enough disk space and set the permissions so the
@@ -66,7 +64,7 @@ user you start the server with can read and write there. This directory goes und
 `working_directory` in the settings file. Relative paths within the configuration file (used
 for other locations) will be treated relative to that directory.
 
-### Setting up a database/repository directories
+### Setting up database/repository directories
 The databases for the official repositories will be synced from the upstream repositories and
 stored in a local directory. The actual packages might be found in the pacman cache directory.
 Example configuration:
