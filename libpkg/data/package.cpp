@@ -211,10 +211,21 @@ PackageVersionPartComparison PackageVersion::compareParts(const string &part1, c
 {
     const char *part1Pos = part1.data(), *part2Pos = part2.data();
     const char *part1End = part1.data() + part1.size(), *part2End = part2.data() + part2.size();
-    for (;;) {
+    for (int i = 0;; ++i) {
         // determine current segments
         part1End = firstNonAlphanumericCharacter(part1Pos, part1End);
         part2End = firstNonAlphanumericCharacter(part2Pos, part2End);
+        // check whether one of the segments is the epoch
+        if (!i) {
+            const auto part1IsEpoch = *part1End == ':';
+            const auto part2IsEpoch = *part2End == ':';
+            // if one one has an epoch, consider the one with epoch newer
+            if (part1IsEpoch && !part2IsEpoch) {
+                return PackageVersionPartComparison::Newer;
+            } else if (part2IsEpoch && !part1IsEpoch) {
+                return PackageVersionPartComparison::Older;
+            }
+        }
         // compare segments
         const auto segmentComparsion = compareSegments(part1Pos, part1End, part2Pos, part2End);
         if (segmentComparsion != PackageVersionPartComparison::Equal) {

@@ -206,6 +206,16 @@ void DataTests::testDependencyMatching()
     CPPUNIT_ASSERT_MESSAGE("real-world ffmpeg example (1)", pkg3.providesDependency(Dependency::fromString("ffmpeg<1:4.3")));
     pkg3.version = "1:4.1-2";
     CPPUNIT_ASSERT_MESSAGE("real-world ffmpeg example (2)", !pkg3.providesDependency(Dependency::fromString("ffmpeg>=1:4.1-3")));
+
+    pkg3.name = "python-jinja";
+    pkg3.version = "1:3.0.3-1";
+    CPPUNIT_ASSERT_MESSAGE("real-world python-jinja example (epoch equal)", pkg3.providesDependency(Dependency::fromString("python-jinja>=1:2.10.3")));
+    CPPUNIT_ASSERT_MESSAGE("real-world python-jinja example (epoch absend)", pkg3.providesDependency(Dependency::fromString("python-jinja>=2.10.3")));
+    CPPUNIT_ASSERT_MESSAGE("real-world python-jinja example (epoch higher)", !pkg3.providesDependency(Dependency::fromString("python-jinja>=2:2.10.3")));
+    pkg3.version = "3.0.3-1";
+    CPPUNIT_ASSERT_MESSAGE("real-world python-jinja example (epoch absend in package)", !pkg3.providesDependency(Dependency::fromString("python-jinja>=1:2.10.3")));
+    pkg3.version = "3:3.0.3-1";
+    CPPUNIT_ASSERT_MESSAGE("real-world python-jinja example (epoch higher in package)", pkg3.providesDependency(Dependency::fromString("python-jinja>=2:2.10.3")));
 }
 
 void DataTests::testPackageSearch()
