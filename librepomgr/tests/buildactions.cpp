@@ -425,7 +425,7 @@ void BuildActionsTests::testConductingBuild()
     m_buildAction = std::make_shared<BuildAction>(0, &m_setup);
     m_buildAction->type = BuildActionType::ConductBuild;
     m_buildAction->directory = "conduct-build-test";
-    m_buildAction->packageNames = { "boost" };
+    m_buildAction->packageNames = { "boost" }; // ignore packages foo/bar/baz for first tests
     m_buildAction->flags = static_cast<BuildActionFlagType>(ConductBuildFlags::BuildAsFarAsPossible | ConductBuildFlags::SaveChrootOfFailures
         | ConductBuildFlags::UpdateChecksums | ConductBuildFlags::AutoStaging);
 
@@ -610,6 +610,36 @@ void BuildActionsTests::testConductingBuild()
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
     CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+
+    // conduct build again with all packages/batches
+    for (const auto *pkg : { "foo", "bar", "baz" }) {
+        std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/src"));
+        std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/pkg"));
+    }
+    writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
+    m_buildAction->packageNames.clear(); // don't build only "boost"
+    m_buildAction->flags = noBuildActionFlags;
+    runBuildAction("conduct build with all packages");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "failure as packages foo/bar/baz are not actually sufficiently configured", BuildActionResult::Failure, m_buildAction->result);
+    internalData = internalBuildAction<ConductBuild>();
+    const auto &progressByPackage = internalData->m_buildProgress.progressByPackage;
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo attempted",
+        "not all source/binary packages exist after the build as expected: foo-1-1.src.tar.gz, foo-1-1-x86_64.pkg.tar.zst"s,
+        progressByPackage.at("foo").error);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar skipped (as the previous batch failed)", std::string(), progressByPackage.at("bar").error);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz skipped (as the previous batch failed)", std::string(), progressByPackage.at("baz").error);
+
+    // conduct build again with all packages/batches, building as far as possible
+    writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
+    m_buildAction->flags = static_cast<BuildActionFlagType>(ConductBuildFlags::BuildAsFarAsPossible);
+    runBuildAction("conduct build with all packages, building as far as possible");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("failure, same as before", BuildActionResult::Failure, m_buildAction->result);
+    internalData = internalBuildAction<ConductBuild>();
+    const auto &progressByPackage2 = internalData->m_buildProgress.progressByPackage;
+    CPPUNIT_ASSERT_MESSAGE("build of foo still attempted", !progressByPackage2.at("foo").error.empty());
+    CPPUNIT_ASSERT_MESSAGE("build of bar attempted now", !progressByPackage2.at("bar").error.empty());
+    CPPUNIT_ASSERT_MESSAGE("build of baz attempted now", !progressByPackage2.at("baz").error.empty());
 }
 
 static void hardlinkOrCopy(

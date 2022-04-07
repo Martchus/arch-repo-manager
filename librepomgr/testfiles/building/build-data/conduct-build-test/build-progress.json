@@ -18,6 +18,15 @@
             "checksumsUpdated": false,
             "hasSources": false,
             "addedToRepo": false
+        },
+        "foo": {
+            "buildDirectory": "/tmp/wc3//building/build-data/conduct-build-test/foo/pkg"
+        },
+        "bar": {
+            "buildDirectory": "/tmp/wc3//building/build-data/conduct-build-test/bar/pkg"
+        },
+        "baz": {
+            "buildDirectory": "/tmp/wc3//building/build-data/conduct-build-test/baz/pkg"
         }
     },
     "targetDbFilePath": "",
