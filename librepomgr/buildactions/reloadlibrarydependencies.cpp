@@ -178,8 +178,8 @@ bool ReloadLibraryDependencies::addRelevantPackage(LibPkg::StorageID packageID, 
     std::error_code ec;
     const auto &fileName = packageInfo->fileName;
     const auto &arch = packageInfo->arch;
-    if (!db->localPkgDir.empty()) {
-        path = db->localPkgDir % '/' + fileName;
+    if (!db->localPkgDir.empty() && std::filesystem::file_size(cachePath = db->localPkgDir % '/' + fileName, ec) && !ec) {
+        path = std::move(cachePath);
     } else if (std::filesystem::file_size(cachePath = m_cacheDir + fileName, ec) && !ec) {
         path = std::move(cachePath);
     } else if (std::filesystem::file_size(cachePath = m_cacheDir % arch % '/' + fileName, ec) && !ec) {
