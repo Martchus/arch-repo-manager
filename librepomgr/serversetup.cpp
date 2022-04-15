@@ -246,7 +246,7 @@ LibPkg::StorageID ServiceSetup::BuildSetup::allocateBuildActionID()
 {
     static const auto emptyBuildAction = BuildAction();
     auto txn = m_storage->buildActions.getRWTransaction();
-    const auto id = txn.put(emptyBuildAction);
+    const auto id = txn.put(emptyBuildAction, txn.newID());
     txn.commit();
     return id;
 }
@@ -321,6 +321,9 @@ StorageID ServiceSetup::BuildSetup::storeBuildAction(const std::shared_ptr<Build
     }
     // update persistent storage
     auto txn = m_storage->buildActions.getRWTransaction();
+    if (!buildAction->id) {
+        buildAction->id = txn.newID();
+    }
     const auto id = txn.put(*buildAction, static_cast<LibPkg::StorageID>(buildAction->id)); // buildAction->id expected to be a valid StorageID or 0
     txn.commit();
     return id;
