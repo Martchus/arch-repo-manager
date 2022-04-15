@@ -20,13 +20,13 @@
             "addedToRepo": false
         },
         "foo": {
-            "buildDirectory": "/tmp/wc3//building/build-data/conduct-build-test/foo/pkg"
+            "buildDirectory": ""
         },
         "bar": {
-            "buildDirectory": "/tmp/wc3//building/build-data/conduct-build-test/bar/pkg"
+            "buildDirectory": ""
         },
         "baz": {
-            "buildDirectory": "/tmp/wc3//building/build-data/conduct-build-test/baz/pkg"
+            "buildDirectory": ""
         }
     },
     "targetDbFilePath": "",
