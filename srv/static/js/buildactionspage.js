@@ -32,9 +32,10 @@ export function initBuildActionsForm()
     return true;
 }
 
-function queryBuildActions()
+function queryBuildActions(additionalParams)
 {
-    AjaxHelper.queryRoute('GET', '/build-action', showBuildActions, 'build-action');
+    additionalParams = additionalParams === undefined ? '' : '?' + additionalParams;
+    AjaxHelper.queryRoute('GET', '/build-action' + additionalParams, showBuildActions, 'build-action');
     return true;
 }
 

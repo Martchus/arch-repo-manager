@@ -37,7 +37,13 @@ export function renderReloadButton(handler)
     const reloadButton = document.createElement('button');
     reloadButton.className = 'icon-button icon-reload';
     reloadButton.type = 'button';
-    reloadButton.onclick = handler;
+    reloadButton.onclick = function () { handler() };
+    reloadButton.oncontextmenu = function () { return false };
+    reloadButton.onmouseup = function (e) {
+        if (e.which === 3 || e.button === 2) { // right click
+            handler(window.prompt('Enter additional query parameters:'));
+        }
+    }
     reloadButton.appendChild(document.createTextNode('Reload'));
     return reloadButton;
 }

@@ -6,9 +6,10 @@ import * as Utils from './utils.js';
 
 const status = {repoNames: undefined};
 
-export function queryGlobalStatus()
+export function queryGlobalStatus(additionalParams)
 {
-    AjaxHelper.queryRoute('GET', '/status', handleGlobalStatusUpdate, 'global');
+    additionalParams = additionalParams === undefined ? '' : '?' + additionalParams;
+    AjaxHelper.queryRoute('GET', '/status' + additionalParams, handleGlobalStatusUpdate, 'global');
     return true;
 }
 
