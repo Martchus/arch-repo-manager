@@ -24,7 +24,10 @@ export function initPackageSearch(sectionElement, sectionData, newParams)
         };
         searchForm.dataset.initialized = true;
     }
-    const currentParams = sectionData.state.params;
+    let currentParams = sectionData.state.params;
+    if (currentParams && currentParams.startsWith('?')) {
+        currentParams = currentParams.substr(1);
+    }
     const hasNewParams = newParams.length >= 1;
     if (!hasNewParams) {
         if (currentParams !== undefined) {
