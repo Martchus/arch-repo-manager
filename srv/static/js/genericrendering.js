@@ -54,7 +54,7 @@ export function renderCustomList(array, customRenderer, compareFunction)
     const ul = document.createElement('ul');
     array.forEach(function(arrayElement) {
         const li = document.createElement('li');
-        const renderedDomElements = customRenderer(arrayElement);
+        const renderedDomElements = customRenderer(arrayElement, li);
         if (Array.isArray(renderedDomElements)) {
             renderedDomElements.forEach(function(renderedDomElement) {
                 li.appendChild(renderedDomElement);

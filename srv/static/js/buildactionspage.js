@@ -40,9 +40,9 @@ function queryBuildActions(additionalParams)
     return true;
 }
 
-function queryBuildActionDetails(ids)
+function queryBuildActionDetails(ids, detailsTables)
 {
-    AjaxHelper.queryRoute('GET', '/build-action/details?' + AjaxHelper.makeIdParams(ids), showBuildActionDetails, 'build-action-details');
+    AjaxHelper.queryRoute('GET', '/build-action/details?' + AjaxHelper.makeIdParams(ids), showBuildActionDetails.bind(undefined, detailsTables), 'build-action-details');
     return true;
 }
 
@@ -187,17 +187,17 @@ export function handleBuildActionPresetChange()
     });
 }
 
-function renderBuildActionActions(actionValue, buildAction, refresh)
+function renderBuildActionActions(actionValue, buildAction, detailsTable)
 {
     const container = document.createElement('span');
-    if (!refresh) {
+    if (!detailsTable) {
         container.className = 'table-row-actions';
     }
     const id = buildAction.id;
-    container.appendChild(CustomRendering.renderIconLink(refresh ? 'table-refresh' : 'magnify', buildAction, function() {
-        queryBuildActionDetails(id);
+    container.appendChild(CustomRendering.renderIconLink(detailsTable ? 'table-refresh' : 'magnify', buildAction, function() {
+        queryBuildActionDetails(id, detailsTable ? [detailsTable] : undefined);
         return false;
-    }, refresh ? 'Refresh details table' : 'Show details', undefined, '#build-action-details-section?' + id));
+    }, detailsTable ? 'Refresh details table' : 'Show details', undefined, '#build-action-details-section?' + id));
     container.appendChild(CustomRendering.renderIconLink('restart', buildAction, function() {
         if (window.confirm('Do you really want to clone/restart action ' + id + '?')) {
             cloneBuildAction(id);
@@ -460,7 +460,7 @@ function switchToBuildActions()
     SinglePageHelper.updateHashPreventingSectionInitializer('#build-action-section');
 }
 
-function showBuildActionDetails(ajaxRequest)
+function showBuildActionDetails(detailsTables, ajaxRequest)
 {
     if (!window.globalInfo) {
         window.functionsPostponedUntilGlobalInfo.push(showBuildActionDetails.bind(this, ...arguments));
@@ -470,10 +470,10 @@ function showBuildActionDetails(ajaxRequest)
         return;
     }
     const responseJSON = JSON.parse(ajaxRequest.responseText);
-    return showBuildActionDetails2(Array.isArray(responseJSON) ? responseJSON : [responseJSON]);
+    return showBuildActionDetails2(detailsTables, Array.isArray(responseJSON) ? responseJSON : [responseJSON]);
 }
 
-function showBuildActionDetails2(buildActions)
+function showBuildActionDetails2(existingDetailsTables, buildActions)
 {
     const buildActionResults = Utils.getAndEmptyElement('build-action-results');
     let buildActionActions = Utils.getAndEmptyElement('build-action-details-actions');
@@ -483,14 +483,16 @@ function showBuildActionDetails2(buildActions)
             buildActionActions.className = 'heading-actions';
             buildActionResults.appendChild(buildActionActions);
         }
-        buildActionResults.appendChild(renderBuildActionDetailsTable(buildActionDetails));
-        buildActionActions.appendChild(renderBuildActionActions(undefined, buildActionDetails, true));
+        const existingTable = existingDetailsTables ? existingDetailsTables.shift() : undefined;
+        const newTable = renderBuildActionDetailsTable(buildActionDetails, existingTable);
+        buildActionResults.appendChild(newTable);
+        buildActionActions.appendChild(renderBuildActionActions(undefined, buildActionDetails, newTable));
         buildActionActions = undefined;
     });
     switchToBuildActionDetails(buildActions.map(buildAction => buildAction.id));
 }
 
-function renderBuildActionDetailsTable(buildActionDetails)
+function renderBuildActionDetailsTable(buildActionDetails, existingTable)
 {
     return GenericRendering.renderTableFromJsonObject({
         data: buildActionDetails,
@@ -641,7 +643,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                     return GenericRendering.renderStandardTableCell(value.data);
                 }
             },
-            logfiles: renderBuildActionLogFiles,
+            logfiles: renderBuildActionLogFiles.bind(undefined, existingTable),
             artefacts: renderBuildActionArtefacts,
         },
     });
@@ -690,18 +692,27 @@ function handleBuildActionResponse(ajaxRequest)
         switchToBuildActionDetails();
         return;
     }
-    showBuildActionDetails(ajaxRequest);
+    showBuildActionDetails(undefined, ajaxRequest);
 }
 
-function renderBuildActionLogFiles(array, obj)
+function renderBuildActionLogFiles(existingTable, array, obj)
 {
-    return GenericRendering.renderCustomList(array, function(arrayElement) {
+    return GenericRendering.renderCustomList(array, function(arrayElement, liElement) {
+        const id = 'logfile-' + obj.id + '-' + arrayElement;
+        const liClass = liElement.className = 'li-' + id;
+        if (existingTable !== undefined) {
+            const existingLiElment = existingTable.getElementsByClassName(liClass)[0];
+            if (existingLiElment) {
+                existingLiElment.className = null;
+                return Array.from(existingLiElment.childNodes);
+            }
+        }
         const params = 'id=' + encodeURIComponent(obj.id) + '&name=' + encodeURIComponent(arrayElement);
         const logFilePath = '/build-action/logfile?' + params;
         const newWindowPath = 'log.html#' + params;
         const targetElement = document.createElement('div');
         const streamingSetup = setupTerminalForStreaming({
-            id: 'logfile-' + obj.id + '-' + arrayElement,
+            id: id,
             targetElement: targetElement,
             path: logFilePath,
         });
