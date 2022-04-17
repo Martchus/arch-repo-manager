@@ -4,10 +4,44 @@ import * as CustomRendering from './customrendering.js';
 import * as SinglePageHelper from './singlepage.js';
 import * as Utils from './utils.js';
 
-/// \brief Renders a dependency object.
-export function renderDependency(value)
+export function renderPackageDetailsLink(row)
 {
-    if (value.length < 1) {
+    return GenericRendering.renderLink(row.name, row, queryPackageDetails, 'Show package details', undefined,
+                                       '#package-details-section?' + encodeURIComponent(row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + row.name));
+}
+
+const modeTooltip = {provides: 'dependency', requires: 'dependency', libprovides: 'library', librequires: 'library'};
+
+export function renderPackageSearchLink(name, mode, text)
+{
+    const tooltip = 'Search for ' + (mode !== undefined ? modeTooltip[mode] : 'package');
+    if (mode === undefined) {
+        mode = 'name';
+    }
+    const params = '#package-search-section?name=' + encodeURIComponent(name) + '&mode=' + encodeURIComponent(mode);
+    return GenericRendering.renderLink(text || name, undefined, undefined, tooltip, undefined, params);
+}
+
+/// \brief Renders library names.
+export function renderLibraries(mode, value)
+{
+    if (!Array.isArray(value) || value.length < 1) {
+        return GenericRendering.renderArrayAsCommaSeparatedString(value);
+    }
+    const containerElement = document.createElement('span');
+    value.forEach(function (libraryName) {
+        if (containerElement.firstChild) {
+            containerElement.appendChild(document.createTextNode(' '));
+        }
+        containerElement.appendChild(renderPackageSearchLink(libraryName, mode));
+    });
+    return containerElement;
+}
+
+/// \brief Renders a dependency object.
+export function renderDependency(mode, value)
+{
+    if (!Array.isArray(value) || value.length < 1) {
         return GenericRendering.renderArrayAsCommaSeparatedString(value);
     }
     const list = document.createElement('ul');
@@ -22,7 +56,7 @@ export function renderDependency(value)
                 res += mode + dependency.version;
             }
         }
-        item.appendChild(document.createTextNode(res));
+        item.appendChild(renderPackageSearchLink(res, mode || 'provides'));
         if (dependency.description) {
             const descriptionSpan = document.createElement('span');
             descriptionSpan.appendChild(document.createTextNode(' - ' + dependency.description));
@@ -61,15 +95,15 @@ export function renderPackage(packageObj, withoutBasics)
             },
             licenses: GenericRendering.renderArrayAsCommaSeparatedString,
             groups: GenericRendering.renderArrayAsCommaSeparatedString,
-            dependencies: renderDependency,
-            optionalDependencies: renderDependency,
-            provides: renderDependency,
-            replaces: renderDependency,
-            conflicts: renderDependency,
-            libprovides: GenericRendering.renderArrayAsCommaSeparatedString,
-            libdepends: GenericRendering.renderArrayAsCommaSeparatedString,
-            'sourceInfo.makeDependencies': renderDependency,
-            'sourceInfo.checkDependencies': renderDependency,
+            dependencies: renderDependency.bind(undefined, 'provides'),
+            optionalDependencies: renderDependency.bind(undefined, 'provides'),
+            provides: renderDependency.bind(undefined, 'depends'),
+            replaces: renderDependency.bind(undefined, 'provides'),
+            conflicts: renderDependency.bind(undefined, 'provides'),
+            libprovides: renderLibraries.bind(undefined, 'libdepends'),
+            libdepends: renderLibraries.bind(undefined, 'libprovides'),
+            'sourceInfo.makeDependencies': renderDependency.bind(undefined, 'provides'),
+            'sourceInfo.checkDependencies': renderDependency.bind(undefined, 'provides'),
             'packageInfo.arch': function(value, row) {
                 const sourceInfo = row.sourceInfo;
                 const sourceArchs = sourceInfo !== undefined ? sourceInfo.archs : undefined;
@@ -85,12 +119,6 @@ export function renderPackage(packageObj, withoutBasics)
     });
     table.className = 'package-details-table';
     return table;
-}
-
-export function renderPackageDetailsLink(row)
-{
-    return GenericRendering.renderLink(row.name, row, queryPackageDetails, 'Show package details', undefined,
-                                       '#package-details-section?' + encodeURIComponent(row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + row.name));
 }
 
 function makePackageID(row)
@@ -109,6 +137,18 @@ function switchToPackageDetails(packageID)
 {
     SinglePageHelper.sections['package-details'].state.package = packageID;
     SinglePageHelper.updateHashPreventingSectionInitializer('#package-details-section?' + encodeURIComponent(packageID));
+}
+
+function renderPackageActions(pkg)
+{
+    const container = document.createElement('span');
+    container.appendChild(CustomRendering.renderIconLink('graph', undefined, undefined, 'Show dependend packages',
+        undefined, '#package-search-section?name=' + encodeURIComponent(pkg.name) + '&mode=depends'));
+    container.appendChild(CustomRendering.renderIconLink('table-refresh', undefined, function() {
+        queryPackageDetails(undefined, pkg);
+        return false;
+    }, 'Refresh package details', undefined, '#package-details-section?' + encodeURIComponent(makePackageID(pkg))));
+    return container;
 }
 
 export function showPackageDetails(ajaxRequest, row)
@@ -133,6 +173,8 @@ export function showPackageDetails(ajaxRequest, row)
     packageObj.db = row.db;
     packageObj.dbArch = row.dbArch;
     packageDetailsContainer.appendChild(renderPackage(packageObj, true));
+    const packageActions = Utils.getAndEmptyElement('package-details-actions');
+    packageActions.appendChild(renderPackageActions(packageObj));
 
     switchToPackageDetails(packageID);
 }

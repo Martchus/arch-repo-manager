@@ -168,6 +168,9 @@ export function renderLink(value, row, handler, tooltip, href, middleClickHref)
     if (tooltip !== undefined) {
         linkElement.title = tooltip;
     }
+    if (handler === undefined) {
+        return linkElement;
+    }
     linkElement.onclick = function () {
         handler(value, row);
         return false;

@@ -208,6 +208,9 @@
 .icon-download {
     background-image: url(../img/icon/download.svg);
 }
+.icon-graph {
+    background-image: url(../img/icon/graph.svg);
+}
 
 /* actions shown on top-right corner of build actions and build action details */
 .heading-actions {

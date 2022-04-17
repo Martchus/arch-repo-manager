@@ -623,7 +623,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                                             displayLabels: ['Missing dependencies', 'Missing libraries'],
                                             fieldAccessors: ['deps', 'libs'],
                                             customRenderer: {
-                                                deps: PackageRendering.renderDependency,
+                                                deps: PackageRendering.renderDependency.bind(undefined, 'provides'),
                                             },
                                         });
                                      default:
