@@ -221,19 +221,19 @@ void getPackages(const Params &params, ResponseHandler &&handler)
     RAPIDJSON_NAMESPACE::Document document(RAPIDJSON_NAMESPACE::kArrayType);
     RAPIDJSON_NAMESPACE::Document::Array array(document.GetArray());
 
-    const auto pushPackages = [&dbs, &document, &array, &limit](auto &&packages) {
-        limit -= packages.size();
-        for (const auto &package : packages) {
-            if (!dbs.empty()) {
-                const auto *const db = std::get<Database *>(package.db);
-                const auto dbIterator = dbs.find(db->name);
-                if (dbIterator == dbs.end() || dbIterator->second.find(db->arch) == dbIterator->second.end()) {
-                    continue;
-                }
-            }
-            ReflectiveRapidJSON::JsonReflector::push(package, array, document.GetAllocator());
-        }
-    };
+    const auto visitDb = dbs.empty() ? LibPkg::Config::DatabaseVisitor() : ([&dbs](Database &db) {
+        const auto dbIterator = dbs.find(db.name);
+        return dbIterator == dbs.end() || dbIterator->second.find(db.arch) == dbIterator->second.end();
+    });
+    const auto pushPackage = details
+        ? LibPkg::Config::PackageVisitorConst([&array, &document, &limit](Database &, LibPkg::StorageID, const std::shared_ptr<Package> &pkg) {
+              ReflectiveRapidJSON::JsonReflector::push(pkg, array, document.GetAllocator());
+              return array.Size() >= limit;
+          })
+        : ([&array, &document, &limit](Database &db, LibPkg::StorageID id, const std::shared_ptr<Package> &pkg) {
+              ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageSearchResult(db, pkg, id), array, document.GetAllocator());
+              return array.Size() >= limit;
+          });
 
     auto aurPackages = std::vector<PackageSearchResult>();
     auto neededAurPackages = std::vector<std::string>();
@@ -248,8 +248,8 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 = LibPkg::Config::parsePackageDenotation(name); // assume names are in the form "repo@arch/pkgname", eg. "core@i686/gcc"
             const auto &[dbName, dbArch, packageName] = packageDenotation;
             const auto isDbAur = dbName == "aur";
+            auto packageNameStr = std::string(packageName);
             if (fromAur && (dbName.empty() || isDbAur)) {
-                auto packageNameStr = std::string(packageName);
                 if (const auto [aurPackageID, aurPackage] = aurDb.findPackageWithID(packageNameStr);
                     aurPackage && (!details || aurPackage->origin != PackageOrigin::AurRpcSearch)) {
                     aurPackages.emplace_back(aurDb, aurPackage, aurPackageID);
@@ -259,45 +259,45 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 --limit;
             }
             if (!isDbAur && (!dbs.empty() || !onlyFromAur)) {
-                auto packages = params.setup.config.findPackages(packageDenotation, limit);
-                if (details) {
-                    for (const auto &package : packages) {
-                        if (dbs.empty() || dbs.find(std::get<LibPkg::Database *>(package.db)->name) != dbs.end()) {
-                            ReflectiveRapidJSON::JsonReflector::push(package.pkg, array, document.GetAllocator());
-                        }
-                    }
-                    limit -= packages.size();
-                } else {
-                    pushPackages(std::move(packages));
-                }
+                params.setup.config.packages(dbName, dbArch, packageNameStr, visitDb, pushPackage);
             }
             break;
         }
         case Mode::NameContains:
-            pushPackages(params.setup.config.findPackages(
-                [&dbs, onlyFromAur](const LibPkg::Database &db) { return (dbs.empty() && !onlyFromAur) || dbs.find(db.name) != dbs.end(); }, name,
-                limit));
+            params.setup.config.packagesByName(
+                visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
+                    if (packageName.find(name) != std::string_view::npos) {
+                        const auto [packageID, package] = getPackage();
+                        return pushPackage(db, packageID, package);
+                    }
+                    return false;
+                });
             if (fromAur && !name.empty()) {
                 neededAurPackages.emplace_back(std::move(name));
             }
             break;
         case Mode::Regex:
-            // assume names are regexes
             try {
-                pushPackages(params.setup.config.findPackages(std::regex(name.data(), name.size()), limit));
+                const auto regex = std::regex(name.data(), name.size());
+                params.setup.config.packagesByName(
+                    visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
+                        if (std::regex_match(packageName.begin(), packageName.end(), regex)) {
+                            const auto [packageID, package] = getPackage();
+                            return pushPackage(db, packageID, package);
+                        }
+                        return false;
+                    });
             } catch (const std::regex_error &e) {
                 throw BadRequest(argsToString("regex is invalid: ", e.what()));
             }
             break;
         case Mode::Provides:
         case Mode::Depends:
-            // assume names are dependency notation
-            pushPackages(params.setup.config.findPackages(Dependency::fromString(name), mode == Mode::Depends, limit));
+            params.setup.config.providingPackages(Dependency::fromString(name), mode == Mode::Depends, visitDb, pushPackage);
             break;
         case Mode::LibProvides:
         case Mode::LibDepends:
-            // assume names are "normalized" library names with platform prefix
-            pushPackages(params.setup.config.findPackagesProvidingLibrary(name, mode == Mode::LibDepends, limit));
+            params.setup.config.providingPackages(name, mode == Mode::LibDepends, visitDb, pushPackage);
             break;
         default:;
         }

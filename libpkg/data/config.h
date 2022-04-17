@@ -106,6 +106,12 @@ constexpr bool operator&(BuildOrderOptions lhs, BuildOrderOptions rhs)
 }
 
 struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::BinarySerializable<Config> {
+    using DatabaseVisitor = std::function<bool(Database &)>;
+    using PackageVisitorMove
+        = std::function<bool(Database &, StorageID, std::shared_ptr<Package> &&)>; // package is invalidated/reused unless moved from!!!
+    using PackageVisitorConst = std::function<bool(Database &, StorageID, const std::shared_ptr<Package> &)>;
+    using PackageVisitorByName = std::function<bool(Database &, std::string_view, const std::function<PackageSpec(void)> &)>;
+
     explicit Config();
     ~Config();
 
@@ -132,13 +138,15 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
         std::unordered_map<LibPkg::StorageID, std::shared_ptr<LibPkg::Package>> &runtimeDependencies, DependencySet &missingDependencies,
         std::unordered_set<StorageID> &visited);
 
-    // search for packages
-    static std::pair<std::string_view, std::string_view> parseDatabaseDenotation(std::string_view databaseDenotation);
+    // database search/creation
     Database *findDatabase(std::string_view name, std::string_view architecture);
     Database *findDatabaseFromDenotation(std::string_view databaseDenotation);
     Database *findOrCreateDatabase(std::string &&name, std::string_view architecture, bool keepLocalPaths = false);
     Database *findOrCreateDatabase(std::string_view name, std::string_view architecture, bool keepLocalPaths = false);
     Database *findOrCreateDatabaseFromDenotation(std::string_view databaseDenotation, bool keepLocalPaths = false);
+
+    // packages search
+    static std::pair<std::string_view, std::string_view> parseDatabaseDenotation(std::string_view databaseDenotation);
     static std::tuple<std::string_view, std::string_view, std::string_view> parsePackageDenotation(std::string_view packageDenotation);
     std::vector<PackageSearchResult> findPackages(std::string_view packageDenotation, std::size_t limit = std::numeric_limits<std::size_t>::max());
     std::vector<PackageSearchResult> findPackages(
@@ -149,15 +157,14 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     std::vector<PackageSearchResult> findPackages(
         const Dependency &dependency, bool reverse = false, std::size_t limit = std::numeric_limits<std::size_t>::max());
     std::vector<PackageSearchResult> findPackagesProvidingLibrary(
-        const std::string &library, bool reverse = false, std::size_t limit = std::numeric_limits<std::size_t>::max());
-    std::vector<PackageSearchResult> findPackages(const std::regex &regex, std::size_t limit = std::numeric_limits<std::size_t>::max());
-    std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &)> &databasePred, std::string_view term,
-        std::size_t limit = std::numeric_limits<std::size_t>::max());
-    std::vector<PackageSearchResult> findPackages(const Package &package, std::size_t limit = std::numeric_limits<std::size_t>::max());
-    std::vector<PackageSearchResult> findPackages(const std::function<bool(const Database &)> &databasePred,
-        const std::function<bool(const Database &, const Package &)> &packagePred, std::size_t limit = std::numeric_limits<std::size_t>::max());
-    std::vector<PackageSearchResult> findPackages(
-        const std::function<bool(const Database &, const Package &)> &pred, std::size_t limit = std::numeric_limits<std::size_t>::max());
+        const std::string &library, bool reverse, std::size_t limit = std::numeric_limits<std::size_t>::max());
+
+    // package iteration
+    void packages(std::string_view dbName, std::string_view dbArch, const std::string &packageName, const DatabaseVisitor &databaseVisitor,
+        const PackageVisitorConst &visitor);
+    void packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByName &visitor);
+    void providingPackages(const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor);
+    void providingPackages(const std::string &libraryName, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor);
 
     std::vector<Database> databases;
     Database aur = Database("aur");

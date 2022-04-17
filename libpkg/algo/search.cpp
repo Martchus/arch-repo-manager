@@ -183,97 +183,59 @@ std::vector<PackageSearchResult> Config::findPackagesProvidingLibrary(const std:
     return results;
 }
 
-/*!
- * \brief Returns all packages which names matches \a regex.
- */
-std::vector<PackageSearchResult> Config::findPackages(const std::regex &regex, std::size_t limit)
+void Config::packages(std::string_view dbName, std::string_view dbArch, const std::string &packageName, const DatabaseVisitor &databaseVisitor,
+    const PackageVisitorConst &visitor)
 {
-    auto pkgs = std::vector<PackageSearchResult>();
-    for (auto &db : databases) {
-        db.allPackagesByName([&](std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
-            if (std::regex_match(packageName.begin(), packageName.end(), regex)) {
-                auto [packageID, package] = getPackage();
-                pkgs.emplace_back(db, package, packageID);
-            }
-            return pkgs.size() >= limit;
-        });
+    // don't allow to iterate though all packages
+    if (packageName.empty()) {
+        return;
     }
-    return pkgs;
-}
-
-std::vector<PackageSearchResult> Config::findPackages(
-    const std::function<bool(const Database &)> &databasePred, std::string_view term, std::size_t limit)
-{
-    auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        if (!databasePred(db)) {
+        if ((!dbName.empty() && dbName != db.name) || (!dbArch.empty() && dbArch != db.arch) || (databaseVisitor && databaseVisitor(db))) {
             continue;
         }
-        db.allPackagesByName([&](std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
-            if (packageName.find(term) != std::string_view::npos) {
-                const auto [packageID, package] = getPackage();
-                pkgs.emplace_back(db, package, packageID);
-            }
-            return pkgs.size() >= limit;
-        });
-    }
-    return pkgs;
-}
-
-/*!
- * \brief Returns all packages considered "the same" as \a package.
- * \remarks See Package::isSame().
- */
-std::vector<PackageSearchResult> Config::findPackages(const Package &package, std::size_t limit)
-{
-    auto pkgs = std::vector<PackageSearchResult>();
-    for (auto &db : databases) {
-        if (const auto [id, pkg] = db.findPackageWithID(package.name); pkg && pkg->isSame(package)) {
-            pkgs.emplace_back(db, pkg, id);
-        }
-        if (pkgs.size() >= limit) {
-            return pkgs;
+        if (const auto [id, package] = db.findPackageWithID(packageName); package) {
+            visitor(db, id, package);
         }
     }
-    return pkgs;
 }
 
-/*!
- * \brief Returns all packages \a packagePred returns true for from all databases \a databasePred returns true for.
- */
-std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &)> &databasePred,
-    const std::function<bool(const Database &, const Package &)> &packagePred, std::size_t limit)
+void Config::packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByName &visitor)
 {
-    auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        if (!databasePred(db)) {
+        if (databaseVisitor && databaseVisitor(db)) {
             continue;
         }
-        db.allPackages([&](StorageID packageID, std::shared_ptr<Package> &&package) {
-            if (packagePred(db, *package)) {
-                pkgs.emplace_back(db, std::move(package), packageID);
-            }
-            return pkgs.size() >= limit;
-        });
+        db.allPackagesByName(
+            [&](std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) { return visitor(db, packageName, getPackage); });
     }
-    return pkgs;
 }
 
-/*!
- * \brief Returns all packages \a pred returns true for.
- */
-std::vector<PackageSearchResult> Config::findPackages(const std::function<bool(const Database &, const Package &)> &pred, std::size_t limit)
+void Config::providingPackages(const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor)
 {
-    auto pkgs = std::vector<PackageSearchResult>();
     for (auto &db : databases) {
-        db.allPackages([&](StorageID packageID, std::shared_ptr<Package> &&package) {
-            if (pred(db, *package)) {
-                pkgs.emplace_back(db, std::move(package), packageID);
-            }
-            return pkgs.size() >= limit;
+        if (databaseVisitor && databaseVisitor(db)) {
+            continue;
+        }
+        auto visited = std::unordered_set<LibPkg::StorageID>();
+        db.providingPackages(dependency, reverse, [&](StorageID packageID, const std::shared_ptr<Package> &package) {
+            return visited.emplace(packageID).second ? visitor(db, packageID, package) : false;
         });
     }
-    return pkgs;
+}
+
+void Config::providingPackages(
+    const std::string &libraryName, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor)
+{
+    for (auto &db : databases) {
+        if (databaseVisitor && databaseVisitor(db)) {
+            continue;
+        }
+        auto visited = std::unordered_set<LibPkg::StorageID>();
+        db.providingPackages(libraryName, reverse, [&](StorageID packageID, const std::shared_ptr<Package> &package) {
+            return visited.emplace(packageID).second ? visitor(db, packageID, package) : false;
+        });
+    }
 }
 
 } // namespace LibPkg
