@@ -11,6 +11,7 @@ set(JAVA_SCRIPT_FILES
     static/js/buildactionspage.js
     static/js/customrendering.js
     static/js/genericrendering.js
+    static/js/packagerendering.js
     static/js/globalstatuspage.js
     static/js/log.js
     static/js/packagedetailspage.js

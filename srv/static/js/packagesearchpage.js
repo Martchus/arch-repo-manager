@@ -1,7 +1,7 @@
 import * as AjaxHelper from './ajaxhelper.js';
 import * as GenericRendering from './genericrendering.js';
+import * as PackageRendering from './packagerendering.js';
 import * as SinglePageHelper from './singlepage.js';
-import * as PackageDetailsPage from './packagedetailspage.js';
 import * as Utils from './utils.js';
 
 export function initPackageSearch(sectionElement, sectionData, newParams)
@@ -107,8 +107,7 @@ function showPackageSearchResults(ajaxRequest)
         rowsPerPage: 40,
         customRenderer: {
             name: function (value, row) {
-                return GenericRendering.renderLink(value, row, PackageDetailsPage.queryPackageDetails, 'Show package details', undefined,
-                    '#package-details-section?' + encodeURIComponent(row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + value));
+                return PackageRendering.renderPackageDetailsLink(row);
             },
             checkbox: function(value, row) {
                 return GenericRendering.renderCheckBoxForTableRow(value, row, function(row) {

@@ -1,6 +1,7 @@
 import * as AjaxHelper from './ajaxhelper.js';
 import * as CustomRendering from './customrendering.js';
 import * as GenericRendering from './genericrendering.js';
+import * as PackageRendering from './packagerendering.js';
 import * as SinglePageHelper from './singlepage.js';
 import * as Terminal from './terminal.js';
 import * as Utils from './utils.js';
@@ -622,7 +623,7 @@ function renderBuildActionDetailsTable(buildActionDetails)
                                             displayLabels: ['Missing dependencies', 'Missing libraries'],
                                             fieldAccessors: ['deps', 'libs'],
                                             customRenderer: {
-                                                deps: CustomRendering.renderDependency,
+                                                deps: PackageRendering.renderDependency,
                                             },
                                         });
                                      default:
@@ -781,7 +782,7 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
 
 function renderPackageList(packageList)
 {
-    return GenericRendering.renderCustomList(packageList, CustomRendering.renderPackage);
+    return GenericRendering.renderCustomList(packageList, PackageRendering.renderPackage);
 }
 
 function renderBuildPreparationBuildData(buildDataForPackage)
