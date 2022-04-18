@@ -268,6 +268,11 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
                     if (packageName.find(name) != std::string_view::npos) {
                         const auto [packageID, package] = getPackage();
+                        if (!package) {
+                            cerr << Phrases::ErrorMessage << "Broken index in db \"" << db.name << "\": package \"" << packageName
+                                 << "\" does not exist" << std::endl;
+                            return false;
+                        }
                         return pushPackage(db, packageID, package);
                     }
                     return false;
@@ -283,6 +288,11 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                     visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
                         if (std::regex_match(packageName.begin(), packageName.end(), regex)) {
                             const auto [packageID, package] = getPackage();
+                            if (!package) {
+                                cerr << Phrases::ErrorMessage << "Broken index in db \"" << db.name << "\": package \"" << packageName
+                                     << "\" does not exist" << std::endl;
+                                return false;
+                            }
                             return pushPackage(db, packageID, package);
                         }
                         return false;
