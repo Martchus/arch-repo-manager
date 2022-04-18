@@ -34,6 +34,7 @@ struct PackageUpdaterPrivate {
     bool clear = false;
     std::unique_lock<std::mutex> lock;
     PackageStorage::RWTransaction packagesTxn;
+    std::unordered_set<StorageID> handledIds;
     AffectedDeps affectedProvidedDeps;
     AffectedDeps affectedRequiredDeps;
     AffectedLibs affectedProvidedLibs;
@@ -660,10 +661,6 @@ PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage, bool clea
     , lock(storage.updateMutex)
     , packagesTxn(storage.packages.getRWTransaction())
 {
-    if (clear) {
-        storage.packageCache.clearCacheOnly(storage);
-        packagesTxn.clear();
-    }
 }
 
 void PackageUpdaterPrivate::update(const PackageCache::StoreResult &res, const std::shared_ptr<Package> &package)
@@ -671,6 +668,7 @@ void PackageUpdaterPrivate::update(const PackageCache::StoreResult &res, const s
     if (!res.id) {
         return;
     }
+    handledIds.emplace(res.id);
     update(res.id, false, package);
     if (!clear && res.oldEntry) {
         update(res.id, true, res.oldEntry);
@@ -804,7 +802,16 @@ StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
 void PackageUpdater::commit()
 {
     const auto &storage = m_database.m_storage;
-    m_d->packagesTxn.commit();
+    auto &pkgTxn = m_d->packagesTxn;
+    if (m_d->clear) {
+        const auto &toPreserve = m_d->handledIds;
+        for (auto i = pkgTxn.begin<std::unique_ptr>(); i != pkgTxn.end(); ++i) {
+            if (!toPreserve.contains(i.getID())) {
+                i.del();
+            }
+        }
+    }
+    pkgTxn.commit();
     {
         auto txn = storage->providedDeps.getRWTransaction();
         if (m_d->clear) {

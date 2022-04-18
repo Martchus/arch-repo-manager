@@ -94,19 +94,31 @@ void ReloadDatabase::run()
                         }
                     }
                     auto dbFile = LibPkg::extractFiles(dbPath, &LibPkg::Database::isFileRelevant);
-                    auto packages = LibPkg::Package::fromDatabaseFile(move(dbFile));
                     dbFileLock.lock().unlock();
+
                     m_buildAction->appendOutput(
                         Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch, "\" from local file \"", dbPath, "\"\n");
-                    const auto configLock = m_setup.config.lockToRead();
+
+                    auto configLock = m_setup.config.lockToRead();
                     auto *const destinationDb = m_setup.config.findDatabase(dbName, dbArch);
                     if (!destinationDb) {
+                        configLock.unlock();
                         m_buildAction->appendOutput(
                             Phrases::ErrorMessage, "Loaded database file for \"", dbName, '@', dbArch, "\" but it no longer exists; discarding\n");
                         session->addResponse(std::move(dbName));
                         return;
                     }
-                    destinationDb->replacePackages(packages, lastModified);
+
+                    auto updater = LibPkg::PackageUpdater(*destinationDb, true);
+                    LibPkg::Package::fromDatabaseFile(std::move(dbFile), [&updater](std::shared_ptr<LibPkg::Package> package) {
+                        if (const auto [id, existingPackage] = updater.findPackageWithID(package->name); existingPackage) {
+                            package->addDepsAndProvidesFromOtherPackage(*existingPackage);
+                        }
+                        updater.update(package);
+                        return false;
+                    });
+                    updater.commit();
+                    destinationDb->lastUpdate = lastModified;
                 } catch (const std::runtime_error &e) {
                     m_buildAction->appendOutput(Phrases::ErrorMessage, "An error occurred when reloading database \"", dbName, '@', dbArch,
                         "\" from local file \"", dbPath, "\": ", e.what(), '\n');

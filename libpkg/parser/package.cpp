@@ -3,6 +3,8 @@
 #include "./binary.h"
 #include "./utils.h"
 
+#include "../data/database.h"
+
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
@@ -718,15 +720,31 @@ std::vector<std::shared_ptr<Package>> Package::fromDatabaseFile(FileMap &&databa
 {
     std::vector<std::shared_ptr<Package>> packages;
     packages.reserve(databaseFile.size());
+    std::vector<std::string> descriptionParts;
     for (auto &dir : databaseFile) {
-        vector<string> descriptionParts;
+        descriptionParts.clear();
         descriptionParts.reserve(dir.second.size());
         for (auto &file : dir.second) {
-            descriptionParts.emplace_back(move(file.content));
+            descriptionParts.emplace_back(std::move(file.content));
         }
         packages.emplace_back(Package::fromDescription(descriptionParts));
     }
     return packages;
+}
+
+void Package::fromDatabaseFile(FileMap &&databaseFile, const std::function<bool(std::shared_ptr<Package>)> &visitor)
+{
+    std::vector<std::string> descriptionParts;
+    for (auto &dir : databaseFile) {
+        descriptionParts.clear();
+        descriptionParts.reserve(dir.second.size());
+        for (auto &file : dir.second) {
+            descriptionParts.emplace_back(std::move(file.content));
+        }
+        if (visitor(Package::fromDescription(descriptionParts))) {
+            return;
+        }
+    }
 }
 
 bool Package::isPkgInfoFileOrBinary(const char *filePath, const char *fileName, mode_t mode)
