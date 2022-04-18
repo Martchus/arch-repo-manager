@@ -444,16 +444,6 @@ inline Package::Package(const Package &other)
 {
 }
 
-/*
-Package &Package::operator=(const Package &other)
-{
-    if (this != &other) {
-
-    }
-    return *this;
-}
-*/
-
 inline bool Package::isSame(const Package &other) const
 {
     return name == other.name && version == other.version;
