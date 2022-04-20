@@ -21,17 +21,19 @@ using namespace CppUtilities;
 namespace LibPkg {
 
 struct AddDirectoryToFileMap {
-    void operator()(std::string &&path)
+    bool operator()(std::string_view path)
     {
-        fileMap[std::move(path)];
+        fileMap[std::string(path)];
+        return false;
     }
     FileMap &fileMap;
 };
 
 struct AddFileToFileMap {
-    void operator()(std::string &&directoryPath, ArchiveFile &&file)
+    bool operator()(std::string_view directoryPath, ArchiveFile &&file)
     {
-        fileMap[std::move(directoryPath)].emplace_back(std::move(file));
+        fileMap[std::string(directoryPath)].emplace_back(std::move(file));
+        return false;
     }
     FileMap &fileMap;
 };
@@ -40,8 +42,8 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
     DirectoryHandler &&directoryHandler)
 {
     // iterate through all archive entries
-    struct archive_entry *entry;
-    while (archive_read_next_header(ar, &entry) == ARCHIVE_OK) {
+    struct archive_entry *const entry = archive_entry_new();
+    while (archive_read_next_header2(ar, entry) == ARCHIVE_OK) {
         // check entry type (only dirs, files and symlinks relevant here)
         const auto entryType(archive_entry_filetype(entry));
         if (entryType != AE_IFDIR && entryType != AE_IFREG && entryType != AE_IFLNK) {
@@ -70,7 +72,9 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
                 }
             }
 
-            directoryHandler(string(filePath, dirEnd));
+            if (directoryHandler(std::string_view(filePath, dirEnd))) {
+                return;
+            }
             continue;
         }
 
@@ -94,21 +98,23 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
 
         // read symlink
         if (entryType == AE_IFLNK) {
-            fileHandler(string(filePath, static_cast<string::size_type>(dirEnd - filePath)),
-                ArchiveFile(fileName, string(archive_entry_symlink_utf8(entry)), ArchiveFileType::Link, creationTime, modificationTime));
+            if (fileHandler(std::string_view(filePath, static_cast<string::size_type>(dirEnd - filePath)),
+                    ArchiveFile(fileName, std::string(archive_entry_symlink_utf8(entry)), ArchiveFileType::Link, creationTime, modificationTime))) {
+                return;
+            }
             continue;
         }
 
         // determine file size to pre-allocate buffer for file content
         const la_int64_t fileSize = archive_entry_size(entry);
-        string fileContent;
+        std::string fileContent;
         if (fileSize > 0) {
             fileContent.reserve(static_cast<string::size_type>(fileSize));
         }
 
         // read file content
         const char *buff;
-        size_t size;
+        std::size_t size;
         la_int64_t offset;
         for (;;) {
             int returnCode = archive_read_data_block(ar, reinterpret_cast<const void **>(&buff), &size, &offset);
@@ -119,11 +125,14 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
         }
 
         // move it to results
-        fileHandler(string(filePath, static_cast<string::size_type>(dirEnd - filePath)),
-            ArchiveFile(fileName, move(fileContent), ArchiveFileType::Regular, creationTime, modificationTime));
+        if (fileHandler(std::string_view(filePath, static_cast<string::size_type>(dirEnd - filePath)),
+                ArchiveFile(fileName, std::move(fileContent), ArchiveFileType::Regular, creationTime, modificationTime))) {
+            return;
+        }
     }
 
     // free resources used by libarchive
+    archive_entry_free(entry);
     int returnCode = archive_read_free(ar);
     if (returnCode != ARCHIVE_OK) {
         throw runtime_error("Unable to free archive: " + archiveName);

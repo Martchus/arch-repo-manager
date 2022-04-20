@@ -29,32 +29,16 @@ void Database::loadPackagesFromConfiguredPaths(bool withFiles, bool force)
     }
     const auto lastFileUpdate = lastModified(dbPath);
     if (force || lastFileUpdate > lastUpdate) {
-        loadPackages(extractFiles(dbPath, &isFileRelevant), lastFileUpdate);
+        loadPackages(dbPath, lastFileUpdate);
     }
 }
 
-void LibPkg::Database::loadPackages(const string &databaseData, DateTime lastModified)
+void Database::loadPackages(const std::string &databaseFilePath, DateTime lastModified)
 {
-    loadPackages(extractFilesFromBuffer(databaseData, name + " db file", &isFileRelevant), lastModified);
-}
-
-void Database::loadPackages(FileMap &&databaseFiles, DateTime lastModified)
-{
-    lastUpdate = lastModified;
-    auto updater = PackageUpdater(*this);
-    for (auto &dir : databaseFiles) {
-        if (dir.first.find('/') != std::string::npos) {
-            cerr << Phrases::WarningMessage << "Database \"" << name << "\" contains unexpected sub directory: " << dir.first << Phrases::EndFlush;
-            continue;
-        }
-        auto descriptionParts = std::vector<std::string>();
-        descriptionParts.reserve(dir.second.size());
-        for (auto &file : dir.second) {
-            descriptionParts.emplace_back(std::move(file.content));
-        }
-        updater.update(Package::fromDescription(descriptionParts));
-    }
+    auto updater = PackageUpdater(*this, true);
+    updater.insertFromDatabaseFile(databaseFilePath);
     updater.commit();
+    lastUpdate = lastModified;
 }
 
 } // namespace LibPkg

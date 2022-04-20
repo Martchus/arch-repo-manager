@@ -106,6 +106,7 @@ struct LIBPKG_EXPORT PackageUpdater {
 
     PackageSpec findPackageWithID(const std::string &packageName);
     StorageID update(const std::shared_ptr<Package> &package);
+    bool insertFromDatabaseFile(const std::string &databaseFilePath);
     void commit();
 
 private:
@@ -147,8 +148,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     void resetConfiguration(bool keepLocalPaths = false);
     void clearPackages();
     void loadPackagesFromConfiguredPaths(bool withFiles = false, bool force = false);
-    void loadPackages(const std::string &databaseData, CppUtilities::DateTime lastModified);
-    void loadPackages(FileMap &&databaseFiles, CppUtilities::DateTime lastModified);
+    void loadPackages(const std::string &databaseFilePath, CppUtilities::DateTime lastModified);
     static bool isFileRelevant(const char *filePath, const char *fileName, mode_t);
     std::vector<std::shared_ptr<Package>> findPackages(const std::function<bool(const Database &, const Package &)> &pred);
     void allPackages(const PackageVisitorMove &visitor);
@@ -164,7 +164,6 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     void removePackage(const std::string &packageName);
     StorageID updatePackage(const std::shared_ptr<Package> &package);
     StorageID forceUpdatePackage(const std::shared_ptr<Package> &package);
-    void replacePackages(const std::vector<std::shared_ptr<Package>> &newPackages, CppUtilities::DateTime lastModified);
     std::unordered_map<PackageSpec, UnresolvedDependencies> detectUnresolvedPackages(Config &config,
         const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedPackages,
         const std::unordered_set<std::string_view> &depsToIgnore = std::unordered_set<std::string_view>(),

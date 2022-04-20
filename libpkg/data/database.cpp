@@ -404,21 +404,6 @@ StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
     return res.id;
 }
 
-void Database::replacePackages(const std::vector<std::shared_ptr<Package>> &newPackages, DateTime lastModified)
-{
-    for (const auto &package : newPackages) {
-        if (const auto existingPackage = findPackage(package->name)) {
-            package->addDepsAndProvidesFromOtherPackage(*existingPackage);
-        }
-    }
-    auto updater = PackageUpdater(*this, true);
-    for (const auto &package : newPackages) {
-        updater.update(package);
-    }
-    updater.commit();
-    lastUpdate = lastModified;
-}
-
 /*!
  * \brief Determines which packages are unresolvable assuming new packages are added to the database and certain provides are removed.
  * \param config The configuration supposed to contain database dependencies.
@@ -797,6 +782,18 @@ StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
     const auto res = storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package);
     m_d->update(res, package);
     return res.id;
+}
+
+bool PackageUpdater::insertFromDatabaseFile(const std::string &databaseFilePath)
+{
+    LibPkg::Package::fromDatabaseFile(databaseFilePath, [this](const std::shared_ptr<LibPkg::Package> &package) {
+        if (const auto [id, existingPackage] = findPackageWithID(package->name); existingPackage) {
+            package->addDepsAndProvidesFromOtherPackage(*existingPackage);
+        }
+        update(package);
+        return false;
+    });
+    return false;
 }
 
 void PackageUpdater::commit()

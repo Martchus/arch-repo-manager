@@ -83,8 +83,8 @@ inline VirtualAddressMapping::VirtualAddressMapping()
 
 struct LIBPKG_EXPORT Binary {
     void load(std::string_view filePath);
-    void load(const std::string &fileContent, const std::string &fileName, const std::string &directoryPath, bool isRegularFile = false);
-    std::string addPrefix(const std::string &dependencyName) const;
+    void load(std::string_view fileContent, std::string_view fileName, std::string_view directoryPath, bool isRegularFile = false);
+    std::string addPrefix(std::string_view dependencyName) const;
 
     BinaryType type = BinaryType::Invalid;
     BinarySubType subType = BinarySubType::None;
@@ -99,8 +99,8 @@ struct LIBPKG_EXPORT Binary {
     VirtualAddressMapping virtualAddressMapping;
 
 private:
-    void parse(std::istream &stream, const std::string *fileContent = nullptr);
-    void parseElf(CppUtilities::BinaryReader &reader, const std::string *fileContent = nullptr);
+    void parse(std::istream &stream, const std::string_view *fileContent = nullptr);
+    void parseElf(CppUtilities::BinaryReader &reader, const std::string_view *fileContent = nullptr);
     void parsePe(CppUtilities::BinaryReader &reader, typename std::iostream::off_type baseFileOffset = 0);
     void parseAr(CppUtilities::BinaryReader &reader);
     void parseCoff(CppUtilities::BinaryReader &reader);
@@ -108,8 +108,8 @@ private:
     std::uint64_t readElfAddress(CppUtilities::BinaryReader &reader);
     std::uint32_t readElfInt32(CppUtilities::BinaryReader &reader);
     std::uint16_t readElfInt16(CppUtilities::BinaryReader &reader);
-    std::string readElfString(std::istream &stream, const std::string *fileContent, std::uint64_t stringTableOffset, std::uint64_t stringTableSize,
-        std::uint64_t stringOffset);
+    std::string readElfString(std::istream &stream, const std::string_view *fileContent, std::uint64_t stringTableOffset,
+        std::uint64_t stringTableSize, std::uint64_t stringOffset);
 };
 } // namespace LibPkg
 

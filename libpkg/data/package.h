@@ -384,9 +384,9 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     std::string computeRegularPackageName() const;
     PackageNameData decomposeName() const;
     void addInfoFromPkgInfoFile(const std::string &info);
-    void addDepsAndProvidesFromContainedDirectory(const std::string &directoryPath);
+    void addDepsAndProvidesFromContainedDirectory(std::string_view directoryPath);
     void addDepsAndProvidesFromContainedFile(
-        const std::string &directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
+        std::string_view directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
     void addDepsAndProvidesFromContents(const FileMap &contents);
     std::vector<std::string> processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);
@@ -397,8 +397,7 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
 
     static std::vector<PackageSpec> fromInfo(const std::string &info, bool isPackageInfo = false);
     static std::shared_ptr<Package> fromDescription(const std::vector<std::string> &descriptionParts);
-    static std::vector<std::shared_ptr<Package>> fromDatabaseFile(FileMap &&databaseFile);
-    static void fromDatabaseFile(FileMap &&databaseFile, const std::function<bool(std::shared_ptr<Package>)> &visitor);
+    static void fromDatabaseFile(const std::string &archivePath, const std::function<bool(std::shared_ptr<Package>)> &visitor);
     static std::shared_ptr<Package> fromPkgFile(const std::string &path);
     static std::tuple<std::string_view, std::string_view, std::string_view> fileNameComponents(std::string_view fileName);
     static std::shared_ptr<Package> fromPkgFileName(std::string_view fileName);

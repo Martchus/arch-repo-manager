@@ -37,8 +37,8 @@ struct LIBPKG_EXPORT ArchiveFile {
 
 using FileMap = std::map<std::string, std::vector<ArchiveFile>>;
 using FilePredicate = std::function<bool(const char *, const char *, mode_t)>;
-using DirectoryHandler = std::function<void(std::string &&path)>;
-using FileHandler = std::function<void(std::string &&path, ArchiveFile &&file)>;
+using DirectoryHandler = std::function<bool(std::string_view path)>;
+using FileHandler = std::function<bool(std::string_view path, ArchiveFile &&file)>;
 
 LIBPKG_EXPORT FileMap extractFiles(const std::string &archivePath, const FilePredicate &isFileRelevant = FilePredicate());
 LIBPKG_EXPORT void walkThroughArchive(const std::string &archivePath, const FilePredicate &isFileRelevant = FilePredicate(),

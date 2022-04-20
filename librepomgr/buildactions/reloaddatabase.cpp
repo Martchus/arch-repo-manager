@@ -80,6 +80,7 @@ void ReloadDatabase::run()
         boost::asio::post(
             m_setup.building.ioContext.get_executor(), [this, force, session, dbName = db->name, dbArch = db->arch, dbPath = move(dbPath)]() mutable {
                 try {
+                    auto configLock = m_setup.config.lockToRead();
                     auto dbFileLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(dbName, dbArch));
                     const auto lastModified = LibPkg::lastModified(dbPath);
                     if (!force) {
@@ -93,13 +94,10 @@ void ReloadDatabase::run()
                             return;
                         }
                     }
-                    auto dbFile = LibPkg::extractFiles(dbPath, &LibPkg::Database::isFileRelevant);
-                    dbFileLock.lock().unlock();
 
                     m_buildAction->appendOutput(
                         Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch, "\" from local file \"", dbPath, "\"\n");
 
-                    auto configLock = m_setup.config.lockToRead();
                     auto *const destinationDb = m_setup.config.findDatabase(dbName, dbArch);
                     if (!destinationDb) {
                         configLock.unlock();
@@ -110,13 +108,8 @@ void ReloadDatabase::run()
                     }
 
                     auto updater = LibPkg::PackageUpdater(*destinationDb, true);
-                    LibPkg::Package::fromDatabaseFile(std::move(dbFile), [&updater](std::shared_ptr<LibPkg::Package> package) {
-                        if (const auto [id, existingPackage] = updater.findPackageWithID(package->name); existingPackage) {
-                            package->addDepsAndProvidesFromOtherPackage(*existingPackage);
-                        }
-                        updater.update(package);
-                        return false;
-                    });
+                    updater.insertFromDatabaseFile(dbPath);
+                    dbFileLock.lock().unlock();
                     updater.commit();
                     destinationDb->lastUpdate = lastModified;
                 } catch (const std::runtime_error &e) {

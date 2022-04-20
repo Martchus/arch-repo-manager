@@ -320,21 +320,23 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
 
             // extract the binary package's files
             try {
-                std::set<std::string> dllsReferencedByImportLibs;
+                auto dllsReferencedByImportLibs = std::set<std::string>();
                 LibPkg::walkThroughArchive(
                     currentPkg.path, &LibPkg::Package::isPkgInfoFileOrBinary,
-                    [&currentPkg, &dllsReferencedByImportLibs](std::string &&directoryPath, LibPkg::ArchiveFile &&file) {
+                    [&currentPkg, &dllsReferencedByImportLibs](std::string_view directoryPath, LibPkg::ArchiveFile &&file) {
                         if (directoryPath.empty() && file.name == ".PKGINFO") {
                             currentPkg.info.addInfoFromPkgInfoFile(file.content);
-                            return;
+                            return false;
                         }
                         currentPkg.info.addDepsAndProvidesFromContainedFile(directoryPath, file, dllsReferencedByImportLibs);
+                        return false;
                     },
-                    [&currentPkg](std::string &&directoryPath) {
+                    [&currentPkg](std::string_view directoryPath) {
                         if (directoryPath.empty()) {
-                            return;
+                            return false;
                         }
                         currentPkg.info.addDepsAndProvidesFromContainedDirectory(directoryPath);
+                        return false;
                     });
                 if (auto dllIssues = currentPkg.info.processDllsReferencedByImportLibs(std::move(dllsReferencedByImportLibs)); !dllIssues.empty()) {
                     std::unique_lock<std::mutex> submitWarningLock(submitWarningMutex);

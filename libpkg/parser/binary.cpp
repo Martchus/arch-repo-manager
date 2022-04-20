@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <string_view>
 
 using namespace std;
 using namespace CppUtilities;
@@ -199,7 +200,7 @@ void Binary::load(std::string_view filePath)
     }
 }
 
-void Binary::load(const string &fileContent, const string &fileName, const string &directoryPath, bool isRegularFile)
+void Binary::load(std::string_view fileContent, std::string_view fileName, std::string_view directoryPath, bool isRegularFile)
 {
     stringstream fileStream(ios_base::in | ios_base::out | ios_base::binary);
     fileStream.exceptions(ios_base::failbit | ios_base::badbit);
@@ -239,17 +240,17 @@ static std::string toLower(std::string str)
     return str;
 }
 
-std::string Binary::addPrefix(const std::string &dependencyName) const
+std::string Binary::addPrefix(std::string_view dependencyName) const
 {
     switch (type) {
     case BinaryType::Elf:
         return argsToString(extraPrefix, "elf-", architecture, ':', ':', dependencyName);
     case BinaryType::Pe:
-        return argsToString(extraPrefix, "pe-", architecture, ':', ':', toLower(dependencyName));
+        return argsToString(extraPrefix, "pe-", architecture, ':', ':', toLower(std::string(dependencyName)));
     case BinaryType::Ar:
         switch (subType) {
         case BinarySubType::WindowsImportLibrary:
-            return argsToString(extraPrefix, "pe-", architecture, ':', ':', toLower(dependencyName));
+            return argsToString(extraPrefix, "pe-", architecture, ':', ':', toLower(std::string(dependencyName)));
         default:;
         }
     default:
@@ -257,7 +258,7 @@ std::string Binary::addPrefix(const std::string &dependencyName) const
     }
 }
 
-void Binary::parse(istream &stream, const string *fileContent)
+void Binary::parse(std::istream &stream, const std::string_view *fileContent)
 {
     type = BinaryType::Invalid;
 
@@ -285,7 +286,7 @@ void Binary::parse(istream &stream, const string *fileContent)
     }
 }
 
-void Binary::parseElf(BinaryReader &reader, const string *fileContent)
+void Binary::parseElf(BinaryReader &reader, const std::string_view *fileContent)
 {
     istream &stream = *reader.stream();
 
@@ -731,8 +732,8 @@ std::uint16_t Binary::readElfInt16(BinaryReader &reader)
     return isBigEndian ? reader.readUInt16BE() : reader.readUInt16LE();
 }
 
-string Binary::readElfString(
-    istream &stream, const string *fileContent, std::uint64_t stringTableAddress, std::uint64_t stringTableSize, std::uint64_t relativeStringAddress)
+std::string Binary::readElfString(std::istream &stream, const std::string_view *fileContent, std::uint64_t stringTableAddress,
+    std::uint64_t stringTableSize, std::uint64_t relativeStringAddress)
 {
     // check bounds
     if (relativeStringAddress >= stringTableSize) {

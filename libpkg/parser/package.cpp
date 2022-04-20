@@ -716,33 +716,40 @@ std::shared_ptr<Package> Package::fromDescription(const std::vector<std::string>
     return package;
 }
 
-std::vector<std::shared_ptr<Package>> Package::fromDatabaseFile(FileMap &&databaseFile)
+void Package::fromDatabaseFile(const std::string &archivePath, const std::function<bool(std::shared_ptr<Package>)> &visitor)
 {
-    std::vector<std::shared_ptr<Package>> packages;
-    packages.reserve(databaseFile.size());
-    std::vector<std::string> descriptionParts;
-    for (auto &dir : databaseFile) {
-        descriptionParts.clear();
-        descriptionParts.reserve(dir.second.size());
-        for (auto &file : dir.second) {
-            descriptionParts.emplace_back(std::move(file.content));
-        }
-        packages.emplace_back(Package::fromDescription(descriptionParts));
-    }
-    return packages;
-}
+    // walk though archive, file-by-file; parse files as soon as desc/files available and return via visitor
+    auto packages = std::unordered_map<std::string, std::vector<std::string>>();
+    walkThroughArchive(
+        archivePath, &Database::isFileRelevant,
+        [&packages, &visitor](std::string_view path, ArchiveFile &&file) {
+            auto i = packages.find(std::string(path)); // FIXME: this should actually accept std::string_view in C++20
+            if (i == packages.end()) {
+                i = packages.emplace(std::string(path), 2).first;
+            }
+            auto &parts = i->second;
+            if (file.name == "desc") {
+                parts[0] = std::move(file.content);
+            } else if (file.name == "files") {
+                parts[1] = std::move(file.content);
+            }
+            if (!parts[0].empty() && !parts[1].empty()) {
+                if (visitor(Package::fromDescription(parts))) {
+                    return true;
+                }
+                // remove buffered data immediately to avoid using too much memory
+                packages.erase(i);
+            }
+            return false;
+        },
+        [](std::string_view) { return false; });
 
-void Package::fromDatabaseFile(FileMap &&databaseFile, const std::function<bool(std::shared_ptr<Package>)> &visitor)
-{
-    std::vector<std::string> descriptionParts;
-    for (auto &dir : databaseFile) {
-        descriptionParts.clear();
-        descriptionParts.reserve(dir.second.size());
-        for (auto &file : dir.second) {
-            descriptionParts.emplace_back(std::move(file.content));
-        }
-        if (visitor(Package::fromDescription(descriptionParts))) {
-            return;
+    // take care of packages without "files" file
+    for (auto &[packageName, parts] : packages) {
+        if (!parts[0].empty()) {
+            if (visitor(Package::fromDescription(parts))) {
+                return;
+            }
         }
     }
 }
@@ -768,11 +775,11 @@ void Package::addInfoFromPkgInfoFile(const string &info)
 static const regex pythonVersionRegex("usr/lib/python(2|3)\\.([0-9]*)(\\..*)?/site-packages");
 static const regex perlVersionRegex("usr/lib/perl5/5\\.([0-9]*)(\\..*)?/vendor_perl");
 
-void Package::addDepsAndProvidesFromContainedDirectory(const std::string &directoryPath)
+void Package::addDepsAndProvidesFromContainedDirectory(std::string_view directoryPath)
 {
     // check for Python modules
-    thread_local smatch match;
-    if (regex_match(directoryPath, match, pythonVersionRegex)) {
+    thread_local auto match = std::match_results<std::string_view::const_iterator>();
+    if (std::regex_match(directoryPath.begin(), directoryPath.end(), match, pythonVersionRegex)) {
         const auto majorVersion = match[1].str();
         const auto minorVersion = match[2].str();
         const char *const pythonPackage(majorVersion == "3" ? "python" : "python2");
@@ -783,7 +790,7 @@ void Package::addDepsAndProvidesFromContainedDirectory(const std::string &direct
     }
 
     // check for Perl modules
-    if (regex_match(directoryPath, match, perlVersionRegex)) {
+    if (std::regex_match(directoryPath.begin(), directoryPath.end(), match, perlVersionRegex)) {
         const auto minorVersion = match[1].str();
         auto currentVersion = "5." + minorVersion;
         auto nextVersion = "5." + numberToString(stringToNumber<unsigned int>(minorVersion) + 1);
@@ -793,7 +800,7 @@ void Package::addDepsAndProvidesFromContainedDirectory(const std::string &direct
 }
 
 void Package::addDepsAndProvidesFromContainedFile(
-    const std::string &directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs)
+    std::string_view directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs)
 {
     try {
         Binary binary;
@@ -858,24 +865,26 @@ std::shared_ptr<Package> Package::fromPkgFile(const string &path)
     shared_ptr<Package> package;
     LibPkg::walkThroughArchive(
         path, &LibPkg::Package::isPkgInfoFileOrBinary,
-        [&package, &tmpPackageForLibraryDeps, &dllsReferencedByImportLibs](std::string &&directoryPath, LibPkg::ArchiveFile &&file) {
+        [&package, &tmpPackageForLibraryDeps, &dllsReferencedByImportLibs](std::string_view directoryPath, LibPkg::ArchiveFile &&file) {
             if (directoryPath.empty() && file.name == ".PKGINFO") {
                 if (package) {
-                    return; // only consider one .PKGINFO file (multiple ones are likely not possible in any supported archive formats anyways)
+                    return false; // only consider one .PKGINFO file (multiple ones are likely not possible in any supported archive formats anyways)
                 }
                 auto packages = fromInfo(file.content, true);
                 if (!packages.empty()) {
                     package = std::move(packages.front().pkg);
                 }
-                return;
+                return false;
             }
             tmpPackageForLibraryDeps.addDepsAndProvidesFromContainedFile(directoryPath, file, dllsReferencedByImportLibs);
+            return false;
         },
-        [&tmpPackageForLibraryDeps](std::string &&directoryPath) {
+        [&tmpPackageForLibraryDeps](std::string_view directoryPath) {
             if (directoryPath.empty()) {
-                return;
+                return false;
             }
             tmpPackageForLibraryDeps.addDepsAndProvidesFromContainedDirectory(directoryPath);
+            return false;
         });
     if (!package) {
         throw runtime_error("Package " % path + " does not contain a valid .PKGINFO");

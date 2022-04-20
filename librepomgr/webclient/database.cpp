@@ -153,10 +153,6 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
 
             try {
                 // load packages
-                auto files = extractFiles(session2.destinationFilePath, &Database::isFileRelevant);
-                auto packages = Package::fromDatabaseFile(std::move(files));
-
-                // insert packages
                 auto lock = setup.config.lockToRead();
                 auto db = setup.config.findDatabase(dbName, dbArch);
                 if (!db) {
@@ -164,7 +160,10 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
                     log(Phrases::ErrorMessage, "Retrieved database file for \"", dbName, '@', dbArch, "\" but it no longer exists; discarding\n");
                     return;
                 }
-                db->replacePackages(packages, lastModified);
+                auto updater = LibPkg::PackageUpdater(*db, true);
+                updater.insertFromDatabaseFile(session2.destinationFilePath);
+                updater.commit();
+                db->lastUpdate = lastModified;
             } catch (const std::runtime_error &e) {
                 log(Phrases::ErrorMessage, "Unable to parse retrieved database file for \"", dbName, '@', dbArch, "\": ", e.what(), '\n');
                 dbQuerySession->addResponse(std::move(dbName));
