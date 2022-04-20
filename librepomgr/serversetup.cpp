@@ -700,8 +700,9 @@ void ServiceSetup::restoreState()
     }
 
     // open LMDB storage
-    cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::EndFlush;
+    cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::End;
     config.initStorage(dbPath.data(), maxDbs);
+    cout << Phrases::SubMessage << "Package cache limit: " << packageCacheLimit << Phrases::End;
     config.setPackageCacheLimit(packageCacheLimit);
     cout << Phrases::InfoMessage << "Opening actions LMDB file: " << building.dbPath << Phrases::EndFlush;
     building.initStorage(building.dbPath.data());
