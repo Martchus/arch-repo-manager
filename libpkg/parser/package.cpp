@@ -716,7 +716,7 @@ std::shared_ptr<Package> Package::fromDescription(const std::vector<std::string>
     return package;
 }
 
-void Package::fromDatabaseFile(const std::string &archivePath, const std::function<bool(std::shared_ptr<Package>)> &visitor)
+void Package::fromDatabaseFile(const std::string &archivePath, const std::function<bool(const std::shared_ptr<Package> &)> &visitor)
 {
     // walk though archive, file-by-file; parse files as soon as desc/files available and return via visitor
     auto packages = std::unordered_map<std::string, std::vector<std::string>>();
