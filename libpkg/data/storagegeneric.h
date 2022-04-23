@@ -102,6 +102,7 @@ public:
     iterator begin();
     iterator end();
     void setLimit(std::size_t limit);
+    std::size_t size() const;
 
 private:
     EntryList m_entries;
@@ -129,6 +130,11 @@ template <typename StorageEntryType> inline auto StorageCacheEntries<StorageEntr
     return m_entries.end();
 }
 
+template <typename StorageEntryType> inline std::size_t StorageCacheEntries<StorageEntryType>::size() const
+{
+    return m_entries.size();
+}
+
 template <typename StorageEntriesType, typename StorageType, typename SpecType> struct StorageCache {
     using Entries = StorageEntriesType;
     using Entry = typename Entries::Entry;
@@ -151,11 +157,18 @@ template <typename StorageEntriesType, typename StorageType, typename SpecType> 
     void clear(Storage &storage);
     void clearCacheOnly(Storage &storage);
     void setLimit(std::size_t limit);
+    std::size_t size();
 
 private:
     Entries m_entries;
     std::mutex m_mutex;
 };
+
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+std::size_t StorageCache<StorageEntriesType, StorageType, SpecType>::size()
+{
+    return m_entries.size();
+}
 
 } // namespace LibPkg
 

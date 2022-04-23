@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 set(HEADER_FILES
     errorhandling.h
     serversetup.h
+    resourceusage.h
     helper.h
     json.h
     logcontext.h
@@ -32,6 +33,7 @@ set(SRC_FILES
     json.cpp
     errorhandling.cpp
     serversetup.cpp
+    resourceusage.cpp
     globallock.cpp
     authentication.cpp
     webapi/server.cpp
@@ -128,6 +130,7 @@ add_reflection_generator_invocation(
     INPUT_FILES
     errorhandling.h
     serversetup.h
+    resourceusage.h
     buildactions/buildaction.h
     buildactions/buildactionmeta.h
     buildactions/buildactiontemplate.h

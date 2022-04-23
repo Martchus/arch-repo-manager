@@ -5,6 +5,7 @@
 #include "./buildactions/buildaction.h"
 #include "./buildactions/buildactiontemplate.h"
 #include "./globallock.h"
+#include "./resourceusage.h"
 
 #include "../libpkg/data/config.h"
 #include "../libpkg/data/lockable.h"
@@ -57,7 +58,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     void initStorage();
     int run();
     int fixDb();
-    ServiceStatus computeStatus() const;
+    ServiceStatus computeStatus();
 
     // variables relevant for the web server; only changed when (re)loading config
     struct LIBREPOMGR_EXPORT WebServerSetup {
@@ -142,7 +143,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         LibPkg::StorageID storeBuildAction(const std::shared_ptr<BuildAction> &buildAction);
         void deleteBuildAction(const std::vector<std::shared_ptr<BuildAction>> &actions);
         std::size_t buildActionCount();
-        std::size_t runningBuildActionCount();
+        std::size_t runningBuildActionCount() const;
         void rebuildDb();
         void forEachBuildAction(std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func,
             std::size_t limit, std::size_t start);
@@ -185,7 +186,7 @@ inline bool ServiceSetup::BuildSetup::hasStorage() const
     return m_storage != nullptr;
 }
 
-inline std::size_t ServiceSetup::BuildSetup::runningBuildActionCount()
+inline std::size_t ServiceSetup::BuildSetup::runningBuildActionCount() const
 {
     return m_runningActions.size();
 }
@@ -214,15 +215,16 @@ inline std::pair<ServiceSetup::Locks::LockTable *, std::unique_lock<std::shared_
 }
 
 struct LIBREPOMGR_EXPORT ServiceStatus : public ReflectiveRapidJSON::JsonSerializable<ServiceStatus> {
-    ServiceStatus(const ServiceSetup &setup);
+    ServiceStatus(ServiceSetup &setup);
 
     const char *const version = nullptr;
     const LibPkg::Status config;
     const BuildActionMetaInfo &actions;
     const BuildPresets &presets;
+    ResourceUsage resourceUsage;
 };
 
-inline ServiceStatus ServiceSetup::computeStatus() const
+inline ServiceStatus ServiceSetup::computeStatus()
 {
     return ServiceStatus(*this);
 }

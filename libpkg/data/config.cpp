@@ -62,6 +62,11 @@ void Config::initStorage(const char *path, std::uint32_t maxDbs)
     aur.initStorage(*m_storage);
 }
 
+std::size_t Config::cachedPackages() const
+{
+    return m_storage ? m_storage->packageCache().size() : 0;
+}
+
 void Config::setPackageCacheLimit(std::size_t limit)
 {
     m_storage->packageCache().setLimit(limit);

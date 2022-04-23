@@ -30,7 +30,7 @@ function handleGlobalStatusUpdate(ajaxRequest)
         Utils.getAndEmptyElement('application-version').appendChild(document.createTextNode(applicationVersion));
     }
     const dbStats = responseJson.config.dbStats;
-    const table = GenericRendering.renderTableFromJsonArray({
+    const dbTable = GenericRendering.renderTableFromJsonArray({
         rows: dbStats,
         columnHeaders: ['Arch', 'Database', 'Package count', 'Last update', 'Synced from mirror'],
         columnAccessors: ['arch', 'name', 'packageCount', 'lastUpdate', 'syncFromMirror'],
@@ -49,7 +49,31 @@ function handleGlobalStatusUpdate(ajaxRequest)
             },
         },
     });
-    globalStatus.appendChild(table);
+    globalStatus.appendChild(dbTable);
+
+    const resourceUsageHeading = document.createElement('h2');
+    resourceUsageHeading.appendChild(document.createTextNode('Resource usage'));
+    globalStatus.appendChild(resourceUsageHeading);
+    const resTable = GenericRendering.renderTableFromJsonObject({
+        data: responseJson.resourceUsage,
+        displayLabels: [
+            'Virtual memory', 'Resident set size', 'Peak resident set size', 'Shared resident set size',
+            'Package-DB size', 'Actions-DB size', 'Cached packages', 'Actions', 'Running actions',
+        ],
+        fieldAccessors: [
+            'virtualMemory', 'residentSetSize', 'peakResidentSetSize', 'sharedResidentSetSize',
+            'packageDbSize', 'actionsDbSize', 'cachedPackages', 'actionsCount', 'runningActionsCount',
+        ],
+        customRenderer: {
+            virtualMemory: GenericRendering.renderDataSize,
+            residentSetSize: GenericRendering.renderDataSize,
+            peakResidentSetSize: GenericRendering.renderDataSize,
+            sharedResidentSetSize: GenericRendering.renderDataSize,
+            packageDbSize: GenericRendering.renderDataSize,
+            actionsDbSize: GenericRendering.renderDataSize,
+        },
+    });
+    globalStatus.appendChild(resTable);
 
     // update database selections
     const repoSelections = [
