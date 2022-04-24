@@ -874,13 +874,8 @@ ServiceStatus::ServiceStatus(ServiceSetup &setup)
     , config(setup.config.computeStatus())
     , actions(setup.building.metaInfo)
     , presets(setup.building.presets)
+    , resourceUsage(setup)
 {
-    auto ec = std::error_code();
-    resourceUsage.packageDbSize = std::filesystem::file_size(setup.dbPath, ec);
-    resourceUsage.actionsDbSize = std::filesystem::file_size(setup.building.dbPath, ec);
-    resourceUsage.cachedPackages = setup.config.cachedPackages();
-    resourceUsage.actionsCount = setup.building.buildActionCount();
-    resourceUsage.runningActionsCount = setup.building.runningBuildActionCount();
 }
 
 } // namespace LibRepoMgr

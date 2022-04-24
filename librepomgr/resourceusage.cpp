@@ -1,4 +1,5 @@
 #include "./resourceusage.h"
+#include "./serversetup.h"
 
 #if defined(PLATFORM_WINDOWS)
 #include <psapi.h>
@@ -9,9 +10,11 @@
 #include <unistd.h>
 #endif
 
+#include <filesystem>
+
 namespace LibRepoMgr {
 
-ResourceUsage::ResourceUsage()
+MemoryUsage::MemoryUsage()
 {
 #if defined(PLATFORM_WINDOWS)
     auto info = PROCESS_MEMORY_COUNTERS();
@@ -33,6 +36,16 @@ ResourceUsage::ResourceUsage()
     getrusage(RUSAGE_SELF, &rusage);
     peakResidentSetSize = static_cast<std::size_t>(rusage.ru_maxrss) * 1024u;
 #endif
+}
+
+ResourceUsage::ResourceUsage(ServiceSetup &setup)
+{
+    auto ec = std::error_code();
+    packageDbSize = std::filesystem::file_size(setup.dbPath, ec);
+    actionsDbSize = std::filesystem::file_size(setup.building.dbPath, ec);
+    cachedPackages = setup.config.cachedPackages();
+    actionsCount = setup.building.buildActionCount();
+    runningActionsCount = setup.building.runningBuildActionCount();
 }
 
 } // namespace LibRepoMgr

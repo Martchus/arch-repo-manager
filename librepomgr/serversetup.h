@@ -221,7 +221,7 @@ struct LIBREPOMGR_EXPORT ServiceStatus : public ReflectiveRapidJSON::JsonSeriali
     const LibPkg::Status config;
     const BuildActionMetaInfo &actions;
     const BuildPresets &presets;
-    ResourceUsage resourceUsage;
+    const ResourceUsage resourceUsage;
 };
 
 inline ServiceStatus ServiceSetup::computeStatus()
