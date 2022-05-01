@@ -52,6 +52,11 @@ inline std::shared_ptr<Response> makeText(const Request &request, std::string &&
     return makeData(request, std::move(text), "text/plain");
 }
 
+inline std::shared_ptr<Response> makeHtml(const Request &request, const std::string &text)
+{
+    return makeData(request, text, "text/html");
+}
+
 inline std::shared_ptr<Response> makeHtml(const Request &request, std::string &&text)
 {
     return makeData(request, std::move(text), "text/html");

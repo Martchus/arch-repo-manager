@@ -36,19 +36,21 @@ void getRoot(const Params &params, ResponseHandler &&handler)
 {
     static const auto routes([] {
         stringstream ss;
-        ss << "Available routes:\n";
+        ss << "<title>Build service</title>"
+              "<p>Available routes:</p><ul>"
+              "<li><a href=\"index.html\">UI</a></li>";
         for (const auto &route : Server::router()) {
             const auto method(boost::beast::http::to_string(route.first.method));
-            ss << method;
+            ss << "<li><pre>" << method;
             for (auto i = method.size(); i < 5; ++i) {
                 ss << ' ';
             }
-            ss << route.first.path << '\n';
+            ss << route.first.path << "</pre></li>";
         }
-        ss << "\nNote: curl -X GET/POST http://...\n";
+        ss << "</ul>";
         return ss.str();
     }());
-    handler(makeText(params.request(), routes));
+    handler(makeHtml(params.request(), routes));
 }
 
 void getVersion(const Params &params, ResponseHandler &&handler)
