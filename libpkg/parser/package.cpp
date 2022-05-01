@@ -987,7 +987,7 @@ std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size
 
 string PackageNameData::compose() const
 {
-    string res;
+    auto res = std::string();
     res.reserve(targetPrefix.size() + vcsSuffix.size() + actualName.size() + 2);
     if (!targetPrefix.empty()) {
         res += targetPrefix;
@@ -1020,14 +1020,14 @@ bool PackageNameData::isVcsPackage() const
     if (vcsSuffix.empty()) {
         return false;
     }
-    static const std::unordered_set<std::string_view> vcsSuffixes = { "cvs", "svn", "hg", "darcs", "bzr", "git" };
+    static const auto vcsSuffixes = std::unordered_set<std::string_view>{ "cvs", "svn", "hg", "darcs", "bzr", "git" };
     const auto lastDash = vcsSuffix.rfind('-');
     return vcsSuffixes.find(lastDash == std::string_view::npos ? vcsSuffix : vcsSuffix.substr(lastDash + 1)) != vcsSuffixes.end();
 }
 
 PackageNameData PackageNameData::decompose(std::string_view packageName)
 {
-    static const std::regex packageNameRegex(
+    static const auto packageNameRegex = std::regex(
         "((lib32|mingw-w64|android-aarch64|android-x86-64|android-x86|android-armv7a-eabi|arm-none-eabi|aarch64-linux-"
         "gnu|riscv64-linux|avr|psp)-)?(.*?)((-(cvs|svn|hg|darcs|bzr|git|custom|compat|static|qt\\d+|doc|cli|gui))*)");
     auto data = PackageNameData{};
