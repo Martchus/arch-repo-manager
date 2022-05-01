@@ -216,11 +216,13 @@ void Binary::load(std::string_view fileContent, std::string_view fileName, std::
         if (name.empty() && isRegularFile && fileName.ends_with(".so")) {
             name = fileName;
         }
-        // add prefix to Android libs to avoid confusion with normal GNU/Linux ELFs
+        // add prefix to Android and compat libs to avoid confusion with normal GNU/Linux ELFs
         // note: Relying on the path is not nice. Have Android libs any special header to be distinguishable?
         if (directoryPath.starts_with("opt/android-libs")
             || (directoryPath.starts_with("opt/android-ndk") && directoryPath.find("/sysroot/") != std::string::npos)) {
             extraPrefix = "android-";
+        } else if (directoryPath.starts_with("usr/static-compat/lib") && fileName.find(".so") != std::string::npos) {
+            extraPrefix = "static-compat-";
         }
         break;
     default:;
