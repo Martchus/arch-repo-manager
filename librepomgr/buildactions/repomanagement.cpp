@@ -1,3 +1,5 @@
+#define CPP_UTILITIES_PATHHELPER_STRING_VIEW
+
 #include "./buildactionprivate.h"
 
 #include "../logging.h"
@@ -587,7 +589,7 @@ void CleanRepository::run()
         auto parentPath = std::filesystem::path();
         try {
             auto archSpecificPath = std::filesystem::canonical(db->localPkgDir);
-            const auto dbFile = argsToString(archSpecificPath, '/', db->name + ".db");
+            const auto dbFile = argsToString(archSpecificPath, '/', !db->path.empty() ? fileName(std::string_view(db->path)) : (db->name + ".db"));
             const auto lastModified = LibPkg::lastModified(dbFile);
             if (lastModified != db->lastUpdate) {
                 m_messages.errors.emplace_back("The db file's last modification (" % lastModified.toString() % ") does not match the last db update ("
