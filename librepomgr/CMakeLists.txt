@@ -118,6 +118,9 @@ use_openssl(VISIBILITY PUBLIC)
 # link against pthread
 list(APPEND PUBLIC_LIBRARIES pthread)
 
+# avoid fatal warning about potential null pointer deref from GCC 12 about code included from Boost.Asio
+list(APPEND META_PUBLIC_COMPILE_OPTIONS "-Wno-error=null-dereference")
+
 # apply basic configuration
 include(BasicConfig)
 
