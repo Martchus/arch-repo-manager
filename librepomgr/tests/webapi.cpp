@@ -14,6 +14,7 @@
 #include <c++utilities/io/misc.h>
 #include <c++utilities/tests/testutils.h>
 
+using CppUtilities::operator<<; // must be visible prior to the call site
 #include <cppunit/TestFixture.h>
 #include <cppunit/extensions/HelperMacros.h>
 
