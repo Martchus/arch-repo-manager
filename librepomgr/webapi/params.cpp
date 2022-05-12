@@ -91,7 +91,7 @@ std::string Url::decodeValue(std::string_view value)
         SecondDigit,
     } state
         = AnyChar;
-    boost::beast::string_view::value_type encodedValue;
+    auto encodedValue = boost::beast::string_view::value_type();
     try {
         for (const auto c : value) {
             switch (state) {
