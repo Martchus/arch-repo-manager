@@ -62,6 +62,15 @@ void Config::initStorage(const char *path, std::uint32_t maxDbs)
     aur.initStorage(*m_storage);
 }
 
+void LibPkg::Config::rebuildDb()
+{
+    assert(m_storage != nullptr);
+    for (auto &db : databases) {
+        db.rebuildDb();
+    }
+    aur.rebuildDb();
+}
+
 std::size_t Config::cachedPackages() const
 {
     return m_storage ? m_storage->packageCache().size() : 0;

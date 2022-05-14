@@ -362,6 +362,7 @@ std::size_t ServiceSetup::BuildSetup::buildActionCount()
 
 void ServiceSetup::BuildSetup::rebuildDb()
 {
+    std::cerr << "Rebuilding build actions database\n";
     auto txn = m_storage->buildActions.getRWTransaction();
     auto processed = std::size_t();
     auto ok = std::size_t();
@@ -391,7 +392,7 @@ void ServiceSetup::BuildSetup::rebuildDb()
     } else {
         std::cerr << "All " << ok << " build actions are valid.\n";
     }
-    std::cerr << "Committing changes.\n";
+    std::cerr << "Committing changes to build actions.\n";
     txn.commit();
 }
 
@@ -833,6 +834,7 @@ int ServiceSetup::fixDb()
         loadConfigFiles(true);
         building.initStorage(building.dbPath.data());
         building.rebuildDb();
+        config.rebuildDb();
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
         cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;

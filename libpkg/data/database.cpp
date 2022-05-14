@@ -6,6 +6,8 @@
 
 #include <c++utilities/conversion/stringbuilder.h>
 
+#include <iostream>
+
 using namespace std;
 using namespace CppUtilities;
 
@@ -67,6 +69,34 @@ Database::~Database()
 void Database::initStorage(StorageDistribution &storage)
 {
     m_storage = storage.forDatabase(name % '@' + arch);
+}
+
+void LibPkg::Database::rebuildDb()
+{
+    std::cerr << "Rebuilding package database \"" << name << "\"\n";
+    auto txn = m_storage->packages.getRWTransaction();
+    auto processed = std::size_t();
+    auto ok = std::size_t();
+    txn.rebuild([count = txn.size(), &processed, &ok](StorageID id, Package *package) mutable {
+        std::cerr << "Processing package " << ++processed << " / " << count << '\n';
+        if (!package) {
+            std::cerr << "Deleting package " << id << ": unable to deserialize\n";
+            return false;
+        }
+        if (package->name.empty()) {
+            std::cerr << "Deleting package " << id << ": name is empty\n";
+            return false;
+        }
+        ++ok;
+        return true;
+    });
+    if (ok < processed) {
+        std::cerr << "Discarding " << (processed - ok) << " invalid packages from \"" << name << "\".\n";
+    } else {
+        std::cerr << "All " << ok << " packages from \"" << name << "\" are valid.\n";
+    }
+    std::cerr << "Committing changes to package database \"" << name << "\".\n";
+    txn.commit();
 }
 
 void LibPkg::Database::deducePathsFromLocalDirs()
