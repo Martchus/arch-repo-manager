@@ -681,6 +681,7 @@ void CleanRepository::run()
                 std::make_unique<LibPkg::Database>(argsToString("clean-repository-", dbFilePaths.front().stem()), dbFilePaths.front()));
             db->arch = dirInfo.canonicalPath.stem();
             db->initStorage(*m_setup.config.storage());
+            db->clearPackages();
             db->loadPackagesFromConfiguredPaths();
             dirInfo.relevantDbs.emplace(db.get());
             // acquire lock for db directory
