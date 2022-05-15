@@ -193,13 +193,13 @@ PackageVersion PackageVersion::fromString(const char *versionString, size_t vers
 #define valueString std::string_view(value, valueSize)
 #define ensure_pkg_info                                                                                                                              \
     if (!package.packageInfo)                                                                                                                        \
-    package.packageInfo = make_unique<PackageInfo>()
+    package.packageInfo = make_optional<PackageInfo>()
 #define ensure_install_info                                                                                                                          \
     if (!package.installInfo)                                                                                                                        \
-    package.installInfo = make_unique<InstallInfo>()
+    package.installInfo = make_optional<InstallInfo>()
 
-void addPackageInfo(
-    Package &package, PackageVersion &version, const char *field, size_t fieldSize, const char *value, size_t valueSize, bool isPackageInfo)
+static void addPackageInfo(Package &package, PackageVersion &version, const char *field, size_t fieldSize, const char *value, size_t valueSize,
+    bool isPackageInfo, std::size_t packageCount)
 {
     if_field("pkgbase")
     {
@@ -235,7 +235,7 @@ void addPackageInfo(
             // add as binary arch when parsing PKGINFO
             ensure_pkg_info;
             package.packageInfo->arch = valueString;
-        } else if (package.sourceInfo.use_count() <= 1) {
+        } else if (!packageCount) {
             // add to sourceInfo when still parsing base info
             package.sourceInfo->archs.emplace_back(value, valueSize);
         } else {
@@ -451,11 +451,12 @@ static void addVersionInfo(Package &package, PackageVersion &version, bool isPac
 static void parsePkgInfo(const std::string &info, const std::function<Package *(Package &)> &nextPackage, bool isPackageInfo)
 {
     // define variables to store intermediate results while still parsing package base
-    PackageVersion version;
-    Package basePackage;
+    auto version = PackageVersion();
+    auto packageCount = std::size_t();
+    auto basePackage = Package();
     basePackage.origin = isPackageInfo ? PackageOrigin::PackageInfo : PackageOrigin::SourceInfo;
-    basePackage.sourceInfo = make_shared<SourceInfo>();
-    std::string &packageBase = basePackage.sourceInfo->name;
+    basePackage.sourceInfo = std::make_optional<SourceInfo>();
+    auto &packageBase = basePackage.sourceInfo->name;
 
     // states
     enum {
@@ -560,17 +561,18 @@ static void parsePkgInfo(const std::string &info, const std::function<Package *(
                     }
                     // find next package
                     currentPackage = nextPackage(basePackage);
+                    ++packageCount;
                 }
                 // -> add field to ...
                 try {
                     if (currentPackage) {
                         // ... concrete package info if there's already a concrete package
                         addPackageInfo(*currentPackage, version, currentFieldName, currentFieldNameSize, currentFieldValue, currentFieldValueSize,
-                            isPackageInfo);
+                            isPackageInfo, packageCount);
                     } else {
                         // ... base info if still parsing general info
-                        addPackageInfo(
-                            basePackage, version, currentFieldName, currentFieldNameSize, currentFieldValue, currentFieldValueSize, isPackageInfo);
+                        addPackageInfo(basePackage, version, currentFieldName, currentFieldNameSize, currentFieldValue, currentFieldValueSize,
+                            isPackageInfo, packageCount);
                     }
                 } catch (const ConversionException &) {
                     // FIXME: error handling
@@ -624,8 +626,8 @@ std::shared_ptr<Package> Package::fromDescription(const std::vector<std::string>
 {
     auto package = std::make_shared<Package>();
     package->origin = PackageOrigin::Database;
-    package->sourceInfo = make_shared<SourceInfo>();
-    package->packageInfo = make_unique<PackageInfo>();
+    package->sourceInfo = std::make_optional<SourceInfo>();
+    package->packageInfo = std::make_optional<PackageInfo>();
     for (const auto &desc : descriptionParts) {
         // states
         enum {
@@ -890,7 +892,7 @@ std::shared_ptr<Package> Package::fromPkgFile(const string &path)
         throw runtime_error("Package " % path + " does not contain a valid .PKGINFO");
     }
     if (!package->packageInfo) {
-        package->packageInfo = make_unique<PackageInfo>();
+        package->packageInfo = std::make_optional<PackageInfo>();
     }
     package->packageInfo->fileName = fileName(path);
     package->addDepsAndProvidesFromOtherPackage(tmpPackageForLibraryDeps, true);
@@ -933,7 +935,7 @@ std::shared_ptr<Package> Package::fromPkgFileName(std::string_view fileName)
     pkg->name = name;
     pkg->version = version;
     pkg->provides.emplace_back(pkg->name, pkg->version);
-    pkg->packageInfo = make_unique<PackageInfo>();
+    pkg->packageInfo = std::make_optional<PackageInfo>();
     pkg->packageInfo->fileName = fileName;
     pkg->packageInfo->arch = arch;
     return pkg;
@@ -948,8 +950,9 @@ std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size
     packages.reserve(rpcMultiInfo.results.size());
 
     for (auto &result : rpcMultiInfo.results) {
-        auto package = std::make_shared<Package>();
-        auto sourceInfo = std::make_shared<SourceInfo>();
+        auto &spec = packages.emplace_back();
+        auto *package = &*(spec.pkg = std::make_shared<Package>());
+        auto &sourceInfo = package->sourceInfo = std::make_optional<SourceInfo>();
         package->origin = origin;
         package->name = std::move(result.Name);
         package->version = std::move(result.Version);
@@ -979,8 +982,6 @@ std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size
         sourceInfo->firstSubmitted = DateTime::fromTimeStampGmt(result.FirstSubmitted);
         sourceInfo->lastModified = DateTime::fromTimeStampGmt(result.LastModified);
         sourceInfo->url = std::move(result.URLPath);
-        package->sourceInfo = std::move(sourceInfo);
-        packages.emplace_back(0, std::move(package));
     }
     return packages;
 }

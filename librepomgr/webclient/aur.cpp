@@ -282,7 +282,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 }
                 if (result.packages.empty() || result.packages.front().pkg->name.empty()) {
                     result.error = "Unable to parse .SRCINFO: no package name present";
-                } else if (!(result.sourceInfo = result.packages.front().pkg->sourceInfo)) {
+                } else if (!result.packages.front().pkg->sourceInfo.has_value()) {
                     result.error = "Unable to parse .SRCINFO: no source info present";
                 }
                 multiSession->addResponse(move(result));

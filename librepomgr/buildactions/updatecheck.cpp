@@ -27,7 +27,8 @@ void UpdateCheck::run()
 
     if (m_fromAur && !m_packageLookupDone
         && WebClient::queryAurPackagesForDatabase(m_buildAction->log(), m_setup, m_setup.building.ioContext,
-            &std::get<std::shared_lock<std::shared_mutex>>(configReadLock), **m_destinationDbs.begin(), [this](std::vector<LibPkg::PackageSpec> &&) {
+            &std::get<std::shared_lock<std::shared_mutex>>(configReadLock), **m_destinationDbs.begin(),
+            [this](std::vector<LibPkg::PackageSpec> &&) {
                 m_packageLookupDone = true;
                 run();
             })) {

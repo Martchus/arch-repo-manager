@@ -4,6 +4,15 @@
 #include "../parser/config.h"
 #include "../parser/package.h"
 
+namespace CppUtilities {
+inline std::ostream &operator<<(std::ostream &out, const LibPkg::SourceInfo &sourceInfo)
+{
+    const auto buff = sourceInfo.toJson();
+    out.write(buff.GetString(), ReflectiveRapidJSON::JsonReflector::rapidJsonSize(buff.GetSize()));
+    return out;
+}
+} // namespace CppUtilities
+
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/misc.h>
@@ -194,8 +203,8 @@ void ParserTests::testParsingPlainSrcInfo()
     CPPUNIT_ASSERT_MESSAGE("no regular dependencies"s, pkg1.dependencies.empty());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("optional dependencies"s,
         vector<Dependency>{ Dependency("c++utilities-doc"s, string(), DependencyMode::Any, "API documentation"s) }, pkg1.optionalDependencies);
-    CPPUNIT_ASSERT_MESSAGE("source info present", pkg1.sourceInfo != nullptr);
-    CPPUNIT_ASSERT_MESSAGE("no package info present", pkg1.packageInfo == nullptr);
+    CPPUNIT_ASSERT_MESSAGE("source info present", pkg1.sourceInfo.has_value());
+    CPPUNIT_ASSERT_MESSAGE("no package info present", !pkg1.packageInfo.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "make dependencies"s, vector<Dependency>{ Dependency("cmake"s, "3.0"s, DependencyMode::GreatherEqual) }, pkg1.sourceInfo->makeDependencies);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("check dependencies"s, vector<Dependency>{ Dependency("cppunit"s) }, pkg1.sourceInfo->checkDependencies);
@@ -225,10 +234,10 @@ void ParserTests::testParsingSplitPackageSrcInfo()
         Dependency("mingw-w64-icu"s),
     };
     CPPUNIT_ASSERT_EQUAL_MESSAGE("dependencies (2)"s, dependencies2, pkg2.dependencies);
-    CPPUNIT_ASSERT_MESSAGE("source info present (1)", pkg1.sourceInfo != nullptr);
-    CPPUNIT_ASSERT_MESSAGE("source info present (2)", pkg2.sourceInfo != nullptr);
-    CPPUNIT_ASSERT_MESSAGE("no package info present (1)", pkg1.packageInfo == nullptr);
-    CPPUNIT_ASSERT_MESSAGE("no package info present (2)", pkg2.packageInfo == nullptr);
+    CPPUNIT_ASSERT_MESSAGE("source info present (1)", pkg1.sourceInfo.has_value());
+    CPPUNIT_ASSERT_MESSAGE("source info present (2)", pkg2.sourceInfo.has_value());
+    CPPUNIT_ASSERT_MESSAGE("no package info present (1)", !pkg1.packageInfo.has_value());
+    CPPUNIT_ASSERT_MESSAGE("no package info present (2)", !pkg2.packageInfo.has_value());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("pkgbase (1)"s, "mingw-w64-harfbuzz"s, pkg1.sourceInfo->name);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("pkgbase (2)"s, "mingw-w64-harfbuzz"s, pkg2.sourceInfo->name);
     const vector<string> archs = { "any"s };
@@ -243,8 +252,9 @@ void ParserTests::testParsingSplitPackageSrcInfoWithDifferentArchs()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("3 (split) packages present"s, 3ul, packages.size());
 
     const auto &jre = packages[0].pkg, &jdk = packages[1].pkg, &doc = packages[2].pkg;
-    CPPUNIT_ASSERT_MESSAGE("source info present", jdk->sourceInfo);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("jre has same source info as base", jdk->sourceInfo, jre->sourceInfo);
+    CPPUNIT_ASSERT_MESSAGE("source info present (jdk)", jdk->sourceInfo.has_value());
+    CPPUNIT_ASSERT_MESSAGE("source info present (jre)", jre->sourceInfo.has_value());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("jre has same source info as base", jdk->sourceInfo->archs, jre->sourceInfo->archs);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk-doc has same source info as base", jdk->sourceInfo, doc->sourceInfo);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("jre name", "jre"s, jre->name);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("jdk name", "jdk"s, jdk->name);

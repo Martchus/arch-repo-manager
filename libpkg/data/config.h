@@ -107,10 +107,12 @@ constexpr bool operator&(BuildOrderOptions lhs, BuildOrderOptions rhs)
 
 struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::BinarySerializable<Config> {
     using DatabaseVisitor = std::function<bool(Database &)>;
+    using PackageVisitorBase = std::function<bool(Database &, StorageID, std::shared_ptr<PackageBase> &&)>; // package is invalidated/reused unless moved from!!!
     using PackageVisitorMove
         = std::function<bool(Database &, StorageID, std::shared_ptr<Package> &&)>; // package is invalidated/reused unless moved from!!!
     using PackageVisitorConst = std::function<bool(Database &, StorageID, const std::shared_ptr<Package> &)>;
     using PackageVisitorByName = std::function<bool(Database &, std::string_view, const std::function<PackageSpec(void)> &)>;
+    using PackageVisitorByNameBase = std::function<bool(Database &, std::string_view, const std::function<StorageID(PackageBase&)> &)>;
 
     explicit Config();
     ~Config();
@@ -164,7 +166,10 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     // package iteration
     void packages(std::string_view dbName, std::string_view dbArch, const std::string &packageName, const DatabaseVisitor &databaseVisitor,
         const PackageVisitorConst &visitor);
+    void packages(std::string_view dbName, std::string_view dbArch, const std::string &packageName, const DatabaseVisitor &databaseVisitor,
+        const PackageVisitorBase &visitor);
     void packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByName &visitor);
+    void packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByNameBase &visitor);
     void providingPackages(const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor);
     void providingPackages(const std::string &libraryName, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor);
 

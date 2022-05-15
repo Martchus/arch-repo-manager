@@ -42,6 +42,20 @@ struct LIBPKG_EXPORT PackageSearchResult {
     StorageID id;
 };
 
+struct LIBPKG_EXPORT PackageBaseSearchResult {
+    PackageBaseSearchResult() = default;
+    PackageBaseSearchResult(const Database &database, const PackageBase &package, StorageID id);
+
+    /// \brief The related database.
+    /// \remarks
+    /// - The find functions always uses Database* and it is guaranteed to be never nullptr.
+    /// - The deserialization functions always use DatabaseInfo and the values might be empty if the source was empty.
+    /// - The serialization functions can cope with both alternatives.
+    const Database *db = nullptr;
+    const PackageBase *pkg = nullptr;
+    StorageID id = 0;
+};
+
 /*!
  * \brief The DatabaseUsage enum specifies the usage of a database within pacman.
  */
@@ -131,9 +145,11 @@ struct AtomicDateTime : public std::atomic<CppUtilities::DateTime> {
 };
 
 struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Database>, public ReflectiveRapidJSON::BinarySerializable<Database> {
+    using PackageVisitorBase = std::function<bool(StorageID, std::shared_ptr<PackageBase> &&)>; // package is invalidated/reused unless moved from!!!
     using PackageVisitorMove = std::function<bool(StorageID, std::shared_ptr<Package> &&)>; // package is invalidated/reused unless moved from!!!
     using PackageVisitorConst = std::function<bool(StorageID, const std::shared_ptr<Package> &)>;
     using PackageVisitorByName = std::function<bool(std::string_view, const std::function<PackageSpec(void)> &)>;
+    using PackageVisitorByNameBase = std::function<bool(std::string_view, const std::function<StorageID(PackageBase&)> &)>;
 
     friend struct PackageUpdater;
 
@@ -153,7 +169,9 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     static bool isFileRelevant(const char *filePath, const char *fileName, mode_t);
     std::vector<std::shared_ptr<Package>> findPackages(const std::function<bool(const Database &, const Package &)> &pred);
     void allPackages(const PackageVisitorMove &visitor);
+    void allPackages(const PackageVisitorBase &visitor);
     void allPackagesByName(const PackageVisitorByName &visitor);
+    void allPackagesByName(const PackageVisitorByNameBase &visitor);
     std::size_t packageCount() const;
     void providingPackages(const Dependency &dependency, bool reverse, const PackageVisitorConst &visitor);
     void providingPackages(const std::string &libraryName, bool reverse, const PackageVisitorConst &visitor);
@@ -162,6 +180,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     std::shared_ptr<Package> findPackage(StorageID packageID);
     std::shared_ptr<Package> findPackage(const std::string &packageName);
     PackageSpec findPackageWithID(const std::string &packageName);
+    StorageID findBasePackageWithID(const std::string &packageName, PackageBase &basePackage);
     void removePackage(const std::string &packageName);
     StorageID updatePackage(const std::shared_ptr<Package> &package);
     StorageID forceUpdatePackage(const std::shared_ptr<Package> &package);
@@ -233,6 +252,13 @@ inline bool PackageSearchResult::operator==(const PackageSearchResult &other) co
     return ((!*db1 && !*db2) || (*db1 && *db2 && (**db1).name == (**db2).name)) && pkg == other.pkg;
 }
 
+inline PackageBaseSearchResult::PackageBaseSearchResult(const Database &database, const PackageBase &package, StorageID id)
+    : db(&database)
+    , pkg(&package)
+    , id(id)
+{
+}
+
 } // namespace LibPkg
 
 namespace std {
@@ -247,7 +273,7 @@ template <> struct hash<LibPkg::PackageSearchResult> {
         } else if (const auto *const db = std::get<LibPkg::Database *>(res.db)) {
             dbName = &db->name;
         }
-        return ((hash<string>()(dbName ? *dbName : string()) ^ (hash<std::shared_ptr<LibPkg::Package>>()(res.pkg) << 1)) >> 1);
+        return ((hash<string>()(dbName ? *dbName : string()) ^ (hash<std::shared_ptr<LibPkg::PackageBase>>()(res.pkg) << 1)) >> 1);
     }
 };
 
@@ -263,6 +289,14 @@ LIBPKG_EXPORT void push<LibPkg::PackageSearchResult>(
     const LibPkg::PackageSearchResult &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator);
 template <>
 LIBPKG_EXPORT void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult &reflectable,
+    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors);
+
+// declare custom (de)serialization for PackageBaseSearchResult
+template <>
+LIBPKG_EXPORT void push<LibPkg::PackageBaseSearchResult>(
+    const LibPkg::PackageBaseSearchResult &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator);
+template <>
+LIBPKG_EXPORT void pull<LibPkg::PackageBaseSearchResult>(LibPkg::PackageBaseSearchResult &reflectable,
     const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors);
 
 // declare custom (de)serialization for AtomicDateTime

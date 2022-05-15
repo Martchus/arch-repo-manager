@@ -350,7 +350,7 @@ void PrepareBuild::addResultFromSrcInfo(WebClient::AurSnapshotQuerySession &mult
     auto snapshotResult = WebClient::AurSnapshotResult{ .packageName = packageName, .packages = LibPkg::Package::fromInfo(srcInfo, false) };
     if (snapshotResult.packages.empty() || snapshotResult.packages.front().pkg->name.empty()) {
         snapshotResult.error = "Unable to parse .SRCINFO: no package name present";
-    } else if (!(snapshotResult.sourceInfo = snapshotResult.packages.front().pkg->sourceInfo)) {
+    } else if (!snapshotResult.packages.front().pkg->sourceInfo.has_value()) {
         snapshotResult.error = "Unable to parse .SRCINFO: no source info present";
     }
     multiSession.addResponse(std::move(snapshotResult));
@@ -822,7 +822,9 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
             continue;
         }
         auto &buildData = m_buildDataByPackage[response.packageName];
-        buildData.sourceInfo = move(response.sourceInfo);
+        if (!response.packages.empty() && response.packages.front().pkg) {
+            buildData.sourceInfo = response.packages.front().pkg->sourceInfo;
+        }
         buildData.packages = move(response.packages);
         buildData.error = move(response.error);
         buildData.hasSource = buildData.sourceInfo && !buildData.packages.empty() && buildData.error.empty();

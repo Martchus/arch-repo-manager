@@ -55,7 +55,7 @@ struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSeri
     std::vector<std::shared_ptr<LibPkg::Package>> existingPackages;
     std::string sourceDirectory;
     std::string originalSourceDirectory;
-    std::shared_ptr<LibPkg::SourceInfo> sourceInfo;
+    std::optional<LibPkg::SourceInfo> sourceInfo;
     std::vector<LibPkg::PackageSpec> packages;
     std::vector<std::string> warnings;
     std::string error;
@@ -154,7 +154,14 @@ struct LIBREPOMGR_EXPORT BuildActionMessages : public ReflectiveRapidJSON::JsonS
 class BuildProcessSession;
 struct ServiceSetup;
 
-struct LIBREPOMGR_EXPORT BuildAction : public std::enable_shared_from_this<BuildAction>,
+struct LIBREPOMGR_EXPORT BuildActionBase : public ReflectiveRapidJSON::JsonSerializable<BuildActionBase>,
+                                           public ReflectiveRapidJSON::BinarySerializable<BuildActionBase, 1> {
+    using IdType = BuildActionIdType;
+    static constexpr IdType invalidId = std::numeric_limits<BuildActionBase::IdType>::max();
+};
+
+struct LIBREPOMGR_EXPORT BuildAction : public BuildActionBase,
+                                       public std::enable_shared_from_this<BuildAction>,
                                        public ReflectiveRapidJSON::JsonSerializable<BuildAction>,
                                        public ReflectiveRapidJSON::BinarySerializable<BuildAction, 1> {
     friend InternalBuildAction;
@@ -168,9 +175,6 @@ struct LIBREPOMGR_EXPORT BuildAction : public std::enable_shared_from_this<Build
     friend void WebAPI::Routes::postCloneBuildActions(const WebAPI::Params &params, WebAPI::ResponseHandler &&handler);
 
 public:
-    using IdType = BuildActionIdType;
-    static constexpr IdType invalidId = std::numeric_limits<BuildAction::IdType>::max();
-
     explicit BuildAction(IdType id = invalidId, ServiceSetup *setup = nullptr) noexcept;
     BuildAction &operator=(BuildAction &&other);
     ~BuildAction();
@@ -198,6 +202,12 @@ public:
     void streamFile(const WebAPI::Params &params, const std::string &filePath, boost::beast::string_view fileMimeType,
         boost::beast::string_view contentDisposition = boost::beast::string_view());
     ServiceSetup *setup();
+    using ReflectiveRapidJSON::JsonSerializable<BuildAction>::fromJson;
+    using ReflectiveRapidJSON::JsonSerializable<BuildAction>::toJson;
+    using ReflectiveRapidJSON::JsonSerializable<BuildAction>::toJsonDocument;
+    using ReflectiveRapidJSON::BinarySerializable<BuildAction, 1>::toBinary;
+    using ReflectiveRapidJSON::BinarySerializable<BuildAction, 1>::restoreFromBinary;
+    using ReflectiveRapidJSON::BinarySerializable<BuildAction, 1>::fromBinary;
 
 protected:
 private:
@@ -207,28 +217,26 @@ private:
 
 public:
     IdType id;
+    BuildActionType type = BuildActionType::Invalid;
     std::string taskName;
     std::string templateName;
-    std::string directory;
-    std::vector<std::string> packageNames;
-    std::vector<std::string> sourceDbs, destinationDbs;
-    std::unordered_map<std::string, std::string> settings;
-    BuildActionFlagType flags = noBuildActionFlags;
-    BuildActionType type = BuildActionType::Invalid;
-
-    // only the following member variables are supposed to change after the build action has been added
-    // to the overall list of build actions
     BuildActionStatus status = BuildActionStatus::Created;
     BuildActionResult result = BuildActionResult::None;
-    std::variant<std::string, std::vector<std::string>, LibPkg::LicenseResult, LibPkg::PackageUpdates, BuildPreparation, BuildProgress,
-        PackageMovementResult, std::unordered_map<std::string, std::vector<RepositoryProblem>>, BuildActionMessages>
-        resultData;
-    std::vector<std::string> logfiles;
-    std::vector<std::string> artefacts;
     CppUtilities::DateTime created = CppUtilities::DateTime::gmtNow();
     CppUtilities::DateTime started;
     CppUtilities::DateTime finished;
     std::vector<IdType> startAfter;
+    std::string directory;
+    std::vector<std::string> sourceDbs, destinationDbs;
+    std::vector<std::string> packageNames;
+    BuildActionFlagType flags = noBuildActionFlags;
+    std::unordered_map<std::string, std::string> settings;
+
+    std::vector<std::string> logfiles;
+    std::vector<std::string> artefacts;
+    std::variant<std::string, std::vector<std::string>, LibPkg::LicenseResult, LibPkg::PackageUpdates, BuildPreparation, BuildProgress,
+        PackageMovementResult, std::unordered_map<std::string, std::vector<RepositoryProblem>>, BuildActionMessages>
+        resultData;
 
 private:
     LogContext m_log;

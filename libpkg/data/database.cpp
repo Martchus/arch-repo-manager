@@ -299,12 +299,33 @@ void Database::allPackages(const PackageVisitorMove &visitor)
     }
 }
 
+void Database::allPackages(const PackageVisitorBase &visitor)
+{
+    auto txn = m_storage->packages.getROTransaction();
+    for (auto i = txn.begin<std::shared_ptr, PackageBase>(); i != txn.end(); ++i) {
+        if (visitor(i.getID(), std::move(i.getPointer()))) {
+            return;
+        }
+    }
+}
+
 void LibPkg::Database::allPackagesByName(const PackageVisitorByName &visitor)
 {
     auto txn = m_storage->packages.getROTransaction();
     for (auto i = txn.begin_idx<0, std::shared_ptr>(); i != txn.end(); ++i) {
         const auto packageName = i.getKey().get<string_view>();
-        if (visitor(packageName, [this, &txn, &i]() { return m_storage->packageCache.retrieve(*m_storage, &txn, i.value()); })) {
+        if (visitor(packageName, [this, &txn, &i] { return m_storage->packageCache.retrieve(*m_storage, &txn, i.value()); })) {
+            return;
+        }
+    }
+}
+
+void LibPkg::Database::allPackagesByName(const PackageVisitorByNameBase &visitor)
+{
+    auto txn = m_storage->packages.getROTransaction();
+    for (auto i = txn.begin_idx<0, std::shared_ptr>(); i != txn.end(); ++i) {
+        const auto packageName = i.getKey().get<string_view>();
+        if (visitor(packageName, [&txn, &i] (PackageBase &pkg) { return txn.get(i.value(), pkg); })) {
             return;
         }
     }
@@ -391,6 +412,12 @@ std::shared_ptr<Package> Database::findPackage(const std::string &packageName)
 PackageSpec Database::findPackageWithID(const std::string &packageName)
 {
     return m_storage->packageCache.retrieve(*m_storage, packageName);
+}
+
+StorageID Database::findBasePackageWithID(const std::string &packageName, PackageBase &basePackage)
+{
+    auto txn = m_storage->packages.getROTransaction();
+    return txn.get<0, PackageBase>(packageName, basePackage);
 }
 
 void Database::removePackage(const std::string &packageName)
@@ -504,7 +531,7 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
         // add packages to list of unresolved packages
         for (const auto &affectedPackageID : requiredDep.relevantPackages) {
             const auto affectedPackage = findPackage(affectedPackageID);
-            unresolvedPackages[PackageSpec(affectedPackageID, affectedPackage)].deps.emplace_back(requiredDep);
+            unresolvedPackages[GenericPackageSpec(affectedPackageID, affectedPackage)].deps.emplace_back(requiredDep);
         }
     }
 
@@ -545,7 +572,7 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
         // add packages to list of unresolved packages
         for (const auto &affectedPackageID : requiredLib.relevantPackages) {
             const auto affectedPackage = findPackage(affectedPackageID);
-            unresolvedPackages[PackageSpec(affectedPackageID, affectedPackage)].libs.emplace_back(requiredLib.name);
+            unresolvedPackages[GenericPackageSpec(affectedPackageID, affectedPackage)].libs.emplace_back(requiredLib.name);
         }
     }
 
@@ -801,7 +828,7 @@ PackageUpdater::~PackageUpdater()
 {
 }
 
-LibPkg::PackageSpec LibPkg::PackageUpdater::findPackageWithID(const std::string &packageName)
+PackageSpec LibPkg::PackageUpdater::findPackageWithID(const std::string &packageName)
 {
     return m_database.m_storage->packageCache.retrieve(*m_database.m_storage, &m_d->packagesTxn, packageName);
 }
@@ -901,14 +928,14 @@ void push<LibPkg::PackageSearchResult>(
     push(pkg->timestamp, "timestamp", obj, allocator);
     push(pkg->version, "version", obj, allocator);
     push(pkg->description, "description", obj, allocator);
-    if (const auto &pkgInfo = pkg->packageInfo) {
-        push(pkgInfo->arch, "arch", obj, allocator);
-        push(pkgInfo->buildDate, "buildDate", obj, allocator);
+    if (!pkg->arch.empty()) {
+        push(pkg->arch, "arch", obj, allocator);
+    }
+    if (!pkg->buildDate.isNull()) {
+        push(pkg->buildDate, "buildDate", obj, allocator);
     }
     if (!pkg->archs.empty()) {
         push(pkg->archs, "archs", obj, allocator);
-    } else if (const auto &srcInfo = pkg->sourceInfo) {
-        push(srcInfo->archs, "archs", obj, allocator);
     }
     if (const auto *const dbInfo = std::get_if<LibPkg::DatabaseInfo>(&reflectable.db)) {
         if (!dbInfo->name.empty()) {
@@ -946,16 +973,40 @@ void pull<LibPkg::PackageSearchResult>(LibPkg::PackageSearchResult &reflectable,
     ReflectiveRapidJSON::JsonReflector::pull(pkg->timestamp, "timestamp", obj, errors);
     ReflectiveRapidJSON::JsonReflector::pull(pkg->version, "version", obj, errors);
     ReflectiveRapidJSON::JsonReflector::pull(pkg->description, "description", obj, errors);
-    auto &pkgInfo = pkg->packageInfo;
-    if (!pkgInfo) {
-        pkgInfo = make_unique<LibPkg::PackageInfo>();
-    }
-    ReflectiveRapidJSON::JsonReflector::pull(pkgInfo->arch, "arch", obj, errors);
-    ReflectiveRapidJSON::JsonReflector::pull(pkgInfo->buildDate, "buildDate", obj, errors);
+    ReflectiveRapidJSON::JsonReflector::pull(pkg->arch, "arch", obj, errors);
+    ReflectiveRapidJSON::JsonReflector::pull(pkg->buildDate, "buildDate", obj, errors);
     ReflectiveRapidJSON::JsonReflector::pull(pkg->archs, "archs", obj, errors);
     auto &dbInfo = reflectable.db.emplace<LibPkg::DatabaseInfo>();
     ReflectiveRapidJSON::JsonReflector::pull(dbInfo.name, "db", obj, errors);
     ReflectiveRapidJSON::JsonReflector::pull(dbInfo.arch, "dbArch", obj, errors);
+}
+
+template <>
+void push<LibPkg::PackageBaseSearchResult>(
+    const LibPkg::PackageBaseSearchResult &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+{
+    // serialize PackageBaseSearchResult object in accordance with PackageSearchResult
+    value.SetObject();
+    auto obj = value.GetObject();
+    if (auto &pkg = reflectable.pkg) {
+        push(*pkg, obj, allocator);
+    }
+    if (const auto &db = reflectable.db) {
+        push(db->name, "db", obj, allocator);
+        if (!db->arch.empty()) {
+            push(db->arch, "dbArch", obj, allocator);
+        }
+    }
+}
+
+template <>
+void pull<LibPkg::PackageBaseSearchResult>(LibPkg::PackageBaseSearchResult &reflectable,
+    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors)
+{
+    CPP_UTILITIES_UNUSED(reflectable)
+    CPP_UTILITIES_UNUSED(value)
+    CPP_UTILITIES_UNUSED(errors)
+    throw std::logic_error("Attempt to deserialize LibPkg::PackageBaseSearchResult");
 }
 
 template <>

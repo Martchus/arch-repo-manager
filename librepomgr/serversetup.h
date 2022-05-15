@@ -44,7 +44,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::string pacmanConfigFilePath = "/etc/pacman.conf";
     std::filesystem::path initialWorkingDirectory;
     std::string workingDirectory = "workingdir";
-    std::string dbPath = "libpkg.db";
+    std::string dbPath = "libpkg-1.db";
     std::uint32_t maxDbs = 512;
     std::size_t packageCacheLimit = 1000;
 
@@ -130,7 +130,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         // never changed after startup
         unsigned short threadCount = 4;
         boost::asio::io_context ioContext;
-        std::string dbPath = "librepomgr.db";
+        std::string dbPath = "librepomgr-1.db";
 
         void initStorage(const char *path);
         bool hasStorage() const;

@@ -163,7 +163,7 @@ ostream &operator<<(ostream &o, const PackageVersionPartComparison &res)
     return o;
 }
 
-PackageVersionComparison Package::compareVersion(const Package &other) const
+PackageVersionComparison PackageBase::compareVersion(const PackageBase &other) const
 {
     return PackageVersion::fromString(version).compare(PackageVersion::fromString(other.version));
 }
@@ -331,7 +331,7 @@ string LibPkg::Package::computeFileName(const char *extension) const
     return argsToString(name, '-', version, '-', packageInfo->arch, '.', extension);
 }
 
-string LibPkg::Package::computeRegularPackageName() const
+string LibPkg::PackageBase::computeRegularPackageName() const
 {
     if (name == "mingw-w64-headers" || name == "mingw-w64-crt") {
         return string();
@@ -352,6 +352,17 @@ string LibPkg::Package::computeRegularPackageName() const
     return string();
 }
 
+void PackageBase::clear()
+{
+    origin = PackageOrigin::Default;
+    timestamp = buildDate = DateTime();
+    name.clear();
+    version.clear();
+    arch.clear();
+    archs.clear();
+    description.clear();
+}
+
 bool Package::addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force)
 {
     if (&otherPackage == this) {
@@ -369,7 +380,7 @@ bool Package::addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bo
 
     // add package info from other package if this package has none at all
     if (!packageInfo && otherPackage.packageInfo) {
-        packageInfo = make_unique<PackageInfo>(*(otherPackage.packageInfo));
+        packageInfo = std::make_optional<PackageInfo>(*(otherPackage.packageInfo));
     }
     // add source info from other package; at least add missing make and check dependencies
     if (!sourceInfo) {
@@ -552,36 +563,112 @@ namespace ReflectiveRapidJSON {
 
 namespace JsonReflector {
 
-template <>
-LIBPKG_EXPORT void push<LibPkg::PackageSpec>(
-    const LibPkg::PackageSpec &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+template <typename PackageSpecType, Traits::EnableIf<Traits::IsSpecializationOf<PackageSpecType, LibPkg::GenericPackageSpec>> * = nullptr>
+static void internalPush(
+    const PackageSpecType &reflectable, ::RAPIDJSON_NAMESPACE::Value::Object &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
 {
     // just serialize the package (and ignore the ID)
-    push(reflectable.pkg, value, allocator);
+    if (reflectable.pkg) {
+        push(*reflectable.pkg, value, allocator);
+    }
 }
 
-template <>
-LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,
-    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors)
+template <typename PackageSpecType, Traits::EnableIf<Traits::IsSpecializationOf<PackageSpecType, LibPkg::GenericPackageSpec>> * = nullptr>
+static void internalPull(
+    PackageSpecType &reflectable, const ::RAPIDJSON_NAMESPACE::GenericValue<::RAPIDJSON_NAMESPACE::UTF8<char>>::ConstObject &value, JsonDeserializationErrors *errors)
 {
-    // allow the package being specified with ID or directly
-    if (!value.IsObject()) {
-        if (errors) {
-            errors->reportTypeMismatch<LibPkg::PackageSpec>(value.GetType());
-        }
-        return;
-    }
     // find member
     if (const auto pkg = value.FindMember("pkg"); pkg != value.MemberEnd()) {
-        pull(reflectable.pkg, pkg->value, errors);
+        reflectable.pkg = std::make_shared<typename decltype(reflectable.pkg)::element_type>();
+        pull(*reflectable.pkg, pkg->value, errors);
         if (const auto id = value.FindMember("id"); id != value.MemberEnd()) {
             pull(reflectable.id, id->value, errors);
         }
     } else {
-        pull(reflectable.pkg, value, errors);
+        reflectable.pkg = std::make_shared<typename decltype(reflectable.pkg)::element_type>();
+        pull(*reflectable.pkg, value, errors);
     }
 }
 
+template <>
+LIBPKG_EXPORT void push<LibPkg::PackageSpec>(const LibPkg::PackageSpec &reflectable, ::RAPIDJSON_NAMESPACE::Value::Object &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+{
+    internalPush(reflectable, value, allocator);
+}
+template <>
+LIBPKG_EXPORT void push<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(const LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, ::RAPIDJSON_NAMESPACE::Value::Object &value,
+    RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+{
+    internalPush(reflectable, value, allocator);
+}
+template <>
+LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,const ::RAPIDJSON_NAMESPACE::GenericValue<::RAPIDJSON_NAMESPACE::UTF8<char>>::ConstObject &value,
+    JsonDeserializationErrors *errors)
+{
+    internalPull(reflectable, value, errors);
+}
+template <>
+LIBPKG_EXPORT void pull<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable,
+    const ::RAPIDJSON_NAMESPACE::GenericValue<::RAPIDJSON_NAMESPACE::UTF8<char>>::ConstObject &value, JsonDeserializationErrors *errors)
+{
+    internalPull(reflectable, value, errors);
+}
+
 } // namespace JsonReflector
+
+namespace BinaryReflector {
+
+template <typename PackageSpecType, Traits::EnableIf<Traits::IsSpecializationOf<PackageSpecType, LibPkg::GenericPackageSpec>> * = nullptr>
+BinaryVersion internalReadCustomType(BinaryDeserializer &deserializer, PackageSpecType &reflectable, BinaryVersion version)
+{
+    // read version
+    using V = Versioning<::ReflectiveRapidJSON::BinarySerializable<PackageSpecType>>;
+    if constexpr (V::enabled) {
+        V::assertVersion(version = deserializer.readVariableLengthUIntBE(), "LibPkg::GenericPackageSpec");
+    }
+    // read members
+    deserializer.read(reflectable.id, version);
+    deserializer.read(reflectable.pkg, version);
+    return version;
+}
+
+template <typename PackageSpecType, Traits::EnableIf<Traits::IsSpecializationOf<PackageSpecType, LibPkg::GenericPackageSpec>> * = nullptr>
+void internalWriteCustomType(BinarySerializer &serializer, const PackageSpecType &reflectable, BinaryVersion version)
+{
+    // write version
+    using V = Versioning<::ReflectiveRapidJSON::BinarySerializable<PackageSpecType>>;
+    if constexpr (V::enabled) {
+        serializer.writeVariableLengthUIntBE(V::applyDefault(version));
+    }
+    // write members
+    serializer.write(reflectable.id, version);
+    serializer.write(reflectable.pkg, version);
+}
+
+template <>
+LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::PackageSpec>(BinaryDeserializer &deserializer, LibPkg::PackageSpec &reflectable, BinaryVersion version)
+{
+    return internalReadCustomType(deserializer, reflectable, version);
+}
+
+template <>
+LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(BinaryDeserializer &deserializer, LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, BinaryVersion version)
+{
+    return internalReadCustomType(deserializer, reflectable, version);
+}
+
+template <>
+LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSpec>(BinarySerializer &serializer, const LibPkg::PackageSpec &reflectable, BinaryVersion version)
+{
+    internalWriteCustomType(serializer, reflectable, version);
+}
+
+template <>
+LIBPKG_EXPORT void writeCustomType<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(BinarySerializer &serializer, const LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, BinaryVersion version)
+{
+    internalWriteCustomType(serializer, reflectable, version);
+}
+
+} // namespace BinaryReflector
 
 } // namespace ReflectiveRapidJSON

@@ -17,6 +17,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_set>
@@ -201,6 +202,7 @@ LIBPKG_EXPORT std::ostream &operator<<(std::ostream &o, const std::vector<Depend
 struct SourceFile : public ReflectiveRapidJSON::JsonSerializable<SourceFile>, public ReflectiveRapidJSON::BinarySerializable<SourceFile> {
     std::string path;
     std::string contents;
+    bool operator==(const SourceFile &) const = default;
 };
 
 struct LIBPKG_EXPORT SourceInfo : public ReflectiveRapidJSON::JsonSerializable<SourceInfo>,
@@ -219,6 +221,7 @@ struct LIBPKG_EXPORT SourceInfo : public ReflectiveRapidJSON::JsonSerializable<S
     std::string url;
     std::vector<SourceFile> sources;
     std::string directory;
+    bool operator==(const SourceInfo &other) const = default;
 };
 
 struct LIBPKG_EXPORT PackageInfo : public ReflectiveRapidJSON::JsonSerializable<PackageInfo>,
@@ -232,6 +235,7 @@ struct LIBPKG_EXPORT PackageInfo : public ReflectiveRapidJSON::JsonSerializable<
     std::string pgpSignature;
     std::string arch; // arch of concrete binary package
     std::uint32_t size = 0;
+    bool operator==(const PackageInfo &other) const = default;
 };
 
 struct LIBPKG_EXPORT InstallInfo : public ReflectiveRapidJSON::JsonSerializable<InstallInfo>,
@@ -241,6 +245,7 @@ struct LIBPKG_EXPORT InstallInfo : public ReflectiveRapidJSON::JsonSerializable<
     std::vector<std::string> backupFiles;
     InstallStatus installStatus = InstallStatus::Unknown;
     PackageValidation validationMethods = PackageValidation::None;
+    bool operator==(const InstallInfo &other) const = default;
 };
 
 /*!
@@ -333,22 +338,25 @@ struct Package;
  * \brief The PackageSpec struct holds a reference to a package.
  * \remarks If id is non-zero, the package is part of a database using that ID.
  */
-struct LIBPKG_EXPORT PackageSpec : public ReflectiveRapidJSON::JsonSerializable<PackageSpec>,
-                                   public ReflectiveRapidJSON::BinarySerializable<PackageSpec> {
-    explicit PackageSpec(StorageID id = 0, const std::shared_ptr<Package> &pkg = nullptr);
-    bool operator==(const PackageSpec &other) const;
+template <typename PackageType = Package>
+struct LIBPKG_EXPORT GenericPackageSpec : public ReflectiveRapidJSON::JsonSerializable<GenericPackageSpec<PackageType>>,
+                                          public ReflectiveRapidJSON::BinarySerializable<GenericPackageSpec<PackageType>> {
+    explicit GenericPackageSpec(StorageID id = 0, const std::shared_ptr<PackageType> &pkg = nullptr);
+    bool operator==(const GenericPackageSpec &other) const;
 
     StorageID id;
-    std::shared_ptr<Package> pkg;
+    std::shared_ptr<PackageType> pkg;
 };
+using PackageSpec = GenericPackageSpec<>;
 
-inline PackageSpec::PackageSpec(StorageID id, const std::shared_ptr<Package> &pkg)
+template <typename PackageType>
+inline GenericPackageSpec<PackageType>::GenericPackageSpec(StorageID id, const std::shared_ptr<PackageType> &pkg)
     : id(id)
     , pkg(pkg)
 {
 }
 
-inline bool PackageSpec::operator==(const PackageSpec &other) const
+template <typename PackageType> inline bool GenericPackageSpec<PackageType>::operator==(const GenericPackageSpec &other) const
 {
     return id ? id == other.id : pkg == other.pkg;
 }
@@ -357,8 +365,8 @@ inline bool PackageSpec::operator==(const PackageSpec &other) const
 
 namespace std {
 
-template <> struct hash<LibPkg::PackageSpec> {
-    std::size_t operator()(const LibPkg::PackageSpec &spec) const
+template <typename PackageType> struct hash<LibPkg::GenericPackageSpec<PackageType>> {
+    std::size_t operator()(const LibPkg::GenericPackageSpec<PackageType> &spec) const
     {
         using std::hash;
         return spec.id ? hash<decltype(spec.id)>()(spec.id) : hash<decltype(spec.pkg)>()(spec.pkg);
@@ -369,19 +377,38 @@ template <> struct hash<LibPkg::PackageSpec> {
 
 namespace LibPkg {
 
-struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Package>, public ReflectiveRapidJSON::BinarySerializable<Package, 1> {
+struct LIBPKG_EXPORT PackageBase : public ReflectiveRapidJSON::JsonSerializable<PackageBase>,
+                                   public ReflectiveRapidJSON::BinarySerializable<PackageBase, 1> {
+    PackageBase() = default;
+    PackageBase(const PackageBase &other) = default;
+    PackageBase(PackageBase &&other) = default;
+    PackageBase &operator=(PackageBase &&other) = default;
+
+    bool isSame(const PackageBase &other) const;
+    PackageVersionComparison compareVersion(const PackageBase &other) const;
+    std::string computeRegularPackageName() const;
+    void clear();
+
+    PackageOrigin origin = PackageOrigin::Default;
+    CppUtilities::DateTime timestamp, buildDate;
+    std::string name;
+    std::string version;
+    std::string arch;
+    std::vector<std::string> archs; // set if a split package overrides the base archs; if empty, archs from sourceInfo apply
+    std::string description;
+};
+
+struct LIBPKG_EXPORT Package : public PackageBase,
+                               public ReflectiveRapidJSON::JsonSerializable<Package>,
+                               public ReflectiveRapidJSON::BinarySerializable<Package, 1> {
     Package() = default;
-    Package(const Package &other);
+    Package(const Package &other) = default;
     Package(Package &&other) = default;
-    //Package &operator=(const Package &other);
     Package &operator=(Package &&other) = default;
     bool providesDependency(const Dependency &dependency) const;
     static void exportProvides(
         const std::shared_ptr<Package> &package, DependencySet &destinationProvides, std::unordered_set<std::string> &destinationLibProvides);
-    bool isSame(const Package &other) const;
-    PackageVersionComparison compareVersion(const Package &other) const;
     std::string computeFileName(const char *extension = "pkg.tar.zst") const;
-    std::string computeRegularPackageName() const;
     PackageNameData decomposeName() const;
     void addInfoFromPkgInfoFile(const std::string &info);
     void addDepsAndProvidesFromContainedDirectory(std::string_view directoryPath);
@@ -391,24 +418,26 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     std::vector<std::string> processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);
     bool isArchAny() const;
+    using ReflectiveRapidJSON::JsonSerializable<Package>::fromJson;
+    using ReflectiveRapidJSON::JsonSerializable<Package>::toJson;
+    using ReflectiveRapidJSON::JsonSerializable<Package>::toJsonDocument;
+    using ReflectiveRapidJSON::BinarySerializable<Package, 1>::toBinary;
+    using ReflectiveRapidJSON::BinarySerializable<Package, 1>::restoreFromBinary;
+    using ReflectiveRapidJSON::BinarySerializable<Package, 1>::fromBinary;
 
     static bool isPkgInfoFileOrBinary(const char *filePath, const char *fileName, mode_t mode);
     static bool isLicense(const char *filePath, const char *fileName, mode_t mode);
 
-    static std::vector<PackageSpec> fromInfo(const std::string &info, bool isPackageInfo = false);
+    static std::vector<GenericPackageSpec<Package>> fromInfo(const std::string &info, bool isPackageInfo = false);
     static std::shared_ptr<Package> fromDescription(const std::vector<std::string> &descriptionParts);
     static void fromDatabaseFile(const std::string &archivePath, const std::function<bool(const std::shared_ptr<Package> &)> &visitor);
     static std::shared_ptr<Package> fromPkgFile(const std::string &path);
     static std::tuple<std::string_view, std::string_view, std::string_view> fileNameComponents(std::string_view fileName);
     static std::shared_ptr<Package> fromPkgFileName(std::string_view fileName);
-    static std::vector<PackageSpec> fromAurRpcJson(const char *jsonData, std::size_t jsonSize, PackageOrigin origin = PackageOrigin::AurRpcInfo);
+    static std::vector<GenericPackageSpec<Package>> fromAurRpcJson(
+        const char *jsonData, std::size_t jsonSize, PackageOrigin origin = PackageOrigin::AurRpcInfo);
 
-    PackageOrigin origin = PackageOrigin::Default;
-    CppUtilities::DateTime timestamp;
-    std::string name;
-    std::string version;
-    std::vector<std::string> archs; // set if a split package overrides the base archs; if empty, archs from sourceInfo apply
-    std::string description;
+    using PackageBase::version;
     std::string upstreamUrl;
     std::vector<std::string> licenses;
     std::vector<std::string> groups;
@@ -419,32 +448,12 @@ struct LIBPKG_EXPORT Package : public ReflectiveRapidJSON::JsonSerializable<Pack
     std::vector<Dependency> replaces;
     std::set<std::string> libprovides;
     std::set<std::string> libdepends;
-    std::shared_ptr<SourceInfo> sourceInfo;
-    std::unique_ptr<PackageInfo> packageInfo;
-    std::unique_ptr<InstallInfo> installInfo;
+    std::optional<SourceInfo> sourceInfo;
+    std::optional<PackageInfo> packageInfo;
+    std::optional<InstallInfo> installInfo;
 };
 
-inline Package::Package(const Package &other)
-    : origin(other.origin)
-    , timestamp(other.timestamp)
-    , name(other.name)
-    , version(other.version)
-    , description(other.description)
-    , upstreamUrl(other.upstreamUrl)
-    , licenses(other.licenses)
-    , groups(other.groups)
-    , dependencies(other.dependencies)
-    , optionalDependencies(other.optionalDependencies)
-    , conflicts(other.conflicts)
-    , provides(other.provides)
-    , replaces(other.replaces)
-    , sourceInfo(other.sourceInfo)
-    , packageInfo()
-    , installInfo()
-{
-}
-
-inline bool Package::isSame(const Package &other) const
+inline bool PackageBase::isSame(const PackageBase &other) const
 {
     return name == other.name && version == other.version;
 }
@@ -502,17 +511,6 @@ namespace ReflectiveRapidJSON {
 
 REFLECTIVE_RAPIDJSON_TREAT_AS_MULTI_MAP_OR_HASH(LibPkg::DependencySet);
 
-namespace JsonReflector {
-
-// declare custom (de)serialization for LibPkg::PackageSpec
-template <>
-LIBPKG_EXPORT void push<LibPkg::PackageSpec>(
-    const LibPkg::PackageSpec &reflectable, RAPIDJSON_NAMESPACE::Value &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator);
-template <>
-LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,
-    const RAPIDJSON_NAMESPACE::GenericValue<RAPIDJSON_NAMESPACE::UTF8<char>> &value, JsonDeserializationErrors *errors);
-
-} // namespace JsonReflector
 } // namespace ReflectiveRapidJSON
 
 #endif // LIBPKG_DATA_PACKAGE_H

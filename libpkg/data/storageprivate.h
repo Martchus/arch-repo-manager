@@ -8,7 +8,7 @@
 
 namespace LibPkg {
 
-using PackageStorage = LMDBSafe::TypedDBI<Package, LMDBSafe::index_on<Package, std::string, &Package::name>>;
+using PackageStorage = LMDBSafe::TypedDBI<Package, LMDBSafe::index_on_base_member<Package, std::string, PackageBase, &PackageBase::name>>;
 using DependencyStorage = LMDBSafe::TypedDBI<DatabaseDependency, LMDBSafe::index_on<Dependency, std::string, &DatabaseDependency::name>>;
 using LibraryDependencyStorage
     = LMDBSafe::TypedDBI<DatabaseLibraryDependency, LMDBSafe::index_on<DatabaseLibraryDependency, std::string, &DatabaseLibraryDependency::name>>;

@@ -274,7 +274,7 @@ void DataTests::testComputingFileName()
     pkg.name = "test";
     pkg.version = "1.2-3";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("packageInfo required for computing filename", string(), pkg.computeFileName());
-    pkg.packageInfo = make_unique<PackageInfo>();
+    pkg.packageInfo = std::make_optional<PackageInfo>();
     pkg.packageInfo->arch = "x86_64";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("file name computed from name, version and arch", "test-1.2-3-x86_64.pkg.tar.zst"s, pkg.computeFileName());
     pkg.packageInfo->fileName = "explicitly-specified-filename";
@@ -349,8 +349,8 @@ void DataTests::testComputingBuildOrder()
     CPPUNIT_ASSERT_EQUAL(0_st, res.ignored.size());
 
     // ignore cycle if not interested in that particular package
-    m_pkg2->packageInfo = std::make_unique<PackageInfo>();
-    tar->packageInfo = std::make_unique<PackageInfo>();
+    m_pkg2->packageInfo = std::make_optional<PackageInfo>();
+    tar->packageInfo = std::make_optional<PackageInfo>();
     tar->dependencies.clear();
     tar->dependencies.emplace_back("bar");
     db.forceUpdatePackage(tar);

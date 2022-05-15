@@ -228,10 +228,10 @@ bool ReloadLibraryDependencies::addRelevantPackage(LibPkg::StorageID packageID, 
     relevantPkg.info.name = package->name;
     // -> assign certain fields which are used by addDepsAndProvidesFromOtherPackage() to check whether the packages are matching
     relevantPkg.info.version = package->version;
-    relevantPkg.info.packageInfo = std::make_unique<LibPkg::PackageInfo>();
+    relevantPkg.info.packageInfo = std::make_optional<LibPkg::PackageInfo>();
     relevantPkg.info.packageInfo->buildDate = package->packageInfo->buildDate;
     // -> gather source info such as make and check dependencies as well
-    relevantPkg.info.sourceInfo = std::make_shared<LibPkg::SourceInfo>();
+    relevantPkg.info.sourceInfo = std::make_optional<LibPkg::SourceInfo>();
     ++m_remainingPackages;
     return false;
 }

@@ -200,6 +200,29 @@ void Config::packages(std::string_view dbName, std::string_view dbArch, const st
     }
 }
 
+void Config::packages(std::string_view dbName, std::string_view dbArch, const std::string &packageName, const DatabaseVisitor &databaseVisitor,
+    const PackageVisitorBase &visitor)
+{
+    // don't allow to iterate though all packages
+    if (packageName.empty()) {
+        return;
+    }
+    auto basePackage = std::make_shared<PackageBase>();
+    for (auto &db : databases) {
+        if ((!dbName.empty() && dbName != db.name) || (!dbArch.empty() && dbArch != db.arch) || (databaseVisitor && databaseVisitor(db))) {
+            continue;
+        }
+        if (!basePackage) {
+            basePackage = std::make_shared<PackageBase>();
+        } else {
+            basePackage->clear();
+        }
+        if (const auto id = db.findBasePackageWithID(packageName, *basePackage)) {
+            visitor(db, id, std::move(basePackage));
+        }
+    }
+}
+
 void Config::packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByName &visitor)
 {
     for (auto &db : databases) {
@@ -208,6 +231,17 @@ void Config::packagesByName(const DatabaseVisitor &databaseVisitor, const Packag
         }
         db.allPackagesByName(
             [&](std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) { return visitor(db, packageName, getPackage); });
+    }
+}
+
+void Config::packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByNameBase &visitor)
+{
+    for (auto &db : databases) {
+        if (databaseVisitor && databaseVisitor(db)) {
+            continue;
+        }
+        db.allPackagesByName(
+            [&](std::string_view packageName, const std::function<StorageID(PackageBase&)> &getPackage) { return visitor(db, packageName, getPackage); });
     }
 }
 

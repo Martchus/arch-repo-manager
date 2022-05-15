@@ -19,7 +19,6 @@ namespace WebClient {
 struct AurSnapshotResult {
     std::string packageName;
     std::string errorOutput;
-    std::shared_ptr<LibPkg::SourceInfo> sourceInfo;
     std::vector<LibPkg::PackageSpec> packages;
     std::string error;
 };

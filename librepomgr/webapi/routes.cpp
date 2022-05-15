@@ -227,15 +227,18 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         const auto dbIterator = dbs.find(db.name);
         return dbIterator == dbs.end() || dbIterator->second.find(db.arch) == dbIterator->second.end();
     });
-    const auto pushPackage = details
-        ? LibPkg::Config::PackageVisitorConst([&array, &document, &limit](Database &, LibPkg::StorageID, const std::shared_ptr<Package> &pkg) {
-              ReflectiveRapidJSON::JsonReflector::push(pkg, array, document.GetAllocator());
-              return array.Size() >= limit;
-          })
-        : ([&array, &document, &limit](Database &db, LibPkg::StorageID id, const std::shared_ptr<Package> &pkg) {
-              ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageSearchResult(db, pkg, id), array, document.GetAllocator());
+    const auto pushPackage = LibPkg::Config::PackageVisitorBase([&array, &document, &limit](Database &db, LibPkg::StorageID id, const std::shared_ptr<PackageBase> &pkg) {
+              ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageBaseSearchResult(db, *pkg, id), array, document.GetAllocator());
               return array.Size() >= limit;
           });
+    const auto pushBasePackage = [&array, &document, &limit](Database &db, LibPkg::StorageID id, const PackageBase &pkg) {
+              ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageBaseSearchResult(db, pkg, id), array, document.GetAllocator());
+              return array.Size() >= limit;
+          };
+    const auto pushPackageDetails = !details ? LibPkg::Config::PackageVisitorConst() : [&array, &document, &limit](Database &, LibPkg::StorageID, const std::shared_ptr<Package> &pkg) {
+        ReflectiveRapidJSON::JsonReflector::push(pkg, array, document.GetAllocator());
+        return array.Size() >= limit;
+    };
 
     auto aurPackages = std::vector<PackageSearchResult>();
     auto neededAurPackages = std::vector<std::string>();
@@ -261,21 +264,28 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 --limit;
             }
             if (!isDbAur && (!dbs.empty() || !onlyFromAur)) {
-                params.setup.config.packages(dbName, dbArch, packageNameStr, visitDb, pushPackage);
+                if (details) {
+                    params.setup.config.packages(dbName, dbArch, packageNameStr, visitDb, pushPackageDetails);
+                } else {
+                    params.setup.config.packages(dbName, dbArch, packageNameStr, visitDb, pushPackage);
+                }
             }
             break;
         }
-        case Mode::NameContains:
+        case Mode::NameContains: {
+            auto basePackage = PackageBase();
             params.setup.config.packagesByName(
-                visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
+                visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<StorageID(PackageBase&)> &getPackage) {
                     if (packageName.find(name) != std::string_view::npos) {
-                        const auto [packageID, package] = getPackage();
-                        if (!package) {
+                        const auto packageID = getPackage(basePackage);
+                        if (!packageID) {
                             cerr << Phrases::ErrorMessage << "Broken index in db \"" << db.name << "\": package \"" << packageName
                                  << "\" does not exist" << std::endl;
                             return false;
                         }
-                        return pushPackage(db, packageID, package);
+                        const auto stopSearch = pushBasePackage(db, packageID, basePackage);
+                        basePackage.clear();
+                        return stopSearch;
                     }
                     return false;
                 });
@@ -283,19 +293,23 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 neededAurPackages.emplace_back(std::move(name));
             }
             break;
-        case Mode::Regex:
+        }
+        case Mode::Regex: {
             try {
                 const auto regex = std::regex(name.data(), name.size());
+                auto basePackage = PackageBase();
                 params.setup.config.packagesByName(
-                    visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<PackageSpec(void)> &getPackage) {
+                    visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<StorageID(PackageBase&)> &getPackage) {
                         if (std::regex_match(packageName.begin(), packageName.end(), regex)) {
-                            const auto [packageID, package] = getPackage();
-                            if (!package) {
+                            const auto packageID = getPackage(basePackage);
+                            if (!packageID) {
                                 cerr << Phrases::ErrorMessage << "Broken index in db \"" << db.name << "\": package \"" << packageName
                                      << "\" does not exist" << std::endl;
                                 return false;
                             }
-                            return pushPackage(db, packageID, package);
+                            const auto stopSearch = pushBasePackage(db, packageID, basePackage);
+                            basePackage.clear();
+                            return stopSearch;
                         }
                         return false;
                     });
@@ -303,6 +317,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 throw BadRequest(argsToString("regex is invalid: ", e.what()));
             }
             break;
+        }
         case Mode::Provides:
         case Mode::Depends:
             params.setup.config.providingPackages(Dependency::fromString(name), mode == Mode::Depends, visitDb, pushPackage);
