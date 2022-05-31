@@ -385,7 +385,7 @@ struct LIBPKG_EXPORT PackageBase : public ReflectiveRapidJSON::JsonSerializable<
 
     bool isSame(const PackageBase &other) const;
     PackageVersionComparison compareVersion(const PackageBase &other) const;
-    std::string computeRegularPackageName() const;
+    std::string_view computeRegularPackageName() const;
     void clear();
 
     PackageOrigin origin = PackageOrigin::Default;

@@ -328,25 +328,32 @@ string LibPkg::Package::computeFileName(const char *extension) const
     return argsToString(name, '-', version, '-', arch, '.', extension);
 }
 
-string LibPkg::PackageBase::computeRegularPackageName() const
+std::string_view LibPkg::PackageBase::computeRegularPackageName() const
 {
     if (name == "mingw-w64-headers" || name == "mingw-w64-crt") {
-        return string();
+        return std::string_view();
     }
-    if (startsWith(name, "lib32-")) {
-        return name.substr(strlen("lib32-"));
-    } else if (startsWith(name, "mingw-w64-")) {
-        return name.substr(strlen("mingw-w64-"));
-    } else if (startsWith(name, "android-aarch64-")) {
-        return name.substr(strlen("android-aarch64-"));
-    } else if (startsWith(name, "android-x86-64-")) {
-        return name.substr(strlen("android-x86-64-"));
-    } else if (startsWith(name, "android-x86-")) {
-        return name.substr(strlen("android-x86-"));
-    } else if (startsWith(name, "android-armv7a-eabi-")) {
-        return name.substr(strlen("android-armv7a-eabi-"));
+    static constexpr std::string_view prefixes[] = {
+        "lib32-",
+        "mingw-w64-",
+        "android-aarch64-",
+        "android-x86-64-",
+        "android-x86-",
+        "android-armv7a-eabi-",
+        "static-compat-",
+    };
+    for (const auto prefix : prefixes) {
+        if (name.starts_with(prefix)) {
+            return std::string_view(name).substr(prefix.size());
+        }
     }
-    return string();
+    static constexpr std::string_view suffixes[] = { "-static-compat" };
+    for (const auto suffix : suffixes) {
+        if (name.ends_with(suffix)) {
+            return std::string_view(name.data(), name.size() - suffix.size());
+        }
+    }
+    return std::string_view();
 }
 
 void PackageBase::clear()

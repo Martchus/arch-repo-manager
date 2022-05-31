@@ -49,7 +49,7 @@ std::string Config::addLicenseInfo(LicenseResult &result, PackageSearchResult &s
     //  * use the real project name if known
     const auto upstreamVersion = PackageVersion::fromString(package->version).upstream;
     auto regularPackageName = package->computeRegularPackageName();
-    auto packageID = regularPackageName.empty() ? package->name : regularPackageName;
+    auto packageID = regularPackageName.empty() ? package->name : std::string(regularPackageName);
     static const auto displayNames = unordered_map<string, string>{
         { "mingw-w64-headers", "MinGW-w64" },
         { "gcc", "GCC" },
@@ -140,7 +140,7 @@ std::string Config::addLicenseInfo(LicenseResult &result, PackageSearchResult &s
 
     // read custom license
     if (!regularPackageName.empty()) {
-        const auto regularPackageSearchResult = findPackage(Dependency(regularPackageName, package->version));
+        const auto regularPackageSearchResult = findPackage(Dependency(packageID, package->version));
         if (regularPackageSearchResult.pkg) {
             const auto regularUpstreamVersion = PackageVersion::fromString(regularPackageSearchResult.pkg->version).upstream;
             if (upstreamVersion != regularUpstreamVersion) {
