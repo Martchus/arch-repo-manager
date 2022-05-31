@@ -100,9 +100,8 @@ static void printPackageSearchResults(const LibRepoMgr::WebClient::Response::bod
     t.add_row({ "Arch", "Repo", "Name", "Version", "Description", "Build date" });
     for (const auto &[db, package, packageID] : packages) {
         const auto &dbInfo = std::get<LibPkg::DatabaseInfo>(db);
-        t.add_row(
-            { package->packageInfo ? package->arch : dbInfo.arch, dbInfo.name, package->name, package->version, package->description,
-                package->packageInfo && !package->buildDate.isNull() ? package->packageInfo->buildDate.toString() : "?" });
+        t.add_row({ package->packageInfo ? package->arch : dbInfo.arch, dbInfo.name, package->name, package->version, package->description,
+            package->packageInfo && !package->buildDate.isNull() ? package->packageInfo->buildDate.toString() : "?" });
     }
     t.row(0).format().font_align(tabulate::FontAlign::center).font_style({ tabulate::FontStyle::bold });
     configureColumnWidths(t);

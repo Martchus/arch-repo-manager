@@ -227,18 +227,20 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         const auto dbIterator = dbs.find(db.name);
         return dbIterator == dbs.end() || dbIterator->second.find(db.arch) == dbIterator->second.end();
     });
-    const auto pushSharedBasePackage = LibPkg::Config::PackageVisitorBase([&array, &document, &limit](Database &db, LibPkg::StorageID id, const std::shared_ptr<PackageBase> &pkg) {
-              ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageBaseSearchResult(db, *pkg, id), array, document.GetAllocator());
-              return array.Size() >= limit;
-          });
+    const auto pushSharedBasePackage = LibPkg::Config::PackageVisitorBase(
+        [&array, &document, &limit](Database &db, LibPkg::StorageID id, const std::shared_ptr<PackageBase> &pkg) {
+            ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageBaseSearchResult(db, *pkg, id), array, document.GetAllocator());
+            return array.Size() >= limit;
+        });
     const auto pushBasePackage = [&array, &document, &limit](Database &db, LibPkg::StorageID id, const PackageBase &pkg) {
-              ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageBaseSearchResult(db, pkg, id), array, document.GetAllocator());
-              return array.Size() >= limit;
-          };
-    const auto pushPackageDetails = !details ? LibPkg::Config::PackageVisitorConst() : [&array, &document, &limit](Database &, LibPkg::StorageID, const std::shared_ptr<Package> &pkg) {
-        ReflectiveRapidJSON::JsonReflector::push(pkg, array, document.GetAllocator());
+        ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageBaseSearchResult(db, pkg, id), array, document.GetAllocator());
         return array.Size() >= limit;
     };
+    const auto pushPackageDetails = !details ? LibPkg::Config::PackageVisitorConst()
+                                             : [&array, &document, &limit](Database &, LibPkg::StorageID, const std::shared_ptr<Package> &pkg) {
+                                                   ReflectiveRapidJSON::JsonReflector::push(pkg, array, document.GetAllocator());
+                                                   return array.Size() >= limit;
+                                               };
 
     auto aurPackages = std::vector<PackageSearchResult>();
     auto neededAurPackages = std::vector<std::string>();
@@ -275,7 +277,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         case Mode::NameContains: {
             auto basePackage = PackageBase();
             params.setup.config.packagesByName(
-                visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<StorageID(PackageBase&)> &getPackage) {
+                visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<StorageID(PackageBase &)> &getPackage) {
                     if (packageName.find(name) != std::string_view::npos) {
                         const auto packageID = getPackage(basePackage);
                         if (!packageID) {
@@ -299,7 +301,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 const auto regex = std::regex(name.data(), name.size());
                 auto basePackage = PackageBase();
                 params.setup.config.packagesByName(
-                    visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<StorageID(PackageBase&)> &getPackage) {
+                    visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<StorageID(PackageBase &)> &getPackage) {
                         if (std::regex_match(packageName.begin(), packageName.end(), regex)) {
                             const auto packageID = getPackage(basePackage);
                             if (!packageID) {

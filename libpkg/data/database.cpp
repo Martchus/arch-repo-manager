@@ -325,7 +325,7 @@ void LibPkg::Database::allPackagesByName(const PackageVisitorByNameBase &visitor
     auto txn = m_storage->packages.getROTransaction();
     for (auto i = txn.begin_idx<0, std::shared_ptr>(); i != txn.end(); ++i) {
         const auto packageName = i.getKey().get<string_view>();
-        if (visitor(packageName, [&txn, &i] (PackageBase &pkg) { return txn.get(i.value(), pkg); })) {
+        if (visitor(packageName, [&txn, &i](PackageBase &pkg) { return txn.get(i.value(), pkg); })) {
             return;
         }
     }
@@ -377,8 +377,7 @@ void Database::providingPackagesBase(const Dependency &dependency, bool reverse,
                 package = std::make_shared<PackageBase>();
             } else {
                 package->clear();
-            }
-            ;
+            };
             if (packagesTxn.get<PackageBase>(packageID, *package) && visitor(packageID, std::move(package))) {
                 return;
             }

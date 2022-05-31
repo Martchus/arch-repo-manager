@@ -149,7 +149,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     using PackageVisitorMove = std::function<bool(StorageID, std::shared_ptr<Package> &&)>; // package is invalidated/reused unless moved from!!!
     using PackageVisitorConst = std::function<bool(StorageID, const std::shared_ptr<Package> &)>;
     using PackageVisitorByName = std::function<bool(std::string_view, const std::function<PackageSpec(void)> &)>;
-    using PackageVisitorByNameBase = std::function<bool(std::string_view, const std::function<StorageID(PackageBase&)> &)>;
+    using PackageVisitorByNameBase = std::function<bool(std::string_view, const std::function<StorageID(PackageBase &)> &)>;
 
     friend struct PackageUpdater;
 

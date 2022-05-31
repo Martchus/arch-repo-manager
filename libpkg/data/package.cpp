@@ -571,8 +571,8 @@ static void internalPush(
 }
 
 template <typename PackageSpecType, Traits::EnableIf<Traits::IsSpecializationOf<PackageSpecType, LibPkg::GenericPackageSpec>> * = nullptr>
-static void internalPull(
-    PackageSpecType &reflectable, const ::RAPIDJSON_NAMESPACE::GenericValue<::RAPIDJSON_NAMESPACE::UTF8<char>>::ConstObject &value, JsonDeserializationErrors *errors)
+static void internalPull(PackageSpecType &reflectable,
+    const ::RAPIDJSON_NAMESPACE::GenericValue<::RAPIDJSON_NAMESPACE::UTF8<char>>::ConstObject &value, JsonDeserializationErrors *errors)
 {
     // find member
     if (const auto pkg = value.FindMember("pkg"); pkg != value.MemberEnd()) {
@@ -588,19 +588,20 @@ static void internalPull(
 }
 
 template <>
-LIBPKG_EXPORT void push<LibPkg::PackageSpec>(const LibPkg::PackageSpec &reflectable, ::RAPIDJSON_NAMESPACE::Value::Object &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+LIBPKG_EXPORT void push<LibPkg::PackageSpec>(
+    const LibPkg::PackageSpec &reflectable, ::RAPIDJSON_NAMESPACE::Value::Object &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
 {
     internalPush(reflectable, value, allocator);
 }
 template <>
-LIBPKG_EXPORT void push<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(const LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, ::RAPIDJSON_NAMESPACE::Value::Object &value,
-    RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
+LIBPKG_EXPORT void push<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(const LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable,
+    ::RAPIDJSON_NAMESPACE::Value::Object &value, RAPIDJSON_NAMESPACE::Document::AllocatorType &allocator)
 {
     internalPush(reflectable, value, allocator);
 }
 template <>
-LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,const ::RAPIDJSON_NAMESPACE::GenericValue<::RAPIDJSON_NAMESPACE::UTF8<char>>::ConstObject &value,
-    JsonDeserializationErrors *errors)
+LIBPKG_EXPORT void pull<LibPkg::PackageSpec>(LibPkg::PackageSpec &reflectable,
+    const ::RAPIDJSON_NAMESPACE::GenericValue<::RAPIDJSON_NAMESPACE::UTF8<char>>::ConstObject &value, JsonDeserializationErrors *errors)
 {
     internalPull(reflectable, value, errors);
 }
@@ -643,13 +644,15 @@ void internalWriteCustomType(BinarySerializer &serializer, const PackageSpecType
 }
 
 template <>
-LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::PackageSpec>(BinaryDeserializer &deserializer, LibPkg::PackageSpec &reflectable, BinaryVersion version)
+LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::PackageSpec>(
+    BinaryDeserializer &deserializer, LibPkg::PackageSpec &reflectable, BinaryVersion version)
 {
     return internalReadCustomType(deserializer, reflectable, version);
 }
 
 template <>
-LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(BinaryDeserializer &deserializer, LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, BinaryVersion version)
+LIBPKG_EXPORT BinaryVersion readCustomType<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(
+    BinaryDeserializer &deserializer, LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, BinaryVersion version)
 {
     return internalReadCustomType(deserializer, reflectable, version);
 }
@@ -661,7 +664,8 @@ LIBPKG_EXPORT void writeCustomType<LibPkg::PackageSpec>(BinarySerializer &serial
 }
 
 template <>
-LIBPKG_EXPORT void writeCustomType<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(BinarySerializer &serializer, const LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, BinaryVersion version)
+LIBPKG_EXPORT void writeCustomType<LibPkg::GenericPackageSpec<LibPkg::PackageBase>>(
+    BinarySerializer &serializer, const LibPkg::GenericPackageSpec<LibPkg::PackageBase> &reflectable, BinaryVersion version)
 {
     internalWriteCustomType(serializer, reflectable, version);
 }

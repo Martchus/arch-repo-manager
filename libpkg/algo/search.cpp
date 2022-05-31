@@ -240,8 +240,9 @@ void Config::packagesByName(const DatabaseVisitor &databaseVisitor, const Packag
         if (databaseVisitor && databaseVisitor(db)) {
             continue;
         }
-        db.allPackagesByName(
-            [&](std::string_view packageName, const std::function<StorageID(PackageBase&)> &getPackage) { return visitor(db, packageName, getPackage); });
+        db.allPackagesByName([&](std::string_view packageName, const std::function<StorageID(PackageBase &)> &getPackage) {
+            return visitor(db, packageName, getPackage);
+        });
     }
 }
 
@@ -258,7 +259,8 @@ void Config::providingPackages(const Dependency &dependency, bool reverse, const
     }
 }
 
-void Config::providingPackagesBase(const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorBase &visitor)
+void Config::providingPackagesBase(
+    const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorBase &visitor)
 {
     for (auto &db : databases) {
         if (databaseVisitor && databaseVisitor(db)) {
