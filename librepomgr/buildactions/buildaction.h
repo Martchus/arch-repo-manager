@@ -158,7 +158,34 @@ struct LIBREPOMGR_EXPORT BuildActionBase : public ReflectiveRapidJSON::JsonSeria
                                            public ReflectiveRapidJSON::BinarySerializable<BuildActionBase, 1> {
     using IdType = BuildActionIdType;
     static constexpr IdType invalidId = std::numeric_limits<BuildActionBase::IdType>::max();
+    explicit BuildActionBase(IdType id = invalidId);
+
+    bool isScheduled() const;
+    bool isExecuting() const;
+    bool isDone() const;
+    bool hasSucceeded() const;
+
+    IdType id;
+    BuildActionType type = BuildActionType::Invalid;
+    std::string taskName;
+    std::string templateName;
+    BuildActionStatus status = BuildActionStatus::Created;
+    BuildActionResult result = BuildActionResult::None;
+    CppUtilities::DateTime created = CppUtilities::DateTime::gmtNow();
+    CppUtilities::DateTime started;
+    CppUtilities::DateTime finished;
+    std::vector<IdType> startAfter;
+    std::string directory;
+    std::vector<std::string> sourceDbs, destinationDbs;
+    std::vector<std::string> packageNames;
+    BuildActionFlagType flags = noBuildActionFlags;
+    std::unordered_map<std::string, std::string> settings;
 };
+
+inline BuildActionBase::BuildActionBase(IdType id)
+    : id(id)
+{
+}
 
 struct LIBREPOMGR_EXPORT BuildAction : public BuildActionBase,
                                        public std::enable_shared_from_this<BuildAction>,
@@ -178,10 +205,6 @@ public:
     explicit BuildAction(IdType id = invalidId, ServiceSetup *setup = nullptr) noexcept;
     BuildAction &operator=(BuildAction &&other);
     ~BuildAction();
-    bool isScheduled() const;
-    bool isExecuting() const;
-    bool isDone() const;
-    bool hasSucceeded() const;
     static bool haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> &buildActions);
     bool isAborted() const;
     const std::atomic_bool &aborted() const;
@@ -216,22 +239,6 @@ private:
     LibPkg::StorageID conclude(BuildActionResult result);
 
 public:
-    IdType id;
-    BuildActionType type = BuildActionType::Invalid;
-    std::string taskName;
-    std::string templateName;
-    BuildActionStatus status = BuildActionStatus::Created;
-    BuildActionResult result = BuildActionResult::None;
-    CppUtilities::DateTime created = CppUtilities::DateTime::gmtNow();
-    CppUtilities::DateTime started;
-    CppUtilities::DateTime finished;
-    std::vector<IdType> startAfter;
-    std::string directory;
-    std::vector<std::string> sourceDbs, destinationDbs;
-    std::vector<std::string> packageNames;
-    BuildActionFlagType flags = noBuildActionFlags;
-    std::unordered_map<std::string, std::string> settings;
-
     std::vector<std::string> logfiles;
     std::vector<std::string> artefacts;
     std::variant<std::string, std::vector<std::string>, LibPkg::LicenseResult, LibPkg::PackageUpdates, BuildPreparation, BuildProgress,
@@ -251,22 +258,22 @@ private:
     std::unique_ptr<InternalBuildAction> m_internalBuildAction;
 };
 
-inline bool BuildAction::isScheduled() const
+inline bool BuildActionBase::isScheduled() const
 {
     return status == BuildActionStatus::Created || status == BuildActionStatus::AwaitingConfirmation;
 }
 
-inline bool BuildAction::isExecuting() const
+inline bool BuildActionBase::isExecuting() const
 {
     return status == BuildActionStatus::Enqueued || status == BuildActionStatus::Running;
 }
 
-inline bool BuildAction::isDone() const
+inline bool BuildActionBase::isDone() const
 {
     return status == BuildActionStatus::Finished;
 }
 
-inline bool BuildAction::hasSucceeded() const
+inline bool BuildActionBase::hasSucceeded() const
 {
     return isDone() && result == BuildActionResult::Success;
 }
@@ -330,44 +337,6 @@ template <typename... Args> inline void BuildAction::appendOutput(CppUtilities::
 {
     appendOutput(std::move(CppUtilities::argsToString(CppUtilities::EscapeCodes::formattedPhraseString(phrase), std::forward<Args>(args)...)));
 }
-
-struct LIBREPOMGR_EXPORT BuildActionBasicInfo : public ReflectiveRapidJSON::JsonSerializable<BuildActionBasicInfo> {
-    explicit BuildActionBasicInfo(const BuildAction &buildAction)
-        : id(buildAction.id)
-        , taskName(buildAction.taskName)
-        , templateName(buildAction.templateName)
-        , directory(buildAction.directory)
-        , packageNames(buildAction.packageNames)
-        , sourceDbs(buildAction.sourceDbs)
-        , destinationDbs(buildAction.destinationDbs)
-        , startAfter(buildAction.startAfter)
-        , settings(buildAction.settings)
-        , flags(buildAction.flags)
-        , type(buildAction.type)
-        , status(buildAction.status)
-        , result(buildAction.result)
-        , created(buildAction.created)
-        , started(buildAction.started)
-        , finished(buildAction.finished)
-    {
-    }
-
-    const BuildAction::IdType id;
-    const std::string &taskName;
-    const std::string &templateName;
-    const std::string &directory;
-    const std::vector<std::string> &packageNames;
-    const std::vector<std::string> &sourceDbs, &destinationDbs;
-    const std::vector<BuildAction::IdType> &startAfter;
-    const std::unordered_map<std::string, std::string> settings;
-    const BuildActionFlagType flags = noBuildActionFlags;
-    const BuildActionType type;
-    const BuildActionStatus status;
-    const BuildActionResult result;
-    const CppUtilities::DateTime created;
-    const CppUtilities::DateTime started;
-    const CppUtilities::DateTime finished;
-};
 
 } // namespace LibRepoMgr
 

@@ -145,9 +145,10 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::size_t buildActionCount();
         std::size_t runningBuildActionCount() const;
         void rebuildDb();
-        void forEachBuildAction(std::function<void(std::size_t)> count, std::function<bool(LibPkg::StorageID, BuildAction &&)> &&func,
-            std::size_t limit, std::size_t start);
-        void forEachBuildAction(std::function<bool(LibPkg::StorageID, BuildAction &, bool &)> &&func);
+        using BuildActionVisitorBase = std::function<bool(LibPkg::StorageID, BuildActionBase &&)>;
+        void forEachBuildAction(std::function<void(std::size_t)> count, BuildActionVisitorBase &&func, std::size_t limit, std::size_t start);
+        using BuildActionVisitorWriteable = std::function<bool(LibPkg::StorageID, BuildAction &, bool &)>;
+        void forEachBuildAction(BuildActionVisitorWriteable &&func);
         std::vector<std::shared_ptr<BuildAction>> followUpBuildActions(BuildActionIdType forId);
 
     private:

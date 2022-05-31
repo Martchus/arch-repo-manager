@@ -198,7 +198,7 @@ bool InternalBuildAction::reportAbortedIfAborted()
 }
 
 BuildAction::BuildAction(IdType id, ServiceSetup *setup) noexcept
-    : id(id)
+    : BuildActionBase(id)
     , m_log(this)
     , m_setup(setup)
     , m_stopHandler(std::bind(&BuildAction::terminateOngoingBuildProcesses, this))

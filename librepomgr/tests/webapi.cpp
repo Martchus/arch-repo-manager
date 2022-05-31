@@ -267,7 +267,7 @@ void WebAPITests::testPostingBuildActionsFromTask()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions actually present", 5_st, building.buildActionCount());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions not started yet", 0_st, building.runningBuildActionCount());
     building.forEachBuildAction([](std::size_t count) { CPPUNIT_ASSERT_EQUAL_MESSAGE("for-each loop returns correct size", 5_st, count); },
-        [](LibPkg::StorageID id, BuildAction &&action) {
+        [](LibPkg::StorageID id, BuildActionBase &&action) {
             CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action.id, " not started yet"), BuildActionStatus::Created, action.status);
             CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action.id, " has no result yet"), BuildActionResult::None, action.result);
             CPPUNIT_ASSERT_EQUAL_MESSAGE(argsToString("build action ", action.id, " has task name assigned"), "foobarbaz"s, action.taskName);

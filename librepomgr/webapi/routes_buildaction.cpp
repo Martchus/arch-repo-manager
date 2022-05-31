@@ -36,8 +36,8 @@ void getBuildActions(const Params &params, ResponseHandler &&handler)
     auto buildActionLock = params.setup.building.lockToRead();
     params.setup.building.forEachBuildAction(
         [&array, &jsonDoc](std::size_t count) { array.Reserve(ReflectiveRapidJSON::JsonReflector::rapidJsonSize(count), jsonDoc.GetAllocator()); },
-        [&array, &jsonDoc, limit](LibPkg::StorageID, BuildAction &&buildAction) {
-            ReflectiveRapidJSON::JsonReflector::push(BuildActionBasicInfo(buildAction), array, jsonDoc.GetAllocator());
+        [&array, &jsonDoc, limit](LibPkg::StorageID, BuildActionBase &&buildActionBase) {
+            ReflectiveRapidJSON::JsonReflector::push(buildActionBase, array, jsonDoc.GetAllocator());
             return array.Size() >= limit;
         },
         limit, start);
