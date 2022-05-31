@@ -470,7 +470,7 @@ void CheckForProblems::run()
                             .desc = "signature file for package \"" % package->packageInfo->fileName + "\" not present", .pkg = package->name });
                     }
                 }
-                if (package->packageInfo->arch == "any" && (!package->libdepends.empty() || !package->libprovides.empty())) {
+                if (package->arch == "any" && (!package->libdepends.empty() || !package->libprovides.empty())) {
                     auto crossOnly = true;
                     for (const auto &libnames : { package->libdepends, package->libprovides }) {
                         for (const auto &libname : libnames) {

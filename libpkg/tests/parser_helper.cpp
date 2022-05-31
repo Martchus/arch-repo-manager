@@ -33,7 +33,7 @@ void checkHarfbuzzPackage(const Package &pkg)
     CPPUNIT_ASSERT_MESSAGE("package info present"s, pkg.packageInfo);
     CPPUNIT_ASSERT_MESSAGE("no source archs present"s, pkg.sourceInfo->archs.empty());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package arch"s, "Martchus <@.net>"s, pkg.packageInfo->packager);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("packer"s, "any"s, pkg.packageInfo->arch);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("packer"s, "any"s, pkg.arch);
     const vector<Dependency> makeDependencies = {
         Dependency("mingw-w64-configure"s),
         Dependency("mingw-w64-cairo"s),
@@ -81,7 +81,7 @@ void checkAutoconfPackage(const Package &pkg)
     CPPUNIT_ASSERT_MESSAGE("package info present"s, pkg.packageInfo);
     CPPUNIT_ASSERT_MESSAGE("no source archs present"s, pkg.sourceInfo->archs.empty());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("packer"s, "Allan McRae <allan@archlinux.org>"s, pkg.packageInfo->packager);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("package arch"s, "any"s, pkg.packageInfo->arch);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package arch"s, "any"s, pkg.arch);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package file name"s, "autoconf-2.69-4-any.pkg.tar.xz"s, pkg.packageInfo->fileName);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package build date"s, 636089958990000000ul, pkg.packageInfo->buildDate.totalTicks());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package files"s, 74ul, pkg.packageInfo->files.size());

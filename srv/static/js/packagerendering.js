@@ -69,7 +69,7 @@ export function renderDependency(mode, value)
 }
 
 const labelsWithoutBasics = ['Architecture', 'Repository', 'Description', 'Upstream URL', 'License(s)', 'Groups', 'Package size', 'Installed size', 'Packager', 'Build date', 'Dependencies', 'Optional dependencies', 'Make dependencies', 'Check dependencies', 'Provides', 'Replaces', 'Conflicts', 'Contained libraries', 'Needed libraries', 'Files'];
-const fieldsWithoutBasics = ['packageInfo.arch', 'db', 'description', 'upstreamUrl', 'licenses', 'groups', 'packageInfo.size', 'installInfo.installedSize', 'packageInfo.packager', 'packageInfo.buildDate', 'dependencies', 'optionalDependencies', 'sourceInfo.makeDependencies', 'sourceInfo.checkDependencies', 'provides', 'replaces', 'conflicts', 'libprovides', 'libdepends', 'packageInfo.files'];
+const fieldsWithoutBasics = ['arch', 'db', 'description', 'upstreamUrl', 'licenses', 'groups', 'packageInfo.size', 'installInfo.installedSize', 'packageInfo.packager', 'packageInfo.buildDate', 'dependencies', 'optionalDependencies', 'sourceInfo.makeDependencies', 'sourceInfo.checkDependencies', 'provides', 'replaces', 'conflicts', 'libprovides', 'libdepends', 'packageInfo.files'];
 const labelsWithBasics = ['Name', 'Version', ...labelsWithoutBasics];
 const fieldsWithBasics = ['name', 'version', ...fieldsWithoutBasics];
 

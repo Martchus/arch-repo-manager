@@ -234,7 +234,7 @@ static void addPackageInfo(Package &package, PackageVersion &version, const char
         if (isPackageInfo) {
             // add as binary arch when parsing PKGINFO
             ensure_pkg_info;
-            package.packageInfo->arch = valueString;
+            package.arch = valueString;
         } else if (!packageCount) {
             // add to sourceInfo when still parsing base info
             package.sourceInfo->archs.emplace_back(value, valueSize);
@@ -319,7 +319,7 @@ static void addPackageDescription(Package &package, const char *field, size_t fi
     }
     else_if_field("ARCH")
     {
-        package.packageInfo->arch = valueString;
+        package.arch = valueString;
     }
     else_if_field("LICENSE")
     {
@@ -934,10 +934,10 @@ std::shared_ptr<Package> Package::fromPkgFileName(std::string_view fileName)
     pkg->origin = PackageOrigin::PackageFileName;
     pkg->name = name;
     pkg->version = version;
+    pkg->arch = arch;
     pkg->provides.emplace_back(pkg->name, pkg->version);
     pkg->packageInfo = std::make_optional<PackageInfo>();
     pkg->packageInfo->fileName = fileName;
-    pkg->packageInfo->arch = arch;
     return pkg;
 }
 

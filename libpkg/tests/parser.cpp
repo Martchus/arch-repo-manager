@@ -280,7 +280,7 @@ void ParserTests::testParsingPkgName()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::PackageFileName, pkg->origin);
     CPPUNIT_ASSERT_EQUAL("texlive-localmanager-git"s, pkg->name);
     CPPUNIT_ASSERT_EQUAL("0.4.6.r0.gd71966e-1"s, pkg->version);
-    CPPUNIT_ASSERT_EQUAL("any"s, pkg->packageInfo->arch);
+    CPPUNIT_ASSERT_EQUAL("any"s, pkg->arch);
 }
 
 void ParserTests::testExtractingPkgFile()

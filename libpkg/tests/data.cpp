@@ -273,10 +273,9 @@ void DataTests::testComputingFileName()
     auto pkg = Package();
     pkg.name = "test";
     pkg.version = "1.2-3";
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("packageInfo required for computing filename", string(), pkg.computeFileName());
-    pkg.packageInfo = std::make_optional<PackageInfo>();
-    pkg.packageInfo->arch = "x86_64";
+    pkg.arch = "x86_64";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("file name computed from name, version and arch", "test-1.2-3-x86_64.pkg.tar.zst"s, pkg.computeFileName());
+    pkg.packageInfo = std::make_optional<PackageInfo>();
     pkg.packageInfo->fileName = "explicitly-specified-filename";
     CPPUNIT_ASSERT_EQUAL_MESSAGE("explicitly specified filename returned", "explicitly-specified-filename"s, pkg.computeFileName());
 }

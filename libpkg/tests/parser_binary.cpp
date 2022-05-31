@@ -104,7 +104,7 @@ void BinaryParserTests::testParsingElfFromPkgFile()
     const auto pkgFilePath3 = testFilePath("perl/perl-linux-desktopfiles-0.22-2-any.pkg.tar.xz");
     const auto package3 = Package::fromPkgFile(pkgFilePath3);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::PackageContents, package3->origin);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "any"s, package3->packageInfo->arch);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "any"s, package3->arch);
     const unordered_set<Dependency> expectedPerlDependencies{
         Dependency("perl", "5.28", DependencyMode::GreatherEqual), // because contained module built against Perl 5.28
         Dependency("perl", "5.29", DependencyMode::LessThan), // because contained module built against Perl 5.28
@@ -120,7 +120,7 @@ void BinaryParserTests::testParsingElfFromPkgFile()
     const auto pkgFilePath4 = testFilePath("python/sphinxbase-5prealpha-7-i686.pkg.tar.xz");
     const auto package4 = Package::fromPkgFile(pkgFilePath4);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", PackageOrigin::PackageContents, package4->origin);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "i686"s, package4->packageInfo->arch);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "i686"s, package4->arch);
     const unordered_set<Dependency> expectedPythonDependencies{
         Dependency("libpulse"), // from PKGBUILD
         Dependency("lapack"), // from PKGBUILD

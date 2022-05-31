@@ -322,13 +322,10 @@ std::string PackageVersion::toString() const
  */
 string LibPkg::Package::computeFileName(const char *extension) const
 {
-    if (!packageInfo) {
-        return string();
-    }
-    if (!packageInfo->fileName.empty()) {
+    if (packageInfo && !packageInfo->fileName.empty()) {
         return packageInfo->fileName;
     }
-    return argsToString(name, '-', version, '-', packageInfo->arch, '.', extension);
+    return argsToString(name, '-', version, '-', arch, '.', extension);
 }
 
 string LibPkg::PackageBase::computeRegularPackageName() const

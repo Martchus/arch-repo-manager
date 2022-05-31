@@ -101,8 +101,8 @@ static void printPackageSearchResults(const LibRepoMgr::WebClient::Response::bod
     for (const auto &[db, package, packageID] : packages) {
         const auto &dbInfo = std::get<LibPkg::DatabaseInfo>(db);
         t.add_row(
-            { package->packageInfo ? package->packageInfo->arch : dbInfo.arch, dbInfo.name, package->name, package->version, package->description,
-                package->packageInfo && !package->packageInfo->buildDate.isNull() ? package->packageInfo->buildDate.toString() : "?" });
+            { package->packageInfo ? package->arch : dbInfo.arch, dbInfo.name, package->name, package->version, package->description,
+                package->packageInfo && !package->buildDate.isNull() ? package->packageInfo->buildDate.toString() : "?" });
     }
     t.row(0).format().font_align(tabulate::FontAlign::center).font_style({ tabulate::FontStyle::bold });
     configureColumnWidths(t);
@@ -135,7 +135,7 @@ static void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type
         tabulate::Table t;
         t.format().hide_border();
         if (pkg->packageInfo) {
-            t.add_row({ "Arch", pkg->packageInfo->arch });
+            t.add_row({ "Arch", pkg->arch });
         } else if (!pkg->archs.empty()) {
             t.add_row({ "Archs", formatList(pkg->archs) });
         } else if (pkg->sourceInfo) {

@@ -233,7 +233,6 @@ struct LIBPKG_EXPORT PackageInfo : public ReflectiveRapidJSON::JsonSerializable<
     std::string md5;
     std::string sha256;
     std::string pgpSignature;
-    std::string arch; // arch of concrete binary package
     std::uint32_t size = 0;
     bool operator==(const PackageInfo &other) const = default;
 };
