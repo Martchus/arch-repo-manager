@@ -171,7 +171,9 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     void packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByName &visitor);
     void packagesByName(const DatabaseVisitor &databaseVisitor, const PackageVisitorByNameBase &visitor);
     void providingPackages(const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor);
+    void providingPackagesBase(const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorBase &visitor);
     void providingPackages(const std::string &libraryName, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor);
+    void providingPackagesBase(const std::string &libraryName, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorBase &visitor);
 
     std::vector<Database> databases;
     Database aur = Database("aur");

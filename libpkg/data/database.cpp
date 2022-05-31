@@ -358,6 +358,34 @@ void Database::providingPackages(const Dependency &dependency, bool reverse, con
     }
 }
 
+void Database::providingPackagesBase(const Dependency &dependency, bool reverse, const PackageVisitorBase &visitor)
+{
+    if (dependency.name.empty()) {
+        return;
+    }
+    auto providesTxn = (reverse ? m_storage->requiredDeps : m_storage->providedDeps).getROTransaction();
+    auto packagesTxn = m_storage->packages.getROTransaction();
+    auto package = std::shared_ptr<PackageBase>();
+    for (auto [i, end] = providesTxn.equal_range<0>(dependency.name); i != end; ++i) {
+        const auto &providedDependency = i.value();
+        const auto &asDependency = static_cast<const Dependency &>(providedDependency);
+        if (!Dependency::matches(dependency.mode, dependency.version, asDependency.version)) {
+            continue;
+        }
+        for (const auto packageID : providedDependency.relevantPackages) {
+            if (!package) {
+                package = std::make_shared<PackageBase>();
+            } else {
+                package->clear();
+            }
+            ;
+            if (packagesTxn.get<PackageBase>(packageID, *package) && visitor(packageID, std::move(package))) {
+                return;
+            }
+        }
+    }
+}
+
 void Database::providingPackages(const std::string &libraryName, bool reverse, const PackageVisitorConst &visitor)
 {
     if (libraryName.empty()) {
@@ -369,6 +397,23 @@ void Database::providingPackages(const std::string &libraryName, bool reverse, c
         for (const auto packageID : i->relevantPackages) {
             auto res = m_storage->packageCache.retrieve(*m_storage, &packagesTxn, packageID);
             if (res.pkg && visitor(packageID, res.pkg)) {
+                return;
+            }
+        }
+    }
+}
+
+void Database::providingPackagesBase(const std::string &libraryName, bool reverse, const PackageVisitorBase &visitor)
+{
+    if (libraryName.empty()) {
+        return;
+    }
+    auto providesTxn = (reverse ? m_storage->requiredLibs : m_storage->providedLibs).getROTransaction();
+    auto packagesTxn = m_storage->packages.getROTransaction();
+    auto package = std::shared_ptr<PackageBase>();
+    for (auto [i, end] = providesTxn.equal_range<0>(libraryName); i != end; ++i) {
+        for (const auto packageID : i->relevantPackages) {
+            if (packagesTxn.get<PackageBase>(packageID, *package) && visitor(packageID, std::move(package))) {
                 return;
             }
         }

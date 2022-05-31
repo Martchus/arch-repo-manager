@@ -227,7 +227,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         const auto dbIterator = dbs.find(db.name);
         return dbIterator == dbs.end() || dbIterator->second.find(db.arch) == dbIterator->second.end();
     });
-    const auto pushPackage = LibPkg::Config::PackageVisitorBase([&array, &document, &limit](Database &db, LibPkg::StorageID id, const std::shared_ptr<PackageBase> &pkg) {
+    const auto pushSharedBasePackage = LibPkg::Config::PackageVisitorBase([&array, &document, &limit](Database &db, LibPkg::StorageID id, const std::shared_ptr<PackageBase> &pkg) {
               ReflectiveRapidJSON::JsonReflector::push(LibPkg::PackageBaseSearchResult(db, *pkg, id), array, document.GetAllocator());
               return array.Size() >= limit;
           });
@@ -267,7 +267,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 if (details) {
                     params.setup.config.packages(dbName, dbArch, packageNameStr, visitDb, pushPackageDetails);
                 } else {
-                    params.setup.config.packages(dbName, dbArch, packageNameStr, visitDb, pushPackage);
+                    params.setup.config.packages(dbName, dbArch, packageNameStr, visitDb, pushSharedBasePackage);
                 }
             }
             break;
@@ -320,11 +320,11 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         }
         case Mode::Provides:
         case Mode::Depends:
-            params.setup.config.providingPackages(Dependency::fromString(name), mode == Mode::Depends, visitDb, pushPackage);
+            params.setup.config.providingPackagesBase(Dependency::fromString(name), mode == Mode::Depends, visitDb, pushSharedBasePackage);
             break;
         case Mode::LibProvides:
         case Mode::LibDepends:
-            params.setup.config.providingPackages(name, mode == Mode::LibDepends, visitDb, pushPackage);
+            params.setup.config.providingPackagesBase(name, mode == Mode::LibDepends, visitDb, pushSharedBasePackage);
             break;
         default:;
         }

@@ -258,6 +258,19 @@ void Config::providingPackages(const Dependency &dependency, bool reverse, const
     }
 }
 
+void Config::providingPackagesBase(const Dependency &dependency, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorBase &visitor)
+{
+    for (auto &db : databases) {
+        if (databaseVisitor && databaseVisitor(db)) {
+            continue;
+        }
+        auto visited = std::unordered_set<LibPkg::StorageID>();
+        db.providingPackagesBase(dependency, reverse, [&](StorageID packageID, std::shared_ptr<PackageBase> &&package) {
+            return visited.emplace(packageID).second ? visitor(db, packageID, std::move(package)) : false;
+        });
+    }
+}
+
 void Config::providingPackages(
     const std::string &libraryName, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorConst &visitor)
 {
@@ -268,6 +281,20 @@ void Config::providingPackages(
         auto visited = std::unordered_set<LibPkg::StorageID>();
         db.providingPackages(libraryName, reverse, [&](StorageID packageID, const std::shared_ptr<Package> &package) {
             return visited.emplace(packageID).second ? visitor(db, packageID, package) : false;
+        });
+    }
+}
+
+void Config::providingPackagesBase(
+    const std::string &libraryName, bool reverse, const DatabaseVisitor &databaseVisitor, const PackageVisitorBase &visitor)
+{
+    for (auto &db : databases) {
+        if (databaseVisitor && databaseVisitor(db)) {
+            continue;
+        }
+        auto visited = std::unordered_set<LibPkg::StorageID>();
+        db.providingPackagesBase(libraryName, reverse, [&](StorageID packageID, std::shared_ptr<PackageBase> &&package) {
+            return visited.emplace(packageID).second ? visitor(db, packageID, std::move(package)) : false;
         });
     }
 }

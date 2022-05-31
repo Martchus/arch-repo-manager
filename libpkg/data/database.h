@@ -174,7 +174,9 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     void allPackagesByName(const PackageVisitorByNameBase &visitor);
     std::size_t packageCount() const;
     void providingPackages(const Dependency &dependency, bool reverse, const PackageVisitorConst &visitor);
+    void providingPackagesBase(const Dependency &dependency, bool reverse, const PackageVisitorBase &visitor);
     void providingPackages(const std::string &libraryName, bool reverse, const PackageVisitorConst &visitor);
+    void providingPackagesBase(const std::string &libraryName, bool reverse, const PackageVisitorBase &visitor);
     bool provides(const Dependency &dependency, bool reverse = false) const;
     bool provides(const std::string &libraryName, bool reverse = false) const;
     std::shared_ptr<Package> findPackage(StorageID packageID);
