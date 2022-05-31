@@ -120,7 +120,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::string makepkgConfigFilePath; // FIXME: not useful after all?; using config-$arch directory within chrootDir instead
         std::vector<std::string> makechrootpkgFlags;
         std::vector<std::string> makepkgFlags;
-        std::string packageCacheDir;
+        std::string packageCacheDir; // cache dir *without* architecture sub-folder (which is automatically added as needed)
         std::uint64_t packageDownloadSizeLimit = 500 * 1024 * 1024;
         std::string testFilesDir;
         BuildPresets presets;

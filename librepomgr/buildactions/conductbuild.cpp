@@ -342,6 +342,9 @@ void ConductBuild::run()
     }
     setupReadLock.unlock();
 
+    // use arch-specific sub-directory within cache dir
+    m_globalPackageCacheDir = m_globalPackageCacheDir % '/' + m_buildPreparation.targetArch;
+
     // fill omitted build progress configuration with defaults from global config
     if (m_autoStaging && m_buildPreparation.stagingDb.empty()) {
         reportError("Auto-staging is enabled but no staging database has been specified in build-preparation.json.");
@@ -559,8 +562,7 @@ void ConductBuild::makePacmanConfigFile(
         section.fields.erase(
             std::remove_if(section.fields.begin(), section.fields.end(), [](const AdvancedIniFile::Field &field) { return field.key == "CacheDir"; }),
             section.fields.end());
-        section.fields.emplace_back(
-            AdvancedIniFile::Field{ .key = "CacheDir", .value = m_globalPackageCacheDir % '/' + m_buildPreparation.targetArch });
+        section.fields.emplace_back(AdvancedIniFile::Field{ .key = "CacheDir", .value = m_globalPackageCacheDir });
         auto archField = section.findField("Architecture");
         if (archField == section.fieldEnd()) {
             throw std::runtime_error("pacman.conf lacks Architecture option");

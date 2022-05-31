@@ -124,6 +124,7 @@ void BuildActionsTests::loadBasicTestSetup()
     m_setup.building.repoAddPath = std::filesystem::absolute(testFilePath("scripts/fake_repo_add.sh"));
     m_setup.building.gpgPath = std::filesystem::absolute(testFilePath("scripts/fake_gpg.sh"));
     m_setup.building.defaultGpgKey = "1234567890";
+    m_setup.building.packageCacheDir = m_setup.building.workingDirectory + "/test-cache-dir";
     m_setup.configFilePath = std::filesystem::absolute(testFilePath("test-config/server.conf"));
 
     std::filesystem::remove_all(m_setup.workingDirectory);
@@ -536,7 +537,8 @@ void BuildActionsTests::testConductingBuild()
         readFile("building/build-data/conduct-build-test/boost/pkg/download.log"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "no staging needed: updpkgsums log", "fake updatepkgsums: \n"s, readFile("building/build-data/conduct-build-test/boost/pkg/updpkgsums.log"));
-    TESTUTILS_ASSERT_LIKE("no staging needed: build log", "fake makechrootpkg: -c -u -C  -r .*chroot-dir/arch-x86_64 -l buildservice --\n"s,
+    TESTUTILS_ASSERT_LIKE("no staging needed: build log",
+        "fake makechrootpkg: -c -u -C .*building/test-cache-dir/x86_64 -r .*chroot-dir/arch-x86_64 -l buildservice --\n"s,
         readFile("building/build-data/conduct-build-test/boost/pkg/build.log"));
     TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
         "fake repo-add: boost.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
