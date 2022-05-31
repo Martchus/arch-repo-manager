@@ -262,7 +262,7 @@ void WebAPITests::testPostingBuildActionsFromTask()
     CPPUNIT_ASSERT_MESSAGE("got response", response);
 
     const auto buildActions = parseBuildActions(response->body());
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("expected number of build actions created", 5_st, buildActions.size());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("expected number of build actions provided as response", 5_st, buildActions.size());
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions actually present", 5_st, building.buildActionCount());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("build actions not started yet", 0_st, building.runningBuildActionCount());
