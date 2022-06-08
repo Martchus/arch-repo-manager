@@ -285,8 +285,9 @@ static void addPackageInfo(Package &package, PackageVersion &version, const char
     }
     else_if_field("builddate")
     {
+        package.buildDate = DateTime::fromTimeStampGmt(stringToNumber<std::time_t>(valueString));
         ensure_pkg_info;
-        package.packageInfo->buildDate = DateTime::fromTimeStampGmt(stringToNumber<std::time_t>(valueString));
+        package.packageInfo->buildDate = package.buildDate;
     }
     else_if_field("packager")
     {
@@ -355,7 +356,7 @@ static void addPackageDescription(Package &package, const char *field, size_t fi
     }
     else_if_field("BUILDDATE")
     {
-        package.packageInfo->buildDate = DateTime::fromTimeStampGmt(stringToNumber<time_t>(valueString));
+        package.buildDate = package.packageInfo->buildDate = DateTime::fromTimeStampGmt(stringToNumber<time_t>(valueString));
     }
     else_if_field("INSTALLDATE")
     {

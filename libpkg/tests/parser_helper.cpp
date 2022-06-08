@@ -83,7 +83,7 @@ void checkAutoconfPackage(const Package &pkg)
     CPPUNIT_ASSERT_EQUAL_MESSAGE("packer"s, "Allan McRae <allan@archlinux.org>"s, pkg.packageInfo->packager);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package arch"s, "any"s, pkg.arch);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package file name"s, "autoconf-2.69-4-any.pkg.tar.xz"s, pkg.packageInfo->fileName);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("package build date"s, 636089958990000000ul, pkg.packageInfo->buildDate.totalTicks());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package build date"s, 636089958990000000ul, pkg.buildDate.totalTicks());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package files"s, 74ul, pkg.packageInfo->files.size());
     CPPUNIT_ASSERT_EQUAL("usr/"s, pkg.packageInfo->files.front());
     const vector<Dependency> makeDependencies = { Dependency("help2man"s) };

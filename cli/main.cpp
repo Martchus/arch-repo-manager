@@ -100,8 +100,8 @@ static void printPackageSearchResults(const LibRepoMgr::WebClient::Response::bod
     t.add_row({ "Arch", "Repo", "Name", "Version", "Description", "Build date" });
     for (const auto &[db, package, packageID] : packages) {
         const auto &dbInfo = std::get<LibPkg::DatabaseInfo>(db);
-        t.add_row({ package->packageInfo ? package->arch : dbInfo.arch, dbInfo.name, package->name, package->version, package->description,
-            package->packageInfo && !package->buildDate.isNull() ? package->packageInfo->buildDate.toString() : "?" });
+        t.add_row({ !package->arch.empty() ? package->arch : dbInfo.arch, dbInfo.name, package->name, package->version, package->description,
+            !package->buildDate.isNull() ? package->buildDate.toString() : "?" });
     }
     t.row(0).format().font_align(tabulate::FontAlign::center).font_style({ tabulate::FontStyle::bold });
     configureColumnWidths(t);
@@ -154,9 +154,9 @@ static void printPackageDetails(const LibRepoMgr::WebClient::Response::body_type
             if (!pkg->packageInfo->packager.empty()) {
                 t.add_row({ "Packager", pkg->packageInfo->packager });
             }
-            if (!pkg->packageInfo->buildDate.isNull()) {
-                t.add_row({ "Packager", pkg->packageInfo->buildDate.toString() });
-            }
+        }
+        if (!pkg->buildDate.isNull()) {
+            t.add_row({ "Build date", pkg->buildDate.toString() });
         }
         t.add_row({ "Dependencies", formatDependencies(pkg->dependencies) });
         t.add_row({ "Optional dependencies", formatDependencies(pkg->optionalDependencies) });

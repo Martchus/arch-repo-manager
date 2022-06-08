@@ -377,8 +377,7 @@ bool Package::addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bo
     if (!force
         && ((otherPackage.origin != PackageOrigin::PackageContents && otherPackage.origin != PackageOrigin::CustomSource)
             || version != otherPackage.version
-            || !(!packageInfo || packageInfo->buildDate.isNull()
-                || (otherPackage.packageInfo && packageInfo->buildDate == otherPackage.packageInfo->buildDate)))) {
+            || !(!packageInfo || buildDate.isNull() || (otherPackage.packageInfo && buildDate == otherPackage.buildDate)))) {
         return false;
     }
 

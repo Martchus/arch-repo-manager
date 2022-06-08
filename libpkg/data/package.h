@@ -228,7 +228,7 @@ struct LIBPKG_EXPORT PackageInfo : public ReflectiveRapidJSON::JsonSerializable<
                                    public ReflectiveRapidJSON::BinarySerializable<PackageInfo> {
     std::string fileName;
     std::vector<std::string> files;
-    CppUtilities::DateTime buildDate;
+    /* [[deprecated("redundant with field in PackageBase; remove at some point")]] */ CppUtilities::DateTime buildDate;
     std::string packager;
     std::string md5;
     std::string sha256;
