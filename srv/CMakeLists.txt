@@ -27,6 +27,7 @@ set(CSS_FILES static/css/basics.css static/css/genericrendering.css static/css/l
 set(IMG_FILES
     static/img/logo.svg
     static/img/icon/content-save.svg
+    static/img/icon/chevron-left.svg
     static/img/icon/power.svg
     static/img/icon/play.svg
     static/img/icon/magnify.svg

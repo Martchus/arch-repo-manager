@@ -3,6 +3,10 @@ import * as PackageDetailsPage from './packagedetailspage.js';
 import * as PackageSearchPage from './packagesearchpage.js';
 import * as SinglePage from './singlepage.js';
 
+if (window.location.pathname === '/') {
+    document.getElementById('back-nav-link').style.display = 'none';
+}
+
 SinglePage.initPage({
     'global': {
     },
