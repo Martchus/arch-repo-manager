@@ -10,7 +10,7 @@ export function renderPackageDetailsLink(row)
                                        '#package-details-section?' + encodeURIComponent(row.db + (row.dbArch ? '@' + row.dbArch : '') + '/' + row.name));
 }
 
-const modeTooltip = {provides: 'dependency', requires: 'dependency', libprovides: 'library', librequires: 'library'};
+const modeTooltip = {depends: 'dependency', provides: 'dependency', requires: 'dependency', libdepends: 'library', libprovides: 'library'};
 
 export function renderPackageSearchLink(name, mode, text)
 {
