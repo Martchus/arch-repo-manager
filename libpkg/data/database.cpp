@@ -377,7 +377,7 @@ void Database::providingPackagesBase(const Dependency &dependency, bool reverse,
                 package = std::make_shared<PackageBase>();
             } else {
                 package->clear();
-            };
+            }
             if (packagesTxn.get<PackageBase>(packageID, *package) && visitor(packageID, std::move(package))) {
                 return;
             }
@@ -412,6 +412,11 @@ void Database::providingPackagesBase(const std::string &libraryName, bool revers
     auto package = std::shared_ptr<PackageBase>();
     for (auto [i, end] = providesTxn.equal_range<0>(libraryName); i != end; ++i) {
         for (const auto packageID : i->relevantPackages) {
+            if (!package) {
+                package = std::make_shared<PackageBase>();
+            } else {
+                package->clear();
+            }
             if (packagesTxn.get<PackageBase>(packageID, *package) && visitor(packageID, std::move(package))) {
                 return;
             }
