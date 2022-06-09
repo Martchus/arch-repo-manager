@@ -35,7 +35,7 @@ export function initPackageSearch(sectionElement, sectionData, newParams)
         }
         return true;
     }
-    const searchParams = SinglePageHelper.sections['package-search'].state.params = newParams[0];
+    const searchParams = sectionData.state.params = newParams[0];
     if (currentParams === searchParams) {
         return true;
     }
@@ -60,10 +60,9 @@ function fillBuildActionFromPackageSearch()
 
 function searchForPackagesFromParams(searchParams)
 {
-    const params = new URLSearchParams(searchParams);
     const form = document.getElementById('package-search-form');
     form.reset();
-    params.forEach(function(value, key) {
+    for (const [key, value] of Object.entries(Utils.hashAsObject(searchParams))) {
         const formElement = form[key];
         if (!formElement) {
             return;
@@ -78,7 +77,7 @@ function searchForPackagesFromParams(searchParams)
         } else {
             formElement.value = value;
         }
-    });
+    }
     const res = AjaxHelper.startFormQueryEx('package-search-form', showPackageSearchResults);
     SinglePageHelper.sections['package-search'].state.params = res.params;
     return res;

@@ -9,10 +9,10 @@ export function splitHashParts()
     return hashParts;
 }
 
-export function hashAsObject()
+export function hashAsObject(hash)
 {
     const hashObject = {};
-    location.hash.substr(1).split('&').forEach(function(hashPart) {
+    (hash || location.hash.substr(1)).split('&').forEach(function(hashPart) {
         const parts = hashPart.split('=', 2);
         if (parts.length < 1) {
             return;
