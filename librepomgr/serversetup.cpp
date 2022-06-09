@@ -873,6 +873,7 @@ std::string ServiceSetup::Locks::forDatabase(const LibPkg::Database &db)
 
 ServiceStatus::ServiceStatus(ServiceSetup &setup)
     : version(applicationInfo.version)
+    , url(applicationInfo.url)
     , config(setup.config.computeStatus())
     , actions(setup.building.metaInfo)
     , presets(setup.building.presets)

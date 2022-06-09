@@ -29,6 +29,10 @@ function handleGlobalStatusUpdate(ajaxRequest)
     if (applicationVersion) {
         Utils.getAndEmptyElement('application-version').appendChild(document.createTextNode(applicationVersion));
     }
+    const applicationURL = responseJson.url;
+    if (applicationURL) {
+        document.getElementById('source-code-repo-link').href = applicationURL;
+    }
     const dbStats = responseJson.config.dbStats;
     const dbTable = GenericRendering.renderTableFromJsonArray({
         rows: dbStats,

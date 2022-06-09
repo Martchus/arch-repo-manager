@@ -216,9 +216,10 @@ inline std::pair<ServiceSetup::Locks::LockTable *, std::unique_lock<std::shared_
 }
 
 struct LIBREPOMGR_EXPORT ServiceStatus : public ReflectiveRapidJSON::JsonSerializable<ServiceStatus> {
-    ServiceStatus(ServiceSetup &setup);
+    explicit ServiceStatus(ServiceSetup &setup);
 
     const char *const version = nullptr;
+    const char *const url = nullptr;
     const LibPkg::Status config;
     const BuildActionMetaInfo &actions;
     const BuildPresets &presets;
