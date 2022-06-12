@@ -5,7 +5,7 @@
     background-image: url(../img/icon/chevron-left.svg);
     background-size: contain;
     filter: invert(100%);
-    margin-right: -20px;
+    margin-right: -5px;
 }
 #back-nav-link a {
     margin-right: 0px;
