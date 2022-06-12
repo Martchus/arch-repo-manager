@@ -83,6 +83,7 @@ enum class ConductBuildFlags : BuildActionFlagType {
     SaveChrootOfFailures = (1 << 1),
     UpdateChecksums = (1 << 2),
     AutoStaging = (1 << 3),
+    UseContainer = (1 << 4),
 };
 enum class CheckForProblemsFlags : BuildActionFlagType {
     None,

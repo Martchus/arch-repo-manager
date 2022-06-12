@@ -592,6 +592,8 @@ private:
         const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeMakechrootpkg(
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, bool hasFailuresInPreviousBatches);
+    InvocationResult invokeMakecontainerpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+        PackageBuildProgress &packageProgress, const std::vector<std::string> &makepkgFlags);
     void addPackageToRepo(
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, PackageBuildProgress &packageProgress);
     void invokeGpg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
@@ -629,6 +631,7 @@ private:
     std::string m_chrootRootUser;
     boost::filesystem::path m_makePkgPath;
     boost::filesystem::path m_makeChrootPkgPath;
+    boost::filesystem::path m_makeContainerPkgPath;
     boost::filesystem::path m_updatePkgSumsPath;
     boost::filesystem::path m_repoAddPath;
     boost::filesystem::path m_gpgPath;
@@ -644,6 +647,7 @@ private:
     bool m_saveChrootDirsOfFailures;
     bool m_updateChecksums;
     bool m_autoStaging;
+    bool m_useContainer;
 };
 
 #ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED

@@ -209,6 +209,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Adds \"breaking\" packages only to the destination DB's staging repsitory and emits a rebuild list",
                     .param = "auto-staging",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(ConductBuildFlags::UseContainer),
+                    .name = "Use container",
+                    .desc = "Builds within a container via `makecontainerpkg` instead of using `makechrootpkg`; eliminates the need to having pacman/devtools and the chroot setup on the build host by using docker/podman instead",
+                    .param = "use-container",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

@@ -154,6 +154,7 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     convertValue(multimap, "ignore_local_pkgbuilds_regex", ignoreLocalPkgbuildsRegex);
     convertValue(multimap, "makepkg_path", makePkgPath);
     convertValue(multimap, "makechrootpkg_path", makeChrootPkgPath);
+    convertValue(multimap, "makecontainerpkg_path", makeContainerPkgPath);
     convertValue(multimap, "updpkgsums_path", updatePkgSumsPath);
     convertValue(multimap, "repo_add_path", repoAddPath);
     convertValue(multimap, "repo_remove_path", repoRemovePath);

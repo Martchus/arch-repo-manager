@@ -107,6 +107,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::regex ignoreLocalPkgbuildsRegex;
         std::string makePkgPath = "makepkg";
         std::string makeChrootPkgPath = "makechrootpkg";
+        std::string makeContainerPkgPath = "makecontainerpkg";
         std::string updatePkgSumsPath = "updpkgsums";
         std::string repoAddPath = "repo-add";
         std::string repoRemovePath = "repo-remove";

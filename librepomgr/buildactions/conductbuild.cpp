@@ -183,6 +183,7 @@ ConductBuild::ConductBuild(ServiceSetup &setup, const std::shared_ptr<BuildActio
     , m_saveChrootDirsOfFailures(false)
     , m_updateChecksums(false)
     , m_autoStaging(false)
+    , m_useContainer(false)
 {
 }
 
@@ -222,6 +223,7 @@ void ConductBuild::run()
     m_saveChrootDirsOfFailures = flags & ConductBuildFlags::SaveChrootOfFailures;
     m_updateChecksums = flags & ConductBuildFlags::UpdateChecksums;
     m_autoStaging = flags & ConductBuildFlags::AutoStaging;
+    m_useContainer = flags & ConductBuildFlags::UseContainer;
     auto &metaInfo = m_setup.building.metaInfo;
     auto metaInfoLock = metaInfo.lockToRead();
     const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::ConductBuild);
@@ -240,21 +242,32 @@ void ConductBuild::run()
     m_gpgKey = findSetting(gpgKeySetting);
     auto setupReadLock = m_setup.lockToRead();
     m_workingDirectory = determineWorkingDirectory(buildDataWorkingDirectory);
-    m_makePkgPath = findExecutable(m_setup.building.makePkgPath);
-    m_makeChrootPkgPath = findExecutable(m_setup.building.makeChrootPkgPath);
+    if (m_useContainer) {
+        m_makeContainerPkgPath = findExecutable(m_setup.building.makeContainerPkgPath);
+    } else {
+        m_makePkgPath = findExecutable(m_setup.building.makePkgPath);
+        m_makeChrootPkgPath = findExecutable(m_setup.building.makeChrootPkgPath);
+    }
     m_updatePkgSumsPath = findExecutable(m_setup.building.updatePkgSumsPath);
     m_repoAddPath = findExecutable(m_setup.building.repoAddPath);
     m_gpgPath = findExecutable(m_setup.building.gpgPath);
     setupReadLock.unlock();
 
     // check executables
-    if (!checkExecutable(m_makePkgPath)) {
-        reportError("Unable to find makepkg executable \"" % m_setup.building.makePkgPath + "\" in PATH.");
-        return;
-    }
-    if (!checkExecutable(m_makeChrootPkgPath)) {
-        reportError("Unable to find makechrootpkg executable \"" % m_setup.building.makeChrootPkgPath + "\" in PATH.");
-        return;
+    if (m_useContainer) {
+        if (!checkExecutable(m_makeContainerPkgPath)) {
+            reportError("Unable to find makecontainerpkg executable \"" % m_setup.building.makeContainerPkgPath + "\" in PATH.");
+            return;
+        }
+    } else {
+        if (!checkExecutable(m_makePkgPath)) {
+            reportError("Unable to find makepkg executable \"" % m_setup.building.makePkgPath + "\" in PATH.");
+            return;
+        }
+        if (!checkExecutable(m_makeChrootPkgPath)) {
+            reportError("Unable to find makechrootpkg executable \"" % m_setup.building.makeChrootPkgPath + "\" in PATH.");
+            return;
+        }
     }
     if (!checkExecutable(m_updatePkgSumsPath)) {
         reportError("Unable to find updpkgsums executable \"" % m_setup.building.updatePkgSumsPath + "\" in PATH.");
@@ -562,7 +575,8 @@ void ConductBuild::makePacmanConfigFile(
         section.fields.erase(
             std::remove_if(section.fields.begin(), section.fields.end(), [](const AdvancedIniFile::Field &field) { return field.key == "CacheDir"; }),
             section.fields.end());
-        section.fields.emplace_back(AdvancedIniFile::Field{ .key = "CacheDir", .value = m_globalPackageCacheDir });
+        section.fields.emplace_back(
+            AdvancedIniFile::Field{ .key = "CacheDir", .value = m_useContainer ? "/var/cache/pacman/pkg/" : m_globalPackageCacheDir });
         auto archField = section.findField("Architecture");
         if (archField == section.fieldEnd()) {
             throw std::runtime_error("pacman.conf lacks Architecture option");
@@ -843,7 +857,12 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
     lock.unlock();
     m_buildAction->log()(Phrases::InfoMessage, "Making source package for ", packageName, " via ", m_makePkgPath.string(), '\n',
         ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
-    processSession->launch(boost::process::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+    if (m_useContainer) {
+        processSession->launch(
+            boost::process::start_dir(buildDirectory), m_makeContainerPkgPath, "--", "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+    } else {
+        processSession->launch(boost::process::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+    }
     return InvocationResult::Ok;
 }
 
@@ -897,6 +916,33 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         return InvocationResult::Error;
     }
 
+    // determine options/variables to pass
+    std::vector<std::string> makechrootpkgFlags, makepkgFlags;
+    // -> cleanup/upgrade
+    if (!packageProgress.skipChrootCleanup) {
+        makechrootpkgFlags.emplace_back("-c");
+    }
+    if (!packageProgress.skipChrootUpgrade) {
+        makechrootpkgFlags.emplace_back("-u");
+    }
+    // -> ccache support (see https://wiki.archlinux.org/index.php/Ccache#makechrootpkg)
+    if (!m_globalCcacheDir.empty()) {
+        makechrootpkgFlags.emplace_back("-d");
+        makechrootpkgFlags.emplace_back(m_globalCcacheDir + "/:/ccache");
+        makepkgFlags.emplace_back("CCACHE_DIR=/ccache");
+    }
+    // -> directory for testfiles (required by tagparser and tageditor)
+    if (!m_globalTestFilesDir.empty()) {
+        makechrootpkgFlags.emplace_back("-d");
+        makechrootpkgFlags.emplace_back(m_globalTestFilesDir + "/:/testfiles");
+        makepkgFlags.emplace_back("TEST_FILE_PATH=/testfiles");
+    }
+
+    // invoke makecontainerpkg instead if container-flag set
+    if (m_useContainer) {
+        return invokeMakecontainerpkg(makepkgchrootSession, packageName, packageProgress, makepkgFlags);
+    }
+
     // do some sanity checks with the chroot
     const auto chrootDir = packageProgress.chrootDirectory % "/arch-" + m_buildPreparation.targetArch;
     const auto buildRoot = chrootDir % '/' + m_chrootRootUser;
@@ -923,28 +969,6 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         auto writeLock = lockToWrite(lock);
         packageProgress.error = "Unable to check chroot directory \"" % buildRoot % "\": " + e.what();
         return InvocationResult::Error;
-    }
-
-    // determine options/variables to pass
-    std::vector<std::string> makechrootpkgFlags, makepkgFlags;
-    // -> cleanup/upgrade
-    if (!packageProgress.skipChrootCleanup) {
-        makechrootpkgFlags.emplace_back("-c");
-    }
-    if (!packageProgress.skipChrootUpgrade) {
-        makechrootpkgFlags.emplace_back("-u");
-    }
-    // -> ccache support (see https://wiki.archlinux.org/index.php/Ccache#makechrootpkg)
-    if (!m_globalCcacheDir.empty()) {
-        makechrootpkgFlags.emplace_back("-d");
-        makechrootpkgFlags.emplace_back(m_globalCcacheDir + "/:/ccache");
-        makepkgFlags.emplace_back("CCACHE_DIR=/ccache");
-    }
-    // -> directory for testfiles (required by tagparser and tageditor)
-    if (!m_globalTestFilesDir.empty()) {
-        makechrootpkgFlags.emplace_back("-d");
-        makechrootpkgFlags.emplace_back(m_globalTestFilesDir + "/:/testfiles");
-        makepkgFlags.emplace_back("TEST_FILE_PATH=/testfiles");
     }
 
     // prepare process session
@@ -984,6 +1008,56 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, makechrootpkgFlags, "-C",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
         packageProgress.makepkgFlags);
+    return InvocationResult::Ok;
+}
+
+InvocationResult ConductBuild::invokeMakecontainerpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
+    const std::string &packageName, PackageBuildProgress &packageProgress, const std::vector<std::string> &makepkgFlags)
+{
+    // skip initial checks as this function is only supposed to be called from within invokeMakechrootpkg
+
+    // copy config files into chroot directory
+    try {
+        std::filesystem::copy_file(makepkgchrootSession->isStagingEnabled() ? m_pacmanStagingConfigPath : m_pacmanConfigPath,
+            packageProgress.buildDirectory + "/pacman.conf", std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(
+            m_makepkgConfigPath, packageProgress.buildDirectory + "/makepkg.conf", std::filesystem::copy_options::overwrite_existing);
+    } catch (const std::filesystem::filesystem_error &e) {
+        packageProgress.error = "Unable to copy config files into build directory \"" % packageProgress.buildDirectory % "\": " + e.what();
+        return InvocationResult::Error;
+    }
+
+    // determine options/variables to pass
+    // -> package cache
+    auto makecontainerpkgFlags = std::vector<std::string>();
+    if (!m_globalPackageCacheDir.empty()) {
+        makecontainerpkgFlags.emplace_back("-v");
+        makecontainerpkgFlags.emplace_back(m_globalPackageCacheDir + "/:/var/cache/pacman/pkg/");
+    }
+    // -> ccache support (see https://wiki.archlinux.org/index.php/Ccache#makechrootpkg)
+    if (!m_globalCcacheDir.empty()) {
+        makecontainerpkgFlags.emplace_back("-v");
+        makecontainerpkgFlags.emplace_back(m_globalCcacheDir + "/:/ccache");
+    }
+    // -> directory for testfiles (required by tagparser and tageditor)
+    if (!m_globalTestFilesDir.empty()) {
+        makecontainerpkgFlags.emplace_back("-v");
+        makecontainerpkgFlags.emplace_back(m_globalTestFilesDir + "/:/testfiles");
+    }
+
+    // prepare process session
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
+        std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
+            std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
+    processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
+        std::bind(
+            &ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2)));
+
+    // invoke makechrootpkg to build package
+    m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, " within container via ", m_makeContainerPkgPath.string(), '\n',
+        ps(Phrases::SubMessage), "build dir: ", packageProgress.buildDirectory, '\n');
+    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeContainerPkgPath, makecontainerpkgFlags, "--",
+        makepkgFlags, packageProgress.makepkgFlags);
     return InvocationResult::Ok;
 }
 

@@ -114,9 +114,15 @@ find $local_db_path -type d -exec chmod 775 {} \+
 find $local_db_path -type f -exec chmod 664 {} \+
 ```
 
-### Setting up the chroot for the build
+### Setting up the chroot for the build with `makechrootpkg`
 The overall reasoning and procedure is already outlined
 [in the Wiki](https://wiki.archlinux.org/index.php/DeveloperWiki:Building_in_a_clean_chroot).
+
+Alternatively, one can also skip this section and use
+[`makecontainerpkg`](https://github.com/Martchus/PKGBUILDs#container-image-building-packages-within-a-container=)
+instead (which should work on any environment with an appropriately configured
+container runtime, e.g. a running Docker daemon and `buildservice-git` being
+added to the `docker` group).
 
 I also like to be able to build for other architectures than x86_64 so the server
 expects a directory layout like this:
