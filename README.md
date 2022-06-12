@@ -57,6 +57,8 @@ cp /usr/share/buildservice-git/skel/presets-example.json /etc/buildservice-git/p
 systemctl enable --now buildservice-git.service
 ```
 
+The service will run as user `buildservice-git`.
+
 ### Setting up a working directory
 The server needs a place to temporarily store PKGBUILDs, cache files and other stuff.
 Just create a directory at any place with enough disk space and set the permissions so the
@@ -109,7 +111,7 @@ The server obviously needs write permissions to add packages to repositories. In
 setup I've just add it as group and set permissions accordingly:
 
 ```
-sudo chown -R martchus:buildservice $local_db_path
+sudo chown -R martchus:buildservice-git $local_db_path
 find $local_db_path -type d -exec chmod 775 {} \+
 find $local_db_path -type f -exec chmod 664 {} \+
 ```
@@ -161,7 +163,7 @@ to configure the databases used during the build. It relies on the configuration
 the `config-*` directories for that and needs permissions to update them:
 
 ```
-sudo chown buildservice:buildservice /the/chroot/directory/arch-x86_64/root/etc/{pacman,makepkg}.conf
+sudo chown buildservice-git:buildservice-git /the/chroot/directory/arch-x86_64/root/etc/{pacman,makepkg}.conf
 ```
 
 ### sudo configuration
@@ -170,7 +172,7 @@ server with is allowed to use `sudo`. Currently it is not possible to supply the
 automatically so one has to allow access without password like this:
 
 ```
-buildservice ALL=(ALL) NOPASSWD:ALL
+buildservice-git ALL=(ALL) NOPASSWD:ALL
 ```
 
 ### Sample NGINX config
@@ -220,10 +222,10 @@ configure errors can be confusing. Internally the server is mounting that direct
 described in [the wiki](https://wiki.archlinux.org/index.php/Ccache#makechrootpkg).
 
 If you want to use the existing `ccache` directory owned by your current user, you could do
-the following to grant the `buildservice` user access to it:
+the following to grant the `buildservice-git` user access to it:
 
 1. Add new group for accessing the cache and add the users to it:
-   `sudo groupadd ccache`, `sudo usermod -a -G ccache "$USER"`, `sudo usermod -a -G ccache buildservice`
+   `sudo groupadd ccache`, `sudo usermod -a -G ccache "$USER"`, `sudo usermod -a -G ccache buildservice-git`
 2. Set group ownership: `sudo chown -R $USER:ccache $ccache_dir`
 3. Ensure dirs are readable by the group and that the group is inherited:
    `sudo find "$ccache_dir" -type d -exec chmod 2775 {} \+`
