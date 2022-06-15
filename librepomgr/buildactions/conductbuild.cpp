@@ -23,7 +23,7 @@
 #include <rapidjson/prettywriter.h>
 
 #include <filesystem>
-#include <iostream>
+#include <fstream>
 #include <unordered_set>
 
 #if __has_include(<experimental/unordered_set>)
