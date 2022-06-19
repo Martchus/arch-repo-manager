@@ -4,6 +4,9 @@
 #include "./storageprivate.h"
 
 #include <c++utilities/conversion/stringbuilder.h>
+#include <c++utilities/io/ansiescapecodes.h>
+
+#include <iostream>
 
 using namespace CppUtilities;
 
@@ -289,6 +292,7 @@ DatabaseStorage::DatabaseStorage(const std::shared_ptr<LMDBSafe::MDBEnv> &env, P
     , requiredLibs(env, argsToString(uniqueDatabaseName, "_librequires"))
     , m_env(env)
 {
+    std::cout << EscapeCodes::Phrases::InfoMessage << "Initialized database storage for \"" << uniqueDatabaseName << "\"\n";
 }
 
 std::size_t hash_value(const PackageCacheRef &ref)

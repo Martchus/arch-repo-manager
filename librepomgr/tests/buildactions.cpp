@@ -302,7 +302,7 @@ void BuildActionsTests::testParsingInfoFromPkgFiles()
     initStorage();
     auto &config = m_setup.config;
     for (const auto dbName : { "foo.db"sv, "bar.db"sv, "baz.db"sv }) {
-        config.findOrCreateDatabase(dbName, std::string_view());
+        config.findOrCreateDatabase(dbName, "x86_64"sv);
     }
 
     // init db object
@@ -707,7 +707,7 @@ void BuildActionsTests::testCleanup()
     // parse db
     // note: The db actually only contains source-highlight and mingw-w64-harfbuzz
     initStorage();
-    auto *const miscDb = m_setup.config.findOrCreateDatabase("misc"sv, std::string_view());
+    auto *const miscDb = m_setup.config.findOrCreateDatabase("misc"sv, "x86_64"sv);
     miscDb->path = repoDir64 / "misc.db";
     miscDb->localDbDir = miscDb->localPkgDir = repoDir64;
     miscDb->loadPackagesFromConfiguredPaths();

@@ -185,7 +185,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     SignatureLevelConfig signatureLevel;
 
 private:
-    Database *createDatabase(std::string &&name);
+    Database *createDatabase(std::string &&name, std::string &&architecture);
     bool addDepsRecursivelyInTopoOrder(std::vector<std::unique_ptr<TopoSortItem>> &allItems, std::vector<TopoSortItem *> &items,
         std::vector<std::string> &ignored, std::vector<PackageSearchResult> &cycleTracking, const Dependency &dependency, BuildOrderOptions options,
         bool onlyDependency);

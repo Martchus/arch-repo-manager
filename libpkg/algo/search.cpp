@@ -38,9 +38,10 @@ Database *Config::findDatabaseFromDenotation(std::string_view databaseDenotation
 /*!
  * \brief Creates a database with the specified \a name and appends it to the configuration.
  */
-Database *Config::createDatabase(std::string &&name)
+Database *Config::createDatabase(std::string &&name, std::string &&architecture)
 {
-    auto *const db = &databases.emplace_back(std::string(name));
+    auto *const db = &databases.emplace_back(std::move(name));
+    db->arch = std::move(architecture);
     if (storage()) {
         db->initStorage(*storage());
     }
@@ -56,11 +57,11 @@ Database *Config::findOrCreateDatabase(std::string &&name, std::string_view arch
     auto *db = findDatabase(name, architecture);
     if (db) {
         db->resetConfiguration(keepLocalPaths);
+        if (!architecture.empty()) {
+            db->arch = architecture;
+        }
     } else {
-        db = createDatabase(std::move(name));
-    }
-    if (!architecture.empty()) {
-        db->arch = architecture;
+        db = createDatabase(std::move(name), std::string(architecture));
     }
     return db;
 }
@@ -74,11 +75,11 @@ Database *Config::findOrCreateDatabase(std::string_view name, std::string_view a
     auto *db = findDatabase(name, architecture);
     if (db) {
         db->resetConfiguration(keepLocalPaths);
+        if (!architecture.empty()) {
+            db->arch = architecture;
+        }
     } else {
-        db = createDatabase(std::string(name));
-    }
-    if (!architecture.empty()) {
-        db->arch = architecture;
+        db = createDatabase(std::string(name), std::string(architecture));
     }
     return db;
 }

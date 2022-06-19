@@ -96,11 +96,11 @@ void DataTests::setupPackages()
     m_pkg3 = std::make_shared<Package>();
     m_pkg3->name = "foo";
     m_pkg3->version = "5.7-1";
-    auto *const db1 = m_config.findOrCreateDatabase("db1"sv, std::string_view());
+    auto *const db1 = m_config.findOrCreateDatabase("db1"sv, "x86_64"sv);
     CPPUNIT_ASSERT_MESSAGE("ID for pkg 1 returned", m_pkgId1 = db1->updatePackage(m_pkg1));
     CPPUNIT_ASSERT_MESSAGE("ID for pkg 2 returned", m_pkgId2 = db1->updatePackage(m_pkg2));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("packages added to db 1", 2_st, db1->packageCount());
-    auto *const db2 = m_config.findOrCreateDatabase("db2"sv, std::string_view());
+    auto *const db2 = m_config.findOrCreateDatabase("db2"sv, "x86_64"sv);
     CPPUNIT_ASSERT_MESSAGE("ID for pkg 3 returned", m_pkgId3 = db2->updatePackage(m_pkg3));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package added to db 2", 1_st, db2->packageCount());
 }
