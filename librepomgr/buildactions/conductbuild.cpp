@@ -971,16 +971,6 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         return InvocationResult::Error;
     }
 
-    // prepare process session
-    auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
-        std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
-            std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
-    processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
-        std::bind(
-            &ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2)));
-    processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "\n", std::string_view(),
-        [processSession = processSession.get()](BufferSearch &, std::string &&) { processSession->locks().pop_back(); }));
-
     // lock the chroot directory to prevent other build tasks from using it
     m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
     auto chrootLock = m_setup.locks.acquireToWrite(m_buildAction->log(), std::string(buildRoot));
@@ -996,6 +986,16 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         packageProgress.error = "Unable to configure chroot \"" % buildRoot % "\": " + e.what();
         return InvocationResult::Error;
     }
+
+    // prepare process session (after configuring chroot so we don't get stuck if configuring chroot fails)
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
+        std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
+            std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
+    processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
+        std::bind(
+            &ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2)));
+    processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "\n", std::string_view(),
+        [processSession = processSession.get()](BufferSearch &, std::string &&) { processSession->locks().pop_back(); }));
 
     // invoke makechrootpkg to build package
     m_buildAction->log()(Phrases::InfoMessage, "Invoking makechrootpkg for ", packageName, " via ", m_makeChrootPkgPath.string(), '\n',
