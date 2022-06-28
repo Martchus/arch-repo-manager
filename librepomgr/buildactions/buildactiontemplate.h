@@ -29,10 +29,8 @@ struct LIBREPOMGR_EXPORT BuildActionSequenceData : public ReflectiveRapidJSON::J
 struct LIBREPOMGR_EXPORT BuildActionSequenceNodes : public ReflectiveRapidJSON::JsonSerializable<BuildActionSequenceData> {
     std::vector<BuildActionSequenceNode> actions;
 };
-struct LIBREPOMGR_EXPORT BuildActionSequence : public BuildActionSequenceData, public BuildActionSequenceNodes {
-};
-struct LIBREPOMGR_EXPORT BuildActionSequenceNode : public std::variant<std::string, BuildActionSequence> {
-};
+struct LIBREPOMGR_EXPORT BuildActionSequence : public BuildActionSequenceData, public BuildActionSequenceNodes {};
+struct LIBREPOMGR_EXPORT BuildActionSequenceNode : public std::variant<std::string, BuildActionSequence> {};
 
 struct LIBREPOMGR_EXPORT BuildTask : public BuildActionSequence, public ReflectiveRapidJSON::JsonSerializable<BuildTask> {
     std::string desc;
