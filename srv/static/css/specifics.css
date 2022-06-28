@@ -105,6 +105,11 @@
     display: inline-block;
     box-sizing: border-box;
     width: 40%;
+    margin-right: 10px;
+    margin-block-end: 10px;
+}
+.form-split-50 select, .form-split-50 input {
+    width: 100%;
 }
 #build-actions-list-form fieldset input[type="button"],
 #package-results-form fieldset input[type="button"] {

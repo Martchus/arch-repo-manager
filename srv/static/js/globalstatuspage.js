@@ -90,9 +90,28 @@ function handleGlobalStatusUpdate(ajaxRequest)
         const repoName = Utils.makeRepoName(dbInfo.name, dbInfo.arch);
         status.repoNames.push(repoName);
         repoSelections.forEach(function (selection) {
+            const id = selection.id;
             const option = document.createElement('option');
-            option.appendChild(document.createTextNode(repoName));
+            option.text = repoName;
+            option.dataset.arch = dbInfo.arch;
             selection.appendChild(option);
+            const filterSel = document.getElementById(id + '-arch-filter');
+            if (!filterSel) {
+                return;
+            }
+            const filterOptId = filterSel.id + dbInfo.arch;
+            if (!filterSel.options.namedItem(filterOptId)) {
+                const filterOpt = document.createElement('option');
+                filterOpt.id = filterOptId;
+                filterOpt.text = dbInfo.arch;
+                filterSel.add(filterOpt);
+                filterSel.onchange = function() {
+                    const filterVal = !filterSel.selectedIndex ? undefined : filterSel.value;
+                    Array.from(selection.options).forEach(function(option) {
+                       option.style.display = !filterVal || filterVal === option.dataset.arch ? 'block' : 'none';
+                    });
+                };
+            }
         });
     });
 

@@ -67,6 +67,10 @@
               <td><input type="text" name="name" placeholder="Package name" /></td>
               <th rowspan="3">Database:</th>
               <th rowspan="3">
+                <select id="package-search-db-arch-filter" class="arch-filter">
+                  <option id="package-search-db-all-archs">All archs</option>
+                </select>
+                <br />
                 <select id="package-search-db" name="db" multiple="multiple">
                   <option id="package-search-db-any" style="font-style: italic;">any</option>
                 </select>
@@ -160,43 +164,53 @@
           <fieldset>
           <legend>Start new build action</legend>
           <div>
-            <div class="form-row">
-              <div class="form-split-50">
-                <label for="build-action-task">Predefined task:</label>
-                <br />
-                <select name="task" id="build-action-task">
-                  <option id="build-action-task-none" data-ignore="1" style="font-style: italic;">None</option>
-                </select>
+            <div style="max-width: 800px;">
+              <div class="form-row">
+                <div class="form-split-50">
+                  <label for="build-action-task">Predefined task:</label>
+                  <br />
+                  <select name="task" id="build-action-task">
+                    <option id="build-action-task-none" data-ignore="1" style="font-style: italic;">None</option>
+                  </select>
+                </div>
+                <div class="form-split-50" id="build-action-task-info">
+                </div>
               </div>
-              <div class="form-split-50" id="build-action-task-info">
+              <div class="form-row">
+                <div class="form-split-50">
+                  <label for="build-action-type">Action:</label>
+                  <br />
+                  <select name="type" id="build-action-type"></select>
+                </div>
+                <div class="form-split-50">
+                  <label for="build-action-directory">Directory:</label>
+                  <br />
+                  <input name="directory" id="build-action-directory" />
+                </div>
               </div>
-            </div>
-            <div class="form-row">
-              <div class="form-split-50">
-                <label for="build-action-type">Action:</label>
-                <br />
-                <select name="type" id="build-action-type"></select>
-              </div>
-              <div class="form-split-50">
-                <label for="build-action-directory">Directory:</label>
-                <br />
-                <input name="directory" id="build-action-directory" style="width: 100%;" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-split-50">
-                <label for="build-action-source-repo">Source repo:</label>
-                <br />
-                <select name="source-repo" id="build-action-source-repo" multiple="multiple">
-                  <option id="build-action-source-repo-none" style="font-style: italic;">none</option>
-                </select>
-              </div>
-              <div class="form-split-50">
-                <label for="build-action-destination-repo">Destination repo:</label>
-                <br />
-                <select name="destination-repo" id="build-action-destination-repo" multiple="multiple">
-                  <option id="build-action-destination-repo-none" style="font-style: italic;">none</option>
-                </select>
+              <div class="form-row">
+                <div class="form-split-50">
+                  <label for="build-action-source-repo">Source repo:</label>
+                  <br />
+                  <select id="build-action-source-repo-arch-filter" class="arch-filter">
+                    <option id="build-action-source-repo-all-archs">All archs</option>
+                  </select>
+                  <br />
+                  <select name="source-repo" id="build-action-source-repo" multiple="multiple">
+                    <option id="build-action-source-repo-none" style="font-style: italic;">none</option>
+                  </select>
+                </div>
+                <div class="form-split-50">
+                  <label for="build-action-destination-repo">Destination repo:</label>
+                  <br />
+                  <select id="build-action-destination-repo-arch-filter" class="arch-filter">
+                    <option id="build-action-destination-repo-all-archs">All archs</option>
+                  </select>
+                  <br />
+                  <select name="destination-repo" id="build-action-destination-repo" multiple="multiple">
+                    <option id="build-action-destination-repo-none" style="font-style: italic;">none</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div class="form-row">
@@ -214,22 +228,22 @@
               <fieldset>
                 <legend>Settings:</legend>
                 <table id="build-action-settings"></table>
-               </fieldset>
+              </fieldset>
             </div>
             <div class="form-row">
               <fieldset>
                 <legend>Start condition:</legend>
                 <input id="build-action-start-immediately" name="start-condition" type="radio" value="immediately"
-                       checked="checked" onchange="this.form['start-after-id'].disabled = this.checked" />
+                      checked="checked" onchange="this.form['start-after-id'].disabled = this.checked" />
                 <label for="build-action-start-immediately">Immediately</label>
                 <input id="build-action-start-manually" name="start-condition" type="radio" value="manually"
-                       onchange="this.form['start-after-id'].disabled = this.checked" />
+                      onchange="this.form['start-after-id'].disabled = this.checked" />
                 <label for="build-action-start-manually">Manually</label>
                 <input id="build-action-start-after" name="start-condition" type="radio" value="after"
-                       onchange="this.form['start-after-id'].disabled = !this.checked" />
+                      onchange="this.form['start-after-id'].disabled = !this.checked" />
                 <label for="build-action-start-after">After</label>
                 <input type="text" name="start-after-id" value="" placeholder="build action ID" disabled="disabled" />
-               </fieldset>
+              </fieldset>
             </div>
           </div>
           <div>
