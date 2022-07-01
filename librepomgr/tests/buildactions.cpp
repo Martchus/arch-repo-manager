@@ -613,35 +613,89 @@ void BuildActionsTests::testConductingBuild()
     CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
         std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
 
+    // define expected errors for subsequent tests
+    const auto expectedFooError = "not all source/binary packages exist after the build as expected: foo-1-1.src.tar.gz, foo-1-1-x86_64.pkg.tar.zst"s;
+    const auto expectedBarError = "not all source/binary packages exist after the build as expected: bar-2-1.src.tar.gz, bar-2-1-x86_64.pkg.tar.zst"s;
+    const auto expectedBazError = "not all source/binary packages exist after the build as expected: baz-3-1.src.tar.gz, baz-3-1-x86_64.pkg.tar.zst"s;
+    const auto expectedDependencyError = "unable to build because dependency failed"s;
+
     // conduct build again with all packages/batches
-    for (const auto *pkg : { "foo", "bar", "baz" }) {
-        std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/src"));
-        std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/pkg"));
+    {
+        for (const auto *pkg : { "foo", "bar", "baz" }) {
+            std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/src"));
+            std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/pkg"));
+        }
+        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
+        m_buildAction->packageNames.clear(); // don't build only "boost"
+        m_buildAction->flags = noBuildActionFlags;
+        runBuildAction("conduct build with all packages");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "failure as packages foo/bar/baz are not actually sufficiently configured", BuildActionResult::Failure, m_buildAction->result);
+        internalData = internalBuildAction<ConductBuild>();
+        const auto &progressByPackage = internalData->m_buildProgress.progressByPackage;
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo attempted", expectedFooError, progressByPackage.at("foo").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo attempted", expectedFooError, progressByPackage.at("foo").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar skipped (as the previous batch failed)", std::string(), progressByPackage.at("bar").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz skipped (as the previous batch failed)", std::string(), progressByPackage.at("baz").error);
     }
-    writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
-    m_buildAction->packageNames.clear(); // don't build only "boost"
-    m_buildAction->flags = noBuildActionFlags;
-    runBuildAction("conduct build with all packages");
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "failure as packages foo/bar/baz are not actually sufficiently configured", BuildActionResult::Failure, m_buildAction->result);
-    internalData = internalBuildAction<ConductBuild>();
-    const auto &progressByPackage = internalData->m_buildProgress.progressByPackage;
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo attempted",
-        "not all source/binary packages exist after the build as expected: foo-1-1.src.tar.gz, foo-1-1-x86_64.pkg.tar.zst"s,
-        progressByPackage.at("foo").error);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar skipped (as the previous batch failed)", std::string(), progressByPackage.at("bar").error);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz skipped (as the previous batch failed)", std::string(), progressByPackage.at("baz").error);
 
     // conduct build again with all packages/batches, building as far as possible
-    writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
-    m_buildAction->flags = static_cast<BuildActionFlagType>(ConductBuildFlags::BuildAsFarAsPossible);
-    runBuildAction("conduct build with all packages, building as far as possible");
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("failure, same as before", BuildActionResult::Failure, m_buildAction->result);
-    internalData = internalBuildAction<ConductBuild>();
-    const auto &progressByPackage2 = internalData->m_buildProgress.progressByPackage;
-    CPPUNIT_ASSERT_MESSAGE("build of foo still attempted", !progressByPackage2.at("foo").error.empty());
-    CPPUNIT_ASSERT_MESSAGE("build of bar attempted now", !progressByPackage2.at("bar").error.empty());
-    CPPUNIT_ASSERT_MESSAGE("build of baz attempted now", !progressByPackage2.at("baz").error.empty());
+    {
+        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
+        m_buildAction->flags = static_cast<BuildActionFlagType>(ConductBuildFlags::BuildAsFarAsPossible);
+        runBuildAction("conduct build with all packages, building as far as possible");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("failure, same as before", BuildActionResult::Failure, m_buildAction->result);
+        internalData = internalBuildAction<ConductBuild>();
+        const auto &progressByPackage = internalData->m_buildProgress.progressByPackage;
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo still attempted", expectedFooError, progressByPackage.at("foo").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar attempted now", expectedBarError, progressByPackage.at("bar").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz attempted now", expectedBazError, progressByPackage.at("baz").error);
+    }
+
+    // conduct build again with all packages/batches, building as far as possible assuming dependency between packages
+    {
+        // reset "build-progress.json" so the package is re-considered
+        writeFile(progressFile.native(), progressData);
+
+        // introduce dependencies
+        auto &buildPreparation = internalData->m_buildPreparation;
+        auto &barBuildData = buildPreparation.buildData["bar"];
+        barBuildData.sourceInfo->checkDependencies.emplace_back("foo");
+        auto &bazBuildData = buildPreparation.buildData["baz"];
+        bazBuildData.packages.at(0).pkg->dependencies.emplace_back("boost");
+        const auto buildPreparationJson = buildPreparation.toJson();
+        writeFile(prepFile.native(), std::string_view(buildPreparationJson.GetString(), buildPreparationJson.GetSize()));
+
+        m_buildAction->flags = static_cast<BuildActionFlagType>(ConductBuildFlags::BuildAsFarAsPossible);
+        runBuildAction("conduct build with all packages, building as far as possible");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("failure, same as before", BuildActionResult::Failure, m_buildAction->result);
+        internalData = internalBuildAction<ConductBuild>();
+        const auto &progressByPackage = internalData->m_buildProgress.progressByPackage;
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of boost succeeded", std::string(), progressByPackage.at("boost").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo still attempted", expectedFooError, progressByPackage.at("foo").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar skipped because foo failed", expectedDependencyError, progressByPackage.at("bar").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz still attempted", expectedBazError, progressByPackage.at("baz").error);
+    }
+
+    // conduct build again with all packages/batches, building as far as possible assuming dependency between packages
+    {
+        // reset "build-progress.json" so the package is re-considered
+        writeFile(progressFile.native(), progressData);
+
+        // assume boost fails as well
+        std::filesystem::remove(buildDir / "build-data/conduct-build-test/boost/pkg/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"); // assume boost fails
+
+        m_buildAction->flags = static_cast<BuildActionFlagType>(ConductBuildFlags::BuildAsFarAsPossible);
+        runBuildAction("conduct build with all packages, building as far as possible");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("failure, same as before", BuildActionResult::Failure, m_buildAction->result);
+        internalData = internalBuildAction<ConductBuild>();
+        const auto &progressByPackage = internalData->m_buildProgress.progressByPackage;
+        const auto expectedBoostError = "not all source/binary packages exist after the build as expected: boost-libs-1.73.0-1-x86_64.pkg.tar.zst"s;
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of boost failed", expectedBoostError, progressByPackage.at("boost").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo still attempted", expectedFooError, progressByPackage.at("foo").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar skipped because foo failed", expectedDependencyError, progressByPackage.at("bar").error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz skipped because boost failed", expectedDependencyError, progressByPackage.at("baz").error);
+    }
 }
 
 static void hardlinkOrCopy(
