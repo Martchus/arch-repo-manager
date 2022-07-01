@@ -73,6 +73,7 @@ BatchProcessingSession::BatchProcessingSession(const std::unordered_set<string_v
     , m_batchEnd(batches.end())
     , m_packageIterator(m_batchIterator != m_batchEnd ? m_batchIterator->begin() : decltype(m_packageIterator)())
     , m_packageEnd(m_batchIterator != m_batchEnd ? m_batchIterator->end() : decltype(m_packageEnd)())
+    , m_firstPackageInBatch(true)
     , m_skipBatchesAfterFailure(skipBatchesAfterFailure)
     , m_hasFailuresInPreviousBatches(false)
     , m_enableStagingInNextBatch(false)
@@ -104,7 +105,7 @@ bool BatchProcessingSession::isStagingEnabled() const
  */
 bool BatchProcessingSession::hasFailuresInPreviousBatches() const
 {
-    return m_hasFailuresInPreviousBatches;
+    return m_hasFailuresInPreviousBatches || (m_firstPackageInBatch && !allResponses().empty());
 }
 
 /*!
@@ -122,6 +123,7 @@ const std::string &BatchProcessingSession::currentPackageName() const
 void BatchProcessingSession::selectNextPackage()
 {
     if (++m_packageIterator != m_packageEnd) {
+        m_firstPackageInBatch = false;
         return; // select the next package within the current batch
     }
     if ((m_hasFailuresInPreviousBatches = !allResponses().empty()) && m_skipBatchesAfterFailure) {
@@ -133,6 +135,7 @@ void BatchProcessingSession::selectNextPackage()
     // select the first package within the next batch
     m_packageIterator = m_batchIterator->begin();
     m_packageEnd = m_batchIterator->end();
+    m_firstPackageInBatch = true;
     m_stagingEnabled = m_stagingEnabled || m_enableStagingInNextBatch;
 }
 

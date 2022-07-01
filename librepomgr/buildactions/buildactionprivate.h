@@ -523,6 +523,7 @@ private:
     std::mutex m_mutex;
     std::vector<std::vector<std::string>>::iterator m_batchBegin, m_batchIterator, m_batchEnd;
     std::vector<std::string>::iterator m_packageIterator, m_packageEnd;
+    bool m_firstPackageInBatch;
     bool m_skipBatchesAfterFailure;
     bool m_hasFailuresInPreviousBatches;
     std::atomic_bool m_enableStagingInNextBatch;
