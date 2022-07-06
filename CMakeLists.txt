@@ -9,7 +9,7 @@ set(META_APP_DESCRIPTION "Repository manager and package builder for Arch Linux"
 set(META_APP_CATEGORIES "System;Utility;Network;FileTransfer")
 set(META_VERSION_MAJOR 0)
 set(META_VERSION_MINOR 0)
-set(META_VERSION_PATCH 2)
+set(META_VERSION_PATCH 3)
 set(META_VERSION_EXACT_SONAME ON)
 set(META_CXX_STANDARD 20)
 
