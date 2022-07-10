@@ -15,6 +15,8 @@
 #include <reflective_rapidjson/binary/serializable.h>
 #include <reflective_rapidjson/json/errorformatting.h>
 
+#include <passwordfile/io/passwordfile.h>
+
 #include <c++utilities/application/argumentparser.h>
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
@@ -307,7 +309,8 @@ StorageID ServiceSetup::BuildSetup::storeBuildAction(const std::shared_ptr<Build
         }
         // immediately start if all follow-up actions have succeeded
         if (allSucceeded && buildAction->setup()) {
-            return buildAction->start(*buildAction->setup());
+            // FIXME: Do we actually ever get here?
+            return buildAction->start(*buildAction->setup(), std::unique_ptr<Io::PasswordFile>());
         }
     } else {
         for (const auto id : buildAction->startAfter) {

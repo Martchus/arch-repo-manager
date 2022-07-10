@@ -8,6 +8,8 @@
 #include "../buildactions/buildactionprivate.h"
 #include "../buildactions/subprocess.h"
 
+#include <passwordfile/io/passwordfile.h>
+
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/io/misc.h>
@@ -72,6 +74,7 @@ private:
 
     std::string m_configDbFile, m_buildingDbFile;
     ServiceSetup m_setup;
+    std::unique_ptr<Io::PasswordFile> m_secrets;
     std::shared_ptr<BuildAction> m_buildAction;
     std::filesystem::path m_workingDir;
     double m_timeoutFactor = 0.0;
@@ -190,7 +193,7 @@ void BuildActionsTests::resetBuildAction()
 void BuildActionsTests::runBuildAction(const char *message, CppUtilities::TimeSpan timeout)
 {
     resetBuildAction();
-    m_buildAction->start(m_setup);
+    m_buildAction->start(m_setup, std::move(m_secrets));
     auto &ioc = m_setup.building.ioContext;
     ioc.restart();
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type> workGuard = boost::asio::make_work_guard(ioc);

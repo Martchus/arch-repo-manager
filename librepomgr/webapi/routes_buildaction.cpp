@@ -279,7 +279,7 @@ void postBuildAction(const Params &params, ResponseHandler &&handler)
     // start build action immediately or just add to setup-global list for now
     auto buildLock2 = params.setup.building.lockToWrite();
     if (startImmediately) {
-        buildAction->start(params.setup);
+        buildAction->start(params.setup, params.session.secrets());
     } else {
         params.setup.building.storeBuildAction(buildAction);
     }
@@ -385,7 +385,7 @@ static std::vector<std::shared_ptr<BuildAction>> allocateBuildActionIDs(ServiceS
     return previousActions;
 }
 
-static bool startFirstBuildActions(ServiceSetup &setup, SequencedBuildActions &newActionSequence)
+static bool startFirstBuildActions(const Params &params, SequencedBuildActions &newActionSequence)
 {
     auto handledFirstAction = false;
     for (auto &sequencedAction : newActionSequence.actions) {
@@ -393,13 +393,13 @@ static bool startFirstBuildActions(ServiceSetup &setup, SequencedBuildActions &n
             auto &action = *maybeAction;
             handledFirstAction = true;
             if (action->isScheduled()) {
-                action->start(setup);
+                action->start(params.setup, params.session.secrets());
             }
             if (!newActionSequence.concurrent) {
                 return true;
             }
         } else if (auto *const subSequence = std::get_if<SequencedBuildActions>(&sequencedAction)) {
-            if (startFirstBuildActions(setup, *subSequence) && !newActionSequence.concurrent) {
+            if (startFirstBuildActions(params, *subSequence) && !newActionSequence.concurrent) {
                 return true;
             }
         }
@@ -475,7 +475,7 @@ void postBuildActionsFromTask(const Params &params, ResponseHandler &&handler, c
 
     // start first build action immediately (read-lock sufficient because build action not part of setup-global list yet)
     if (startNow) {
-        startFirstBuildActions(params.setup, newActionSequence);
+        startFirstBuildActions(params, newActionSequence);
     }
 
     // add build actions to setup-global list
@@ -547,7 +547,7 @@ void postCloneBuildActions(const Params &params, ResponseHandler &&handler)
         clone->type = orig->type;
         clone->startAfter = orig->startAfter;
         if (startImmediately) {
-            clone->start(params.setup);
+            clone->start(params.setup, params.session.secrets());
         }
         params.setup.building.storeBuildAction(std::move(clone));
         cloneIds.emplace_back(id);
@@ -572,7 +572,7 @@ void postStartBuildActions(const Params &params, ResponseHandler &&handler)
         return;
     }
     for (auto &action : buildActionsSearchResult.actions) {
-        action->start(params.setup);
+        action->start(params.setup, params.session.secrets());
     }
     buildActionsSearchResult.lock = std::monostate{};
     handler(makeText(params.request(), "ok"));

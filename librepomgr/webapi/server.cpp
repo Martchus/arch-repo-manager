@@ -35,9 +35,9 @@ const Router Server::s_router = {
     { { http::verb::get, "/api/v0/build-action/details" }, Route{&Routes::getBuildActionDetails, UserPermissions::ReadBuildActionsDetails} },
     { { http::verb::get, "/api/v0/build-action/logfile" }, Route{&Routes::getBuildActionLogFile, UserPermissions::ReadBuildActionsDetails} },
     { { http::verb::get, "/api/v0/build-action/artefact" }, Route{&Routes::getBuildActionArtefact, UserPermissions::DownloadArtefacts} },
-    { { http::verb::post, "/api/v0/build-action" }, Route{&Routes::postBuildAction, UserPermissions::ModifyBuildActions} },
-    { { http::verb::post, "/api/v0/build-action/clone" }, Route{&Routes::postCloneBuildActions, UserPermissions::ModifyBuildActions} },
-    { { http::verb::post, "/api/v0/build-action/start" }, Route{&Routes::postStartBuildActions, UserPermissions::ModifyBuildActions} },
+    { { http::verb::post, "/api/v0/build-action" }, Route{&Routes::postBuildAction, UserPermissions::ModifyBuildActions | UserPermissions::AccessSecrets} },
+    { { http::verb::post, "/api/v0/build-action/clone" }, Route{&Routes::postCloneBuildActions, UserPermissions::ModifyBuildActions | UserPermissions::AccessSecrets} },
+    { { http::verb::post, "/api/v0/build-action/start" }, Route{&Routes::postStartBuildActions, UserPermissions::ModifyBuildActions | UserPermissions::AccessSecrets} },
     { { http::verb::post, "/api/v0/build-action/stop" }, Route{&Routes::postStopBuildActions, UserPermissions::ModifyBuildActions} },
     { { http::verb::post, "/api/v0/quit" }, Route{&Routes::postQuit, UserPermissions::PerformAdminActions} },
 };

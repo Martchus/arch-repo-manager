@@ -3,6 +3,8 @@
 
 #include "../webapi/session.h"
 
+#include <passwordfile/io/passwordfile.h>
+
 #include <reflective_rapidjson/binary/reflector-chronoutilities.h>
 #include <reflective_rapidjson/json/reflector-chronoutilities.h>
 
@@ -259,7 +261,7 @@ bool BuildAction::haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> 
  *        the build action is setup-globally visible.
  * \returns Returns immediately. The real work is done in a build action thread.
  */
-LibPkg::StorageID BuildAction::start(ServiceSetup &setup)
+LibPkg::StorageID BuildAction::start(ServiceSetup &setup, std::unique_ptr<Io::PasswordFile> &&secrets)
 {
     if (!isScheduled()) {
         return 0;
@@ -268,6 +270,13 @@ LibPkg::StorageID BuildAction::start(ServiceSetup &setup)
     started = DateTime::gmtNow();
     status = BuildActionStatus::Running;
     m_setup = &setup;
+
+    // grab secrets from session
+    // note: That's done regardless of the type because we might need to pass the secrets to the next
+    //       action in the chain (regardless of the current build action's type).
+    if (secrets) {
+        m_secrets = std::move(secrets);
+    }
 
     switch (type) {
     case BuildActionType::Invalid:
@@ -366,7 +375,13 @@ LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
         const auto followUps = m_setup->building.followUpBuildActions(id);
         for (auto &followUpAction : followUps) {
             if (followUpAction->isScheduled() && BuildAction::haveSucceeded(m_setup->building.getBuildActions(followUpAction->startAfter))) {
-                followUpAction->start(*m_setup);
+                auto secrets = std::unique_ptr<Io::PasswordFile>();
+                if (m_secrets) {
+                    secrets = std::make_unique<Io::PasswordFile>();
+                    secrets->setPath(m_secrets->path());
+                    secrets->setPassword(m_secrets->password());
+                }
+                followUpAction->start(*m_setup, std::move(secrets));
             }
         }
         // note: Not cleaning up the follow-up actions here because at some point I might implement recursive restarting.

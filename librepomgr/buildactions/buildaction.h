@@ -36,6 +36,10 @@
 
 class BuildActionsTests;
 
+namespace Io {
+class PasswordFile;
+}
+
 namespace LibRepoMgr {
 
 struct ServiceSetup;
@@ -208,7 +212,7 @@ public:
     static bool haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> &buildActions);
     bool isAborted() const;
     const std::atomic_bool &aborted() const;
-    LibPkg::StorageID start(ServiceSetup &setup);
+    LibPkg::StorageID start(ServiceSetup &setup, std::unique_ptr<Io::PasswordFile> &&secrets);
     void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
     void abort();
     void appendOutput(std::string_view output);
@@ -256,6 +260,7 @@ private:
     std::mutex m_outputSessionMutex;
     std::shared_ptr<BuildProcessSession> m_outputSession;
     std::unique_ptr<InternalBuildAction> m_internalBuildAction;
+    std::unique_ptr<Io::PasswordFile> m_secrets;
 };
 
 inline bool BuildActionBase::isScheduled() const

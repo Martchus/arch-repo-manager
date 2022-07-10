@@ -13,6 +13,7 @@ enum class UserPermissions : std::uint64_t {
     ModifyBuildActions = ReadBuildActionsDetails | DownloadArtefacts | (1 << 2),
     PerformAdminActions = (1 << 3),
     TryAgain = (1 << 4),
+    AccessSecrets = (1 << 5),
     DefaultPermissions = ReadBuildActionsDetails,
 };
 

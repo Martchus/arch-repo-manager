@@ -7,6 +7,8 @@
 
 #include "../serversetup.h"
 
+#include <passwordfile/io/passwordfile.h>
+
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/io/misc.h>
@@ -21,6 +23,17 @@ using namespace CppUtilities::EscapeCodes;
 
 namespace LibRepoMgr {
 namespace WebAPI {
+
+Session::Session(boost::asio::ip::tcp::socket &&socket, ServiceSetup &setup)
+    : m_socket(std::move(socket))
+    , m_strand(m_socket.get_executor())
+    , m_setup(setup)
+{
+}
+
+Session::~Session()
+{
+}
 
 void Session::receive()
 {
@@ -89,13 +102,19 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
                 return;
             }
             // prepare file with secrets for user
-            if(!userAuth.name.empty() && !userAuth.password.empty()) {
+            if (!userAuth.name.empty() && !userAuth.password.empty()
+                && (static_cast<PermissionFlags>(requiredPermissions) & static_cast<PermissionFlags>(UserPermissions::AccessSecrets))) {
                 try {
-                    m_secrets.clear();
-                    m_secrets.setPath(argsToString("secrets/"sv, userAuth.name));
-                    m_secrets.setPassword(userAuth.password.data(), userAuth.password.size());
+                    if (m_secrets) {
+                        m_secrets->clear();
+                    } else {
+                        m_secrets = std::make_unique<Io::PasswordFile>();
+                    }
+                    m_secrets->setPath(argsToString("secrets/"sv, userAuth.name));
+                    m_secrets->setPassword(userAuth.password.data(), userAuth.password.size());
                 } catch (const std::ios_base::failure &e) {
-                    cerr << Phrases::WarningMessage << "Failed to close password file \"" << m_secrets.path() << "\" (before preparing new one): " << e.what() << Phrases::End;
+                    cerr << Phrases::WarningMessage << "Failed to close password file \"" << m_secrets->path()
+                         << "\" (before preparing new one): " << e.what() << Phrases::End;
                 }
             }
         }
@@ -112,10 +131,12 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
 
         // discard password; secrets are expected to be read on the immediate call of the route
         try {
-            m_secrets.clearPassword();
-            m_secrets.close();
+            if (m_secrets) {
+                m_secrets->clearPassword();
+                m_secrets->close();
+            }
         } catch (const std::ios_base::failure &e) {
-            cerr << Phrases::WarningMessage << "Failed to close password file \"" << m_secrets.path() << "\": " << e.what() << Phrases::End;
+            cerr << Phrases::WarningMessage << "Failed to close password file \"" << m_secrets->path() << "\": " << e.what() << Phrases::End;
         }
         return;
     }

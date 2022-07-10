@@ -3,7 +3,7 @@
 
 #include "./typedefs.h"
 
-#include <passwordfile/io/passwordfile.h>
+#include "../global.h"
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
@@ -12,15 +12,22 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/strand.hpp>
 
+#include <memory>
+
+namespace Io {
+class PasswordFile;
+}
+
 namespace LibRepoMgr {
 
 struct ServiceSetup;
 
 namespace WebAPI {
 
-class Session : public std::enable_shared_from_this<Session> {
+class LIBREPOMGR_EXPORT Session : public std::enable_shared_from_this<Session> {
 public:
     Session(boost::asio::ip::tcp::socket &&socket, ServiceSetup &config);
+    ~Session();
 
     void receive();
     void respond(std::shared_ptr<Response> &&response);
@@ -33,7 +40,7 @@ public:
     void received(boost::system::error_code ec, std::size_t bytesTransferred);
     void responded(boost::system::error_code ec, std::size_t bytesTransferred, bool shouldClose);
     static boost::beast::string_view determineMimeType(std::string_view path, boost::beast::string_view fallback = "text/plain");
-    Io::PasswordFile &secrets();
+    std::unique_ptr<Io::PasswordFile> &&secrets();
 
 private:
     boost::asio::ip::tcp::socket m_socket;
@@ -42,15 +49,8 @@ private:
     std::unique_ptr<RequestParser> m_parser;
     ServiceSetup &m_setup;
     std::shared_ptr<void> m_res;
-    Io::PasswordFile m_secrets;
+    std::unique_ptr<Io::PasswordFile> m_secrets;
 };
-
-inline Session::Session(boost::asio::ip::tcp::socket &&socket, ServiceSetup &setup)
-    : m_socket(std::move(socket))
-    , m_strand(m_socket.get_executor())
-    , m_setup(setup)
-{
-}
 
 inline const Request &Session::request() const
 {
@@ -67,9 +67,9 @@ inline boost::asio::ip::tcp::socket &Session::socket()
     return m_socket;
 }
 
-inline Io::PasswordFile &Session::secrets()
+inline std::unique_ptr<Io::PasswordFile> &&Session::secrets()
 {
-    return m_secrets;
+    return std::move(m_secrets);
 }
 
 } // namespace WebAPI
