@@ -162,7 +162,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::unordered_map<std::string, UserInfo> users;
 
         void applyConfig(const std::string &userName, const std::multimap<std::string, std::string> &multimap);
-        UserPermissions authenticate(std::string_view authorizationHeader) const;
+        UserAuth authenticate(std::string_view authorizationHeader) const;
     } auth;
 
     struct LIBREPOMGR_EXPORT Locks {

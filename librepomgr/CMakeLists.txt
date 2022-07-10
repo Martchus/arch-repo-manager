@@ -83,6 +83,10 @@ set(CONFIGURATION_PACKAGE_SUFFIX
 find_package(c++utilities${CONFIGURATION_PACKAGE_SUFFIX} 5.11.0 REQUIRED)
 use_cpp_utilities(VISIBILITY PUBLIC)
 
+# find passwordfile
+find_package(passwordfile${CONFIGURATION_PACKAGE_SUFFIX} 5.0.0 REQUIRED)
+use_password_file(VISIBILITY PUBLIC)
+
 # find boost libraries
 option(BOOST_STATIC_LINKAGE "${STATIC_LINKAGE}" "link statically against Boost (instead of dynamically)")
 set(Boost_USE_MULTITHREADED ON)

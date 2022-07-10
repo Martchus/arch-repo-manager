@@ -16,6 +16,12 @@ enum class UserPermissions : std::uint64_t {
     DefaultPermissions = ReadBuildActionsDetails,
 };
 
+struct UserAuth {
+    std::string_view name;
+    std::string_view password;
+    UserPermissions permissions = UserPermissions::DefaultPermissions;
+};
+
 constexpr UserPermissions operator|(UserPermissions lhs, UserPermissions rhs)
 {
     return static_cast<UserPermissions>(

@@ -51,39 +51,41 @@ static constexpr char toLower(const char c)
     return (c >= 'A' && c <= 'Z') ? (c + ('a' - 'A')) : c;
 }
 
-UserPermissions ServiceSetup::Authentication::authenticate(std::string_view authorizationHeader) const
+UserAuth ServiceSetup::Authentication::authenticate(std::string_view authorizationHeader) const
 {
     // extract user name and password from base64 encoded header value
+    auto auth = UserAuth();
     if (!CppUtilities::startsWith(authorizationHeader, "Basic ") && authorizationHeader.size() < 100) {
-        return UserPermissions::DefaultPermissions;
+        return auth;
     }
     std::pair<std::unique_ptr<std::uint8_t[]>, std::uint32_t> data;
     try {
         data = CppUtilities::decodeBase64(authorizationHeader.data() + 6, static_cast<std::uint32_t>(authorizationHeader.size() - 6));
     } catch (const CppUtilities::ConversionException &) {
-        return UserPermissions::DefaultPermissions;
+        return auth;
     }
     const auto parts = CppUtilities::splitStringSimple<std::vector<std::string_view>>(
         std::string_view(reinterpret_cast<const char *>(data.first.get()), data.second), ":", 2);
     if (parts.size() != 2) {
-        return UserPermissions::DefaultPermissions;
+        return auth;
     }
 
     // find relevant user
     const std::string_view userName = parts[0], password = parts[1];
     if (userName.empty() || password.empty()) {
-        return UserPermissions::DefaultPermissions;
+        return auth;
     }
     if (userName == "try" && password == "again") {
-        return UserPermissions::TryAgain;
+        auth.permissions = UserPermissions::TryAgain;
+        return auth;
     }
     const auto user = users.find(std::string(userName));
     if (user == users.cend()) {
-        return UserPermissions::DefaultPermissions;
+        return auth;
     }
     constexpr auto sha512HexSize = 128;
     if (user->second.passwordSha512.size() != sha512HexSize) {
-        return UserPermissions::DefaultPermissions;
+        return auth;
     }
 
     // hash password
@@ -98,12 +100,15 @@ UserPermissions ServiceSetup::Authentication::authenticate(std::string_view auth
     for (unsigned char hashNumber : hash) {
         const auto digits = CppUtilities::numberToString(hashNumber, 16);
         if ((toLower(*(i++)) != toLower(digits.size() < 2 ? '0' : digits.front())) || (toLower(*(i++)) != toLower(digits.back()))) {
-            return UserPermissions::DefaultPermissions;
+            return auth;
         }
     }
 
     // return the user's permissions
-    return user->second.permissions;
+    auth.permissions = user->second.permissions;
+    auth.name = userName;
+    auth.password = password;
+    return auth;
 }
 
 } // namespace LibRepoMgr

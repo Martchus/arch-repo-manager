@@ -74,27 +74,48 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
                 respond(Render::makeAuthRequired(request));
                 return;
             }
-            const auto userPermissions = m_setup.auth.authenticate(std::string_view(authInfo->value().data(), authInfo->value().size()));
+            const auto userAuth = m_setup.auth.authenticate(std::string_view(authInfo->value().data(), authInfo->value().size()));
             using PermissionFlags = std::underlying_type_t<UserPermissions>;
-            if (static_cast<PermissionFlags>(userPermissions) & static_cast<PermissionFlags>(UserPermissions::TryAgain)) {
+            if (static_cast<PermissionFlags>(userAuth.permissions) & static_cast<PermissionFlags>(UserPermissions::TryAgain)) {
                 // send the 401 response again if credentials are 'try again' to show the password prompt for the XMLHttpRequest again
                 // note: This is kind of a hack. Maybe there's a better solution to make XMLHttpRequest forget wrongly entered credentials
                 //       and instead show the login prompt again?
                 respond(Render::makeAuthRequired(request));
                 return;
             }
-            if ((static_cast<PermissionFlags>(requiredPermissions) & static_cast<PermissionFlags>(userPermissions))
+            if ((static_cast<PermissionFlags>(requiredPermissions) & static_cast<PermissionFlags>(userAuth.permissions))
                 != static_cast<PermissionFlags>(requiredPermissions)) {
                 respond(Render::makeForbidden(request));
                 return;
             }
+            // prepare file with secrets for user
+            if(!userAuth.name.empty() && !userAuth.password.empty()) {
+                try {
+                    m_secrets.clear();
+                    m_secrets.setPath(argsToString("secrets/"sv, userAuth.name));
+                    m_secrets.setPassword(userAuth.password.data(), userAuth.password.size());
+                } catch (const std::ios_base::failure &e) {
+                    cerr << Phrases::WarningMessage << "Failed to close password file \"" << m_secrets.path() << "\" (before preparing new one): " << e.what() << Phrases::End;
+                }
+            }
         }
+
+        // invoke the route's handler
+        // note: The error handling is in vain if an exception in a deferred handler is thrown.
         try {
             route.handler(move(params),
                 std::bind(
                     static_cast<void (Session::*)(std::shared_ptr<Response> &&)>(&Session::respond), shared_from_this(), std::placeholders::_1));
         } catch (const BadRequest &badRequest) {
             respond(Render::makeBadRequest(request, badRequest.what()));
+        }
+
+        // discard password; secrets are expected to be read on the immediate call of the route
+        try {
+            m_secrets.clearPassword();
+            m_secrets.close();
+        } catch (const std::ios_base::failure &e) {
+            cerr << Phrases::WarningMessage << "Failed to close password file \"" << m_secrets.path() << "\": " << e.what() << Phrases::End;
         }
         return;
     }

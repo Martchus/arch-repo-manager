@@ -3,6 +3,8 @@
 
 #include "./typedefs.h"
 
+#include <passwordfile/io/passwordfile.h>
+
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 
@@ -31,6 +33,7 @@ public:
     void received(boost::system::error_code ec, std::size_t bytesTransferred);
     void responded(boost::system::error_code ec, std::size_t bytesTransferred, bool shouldClose);
     static boost::beast::string_view determineMimeType(std::string_view path, boost::beast::string_view fallback = "text/plain");
+    Io::PasswordFile &secrets();
 
 private:
     boost::asio::ip::tcp::socket m_socket;
@@ -39,6 +42,7 @@ private:
     std::unique_ptr<RequestParser> m_parser;
     ServiceSetup &m_setup;
     std::shared_ptr<void> m_res;
+    Io::PasswordFile m_secrets;
 };
 
 inline Session::Session(boost::asio::ip::tcp::socket &&socket, ServiceSetup &setup)
@@ -61,6 +65,11 @@ inline void Session::assignEmptyRequest()
 inline boost::asio::ip::tcp::socket &Session::socket()
 {
     return m_socket;
+}
+
+inline Io::PasswordFile &Session::secrets()
+{
+    return m_secrets;
 }
 
 } // namespace WebAPI
