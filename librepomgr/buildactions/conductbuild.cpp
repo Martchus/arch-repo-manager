@@ -6,6 +6,10 @@
 #include "../logging.h"
 #include "../serversetup.h"
 
+#include <passwordfile/io/entry.h>
+#include <passwordfile/io/field.h>
+#include <passwordfile/io/passwordfile.h>
+
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
@@ -286,6 +290,9 @@ void ConductBuild::run()
     m_pacmanConfigPath = m_workingDirectory + "/pacman.conf";
     m_pacmanStagingConfigPath = m_workingDirectory + "/pacman-staging.conf";
 
+    // read secrets
+    readSecrets();
+
     // parse build preparation
     auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
     try {
@@ -481,6 +488,55 @@ void ConductBuild::run()
     }
 
     downloadSourcesAndContinueBuilding();
+}
+
+/*!
+ * \brief Reads secrets from the encrypted password file.
+ * \remarks The password is supposed to be pre-supplied by the web session that started the build action (or
+ *          passed by the previous build action).
+ */
+void LibRepoMgr::ConductBuild::readSecrets()
+{
+    auto *const secretsFile = m_buildAction->secrets();
+    if (!secretsFile) {
+        m_buildAction->log()(Phrases::WarningMessage, "No secrets present all.\n");
+        return;
+    }
+    if (!secretsFile->hasRootEntry()) {
+        try {
+            if (!secretsFile->isOpen()) {
+                secretsFile->open(Io::PasswordFileOpenFlags::ReadOnly);
+            }
+            secretsFile->load();
+            secretsFile->close();
+        } catch (const std::runtime_error &e) {
+            const auto note = secretsFile->password().empty() ? " (password was empty)"sv : std::string_view();
+            m_buildAction->log()(
+                Phrases::WarningMessage, "Unable to load secrets from \"", secretsFile->path(), '\"', note, ':', ' ', e.what(), '\n');
+            return;
+        }
+    }
+    auto *const secrets = secretsFile->rootEntry();
+    auto sudoPath = std::list<std::string>{ "build", "sudo" };
+    auto gpgPath = std::list<std::string>{ "build", "gpg" };
+    if (auto sudoEntry = secrets->entryByPath(sudoPath); sudoEntry && sudoEntry->type() == Io::EntryType::Account) {
+        if (auto sudoFields = static_cast<Io::AccountEntry *>(sudoEntry)->fields(); !sudoFields.empty()) {
+            m_sudoPassword = sudoFields.front().value();
+        }
+    }
+    if (auto gpgEntry = secrets->entryByPath(gpgPath); gpgEntry && gpgEntry->type() == Io::EntryType::Account) {
+        if (auto gpgFields = static_cast<Io::AccountEntry *>(gpgEntry)->fields(); !gpgFields.empty()) {
+            m_gpgPassphrase = gpgFields.front().value();
+        }
+    }
+    if (m_sudoPassword.empty()) {
+        m_buildAction->log()(Phrases::WarningMessage, "No sudo password present. Assuming no password is required.");
+        return;
+    }
+    if (m_gpgPassphrase.empty()) {
+        m_buildAction->log()(Phrases::WarningMessage, "No GPG passphrase present. Assuming no passphrase is required.");
+        return;
+    }
 }
 
 /// \cond
@@ -1294,8 +1350,12 @@ void ConductBuild::invokeGpg(
             // consider the package failed
             signingSession->addResponse(std::move(binaryPackageName));
         });
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, "--detach-sign", "--yes", "--use-agent",
-        "--no-armor", "-u", m_gpgKey, binaryPackage.fileName);
+    auto pinentryArgs = std::vector<std::string>();
+    if (!m_gpgPassphrase.empty()) {
+        pinentryArgs = { "--pinentry-mode", "loopback", "--passphrase-fd", "0" };
+    }
+    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, pinentryArgs, "--detach-sign", "--yes",
+        "--use-agent", "--no-armor", "-u", m_gpgKey, binaryPackage.fileName, boost::process::std_in < boost::asio::buffer(m_gpgPassphrase));
     m_buildAction->log()(Phrases::InfoMessage, "Signing ", binaryPackage.fileName, '\n');
 }
 
