@@ -6,6 +6,10 @@
 #include "../logging.h"
 #include "../serversetup.h"
 
+#include <passwordfile/io/entry.h>
+#include <passwordfile/io/field.h>
+#include <passwordfile/io/passwordfile.h>
+
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
@@ -286,6 +290,9 @@ void ConductBuild::run()
     m_pacmanConfigPath = m_workingDirectory + "/pacman.conf";
     m_pacmanStagingConfigPath = m_workingDirectory + "/pacman-staging.conf";
 
+    // read secrets
+    readSecrets();
+
     // parse build preparation
     auto errors = ReflectiveRapidJSON::JsonDeserializationErrors();
     try {
@@ -481,6 +488,64 @@ void ConductBuild::run()
     }
 
     downloadSourcesAndContinueBuilding();
+}
+
+/*!
+ * \brief Reads secrets from the encrypted password file.
+ * \remarks The password is supposed to be pre-supplied by the web session that started the build action (or
+ *          passed by the previous build action).
+ */
+void LibRepoMgr::ConductBuild::readSecrets()
+{
+    auto *const secretsFile = m_buildAction->secrets();
+    if (!secretsFile) {
+        m_buildAction->log()(Phrases::WarningMessage, "No secrets present all.\n");
+        return;
+    }
+    if (!secretsFile->hasRootEntry()) {
+        try {
+            if (!secretsFile->isOpen()) {
+                secretsFile->open(Io::PasswordFileOpenFlags::ReadOnly);
+            }
+            secretsFile->load();
+            secretsFile->close();
+        } catch (const std::runtime_error &e) {
+            const auto note = secretsFile->password().empty() ? " (password was empty)"sv : std::string_view();
+            m_buildAction->log()(
+                Phrases::WarningMessage, "Unable to load secrets from \"", secretsFile->path(), '\"', note, ':', ' ', e.what(), '\n');
+            return;
+        }
+    }
+    auto *const secrets = secretsFile->rootEntry();
+    auto sudoPath = std::list<std::string>{ "build", "sudo" };
+    auto gpgPath = std::list<std::string>{ "build", "gpg" };
+    if (auto sudoEntry = secrets->entryByPath(sudoPath); sudoEntry && sudoEntry->type() == Io::EntryType::Account) {
+        for (auto fields = static_cast<Io::AccountEntry *>(sudoEntry)->fields(); const auto &field : fields) {
+            if (field.name() == "username") {
+                m_sudoUser = field.value();
+            } else if (field.name() == "password") {
+                m_sudoPassword = field.value();
+            }
+        }
+    }
+    if (auto gpgEntry = secrets->entryByPath(gpgPath); gpgEntry && gpgEntry->type() == Io::EntryType::Account) {
+        for (auto fields = static_cast<Io::AccountEntry *>(gpgEntry)->fields(); const auto &field : fields) {
+            if (field.name() == "key") {
+                m_gpgKey = field.value();
+            } else if (field.name() == "passphrase") {
+                m_gpgPassphrase = field.value();
+            }
+        }
+    }
+    if (m_sudoUser.empty() || m_sudoPassword.empty()) {
+        m_buildAction->log()(Phrases::WarningMessage, "No sudo username and password present. Not switching to a dedicated build user.");
+        m_sudoPassword.clear(); // don't write password to stdin if we don't invoke sudo
+        return;
+    }
+    if (!m_gpgKey.empty() && m_gpgPassphrase.empty()) {
+        m_buildAction->log()(Phrases::WarningMessage, "GPG key is prsent but no passphrase. Signing with key assuming no passphrase is required.");
+        return;
+    }
 }
 
 /// \cond
@@ -920,7 +985,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     }
 
     // determine options/variables to pass
-    std::vector<std::string> makechrootpkgFlags, makepkgFlags;
+    std::vector<std::string> makechrootpkgFlags, makepkgFlags, sudoArgs;
     // -> cleanup/upgrade
     if (!packageProgress.skipChrootCleanup) {
         makechrootpkgFlags.emplace_back("-c");
@@ -939,6 +1004,10 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         makechrootpkgFlags.emplace_back("-d");
         makechrootpkgFlags.emplace_back(m_globalTestFilesDir + "/:/testfiles");
         makepkgFlags.emplace_back("TEST_FILE_PATH=/testfiles");
+    }
+    // -> "sudo …" prefixc to launch build as different user
+    if (!m_sudoUser.empty() && !m_sudoPassword.empty()) {
+        sudoArgs = { "sudo", "--user", m_sudoUser, "--stdin" };
     }
 
     // invoke makecontainerpkg instead if container-flag set
@@ -1008,9 +1077,9 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     locks.reserve(2);
     locks.emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(), chrootDir % '/' + packageProgress.chrootUser));
     locks.emplace_back(std::move(chrootLock));
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, makechrootpkgFlags, "-C",
+    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, sudoArgs, makechrootpkgFlags, "-C",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
-        packageProgress.makepkgFlags);
+        packageProgress.makepkgFlags, boost::process::std_in < boost::asio::buffer(m_sudoPassword));
     return InvocationResult::Ok;
 }
 
@@ -1294,8 +1363,12 @@ void ConductBuild::invokeGpg(
             // consider the package failed
             signingSession->addResponse(std::move(binaryPackageName));
         });
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, "--detach-sign", "--yes", "--use-agent",
-        "--no-armor", "-u", m_gpgKey, binaryPackage.fileName);
+    auto pinentryArgs = std::vector<std::string>();
+    if (!m_gpgPassphrase.empty()) {
+        pinentryArgs = { "--pinentry-mode", "loopback", "--passphrase-fd", "0" };
+    }
+    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, pinentryArgs, "--detach-sign", "--yes",
+        "--use-agent", "--no-armor", "-u", m_gpgKey, binaryPackage.fileName, boost::process::std_in < boost::asio::buffer(m_gpgPassphrase));
     m_buildAction->log()(Phrases::InfoMessage, "Signing ", binaryPackage.fileName, '\n');
 }
 

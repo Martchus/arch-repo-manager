@@ -229,6 +229,7 @@ public:
     void streamFile(const WebAPI::Params &params, const std::string &filePath, boost::beast::string_view fileMimeType,
         boost::beast::string_view contentDisposition = boost::beast::string_view());
     ServiceSetup *setup();
+    Io::PasswordFile *secrets();
     using ReflectiveRapidJSON::JsonSerializable<BuildAction>::fromJson;
     using ReflectiveRapidJSON::JsonSerializable<BuildAction>::toJson;
     using ReflectiveRapidJSON::JsonSerializable<BuildAction>::toJsonDocument;
@@ -317,6 +318,11 @@ inline std::shared_ptr<BuildProcessSession> BuildAction::findBuildProcess(const 
 inline ServiceSetup *BuildAction::setup()
 {
     return m_setup;
+}
+
+inline Io::PasswordFile *BuildAction::secrets()
+{
+    return m_secrets.get();
 }
 
 /*!

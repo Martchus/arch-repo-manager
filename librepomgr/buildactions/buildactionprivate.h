@@ -577,6 +577,7 @@ private:
         bool needsStaging = false;
     };
 
+    void readSecrets();
     [[nodiscard]] std::string locateGlobalConfigPath(const std::string &chrootDir, std::string_view trailingPath) const;
     void makeMakepkgConfigFile(const std::filesystem::path &makepkgConfigPath);
     void makePacmanConfigFile(
@@ -629,6 +630,9 @@ private:
     std::string m_globalPackageCacheDir;
     std::string m_globalTestFilesDir;
     std::string m_gpgKey;
+    std::string m_gpgPassphrase;
+    std::string m_sudoUser;
+    std::string m_sudoPassword;
     std::string m_chrootRootUser;
     boost::filesystem::path m_makePkgPath;
     boost::filesystem::path m_makeChrootPkgPath;
