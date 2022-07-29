@@ -80,7 +80,7 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
     // find route's controller and invoke it
     if (const auto routing(router.find(RouteId{ method, std::string(path) })); routing != router.cend()) {
         const Route &route = routing->second;
-        const auto requiredPermissions = route.permissions;
+        auto requiredPermissions = route.permissions;
         if (requiredPermissions != UserPermissions::None && requiredPermissions != UserPermissions::DefaultPermissions) {
             const auto authInfo = request.find(boost::beast::http::field::authorization);
             if (authInfo == request.end()) {
@@ -94,6 +94,10 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
                 //       and instead show the login prompt again?
                 respond(Render::makeAuthRequired(request));
                 return;
+            }
+            if (!(userAuth.permissions & UserPermissions::AccessSecrets)) {
+                // accessing secrets is rather options; just don't access them if user lacks permissions
+                requiredPermissions -= UserPermissions::AccessSecrets;
             }
             if (!checkFlagEnum(userAuth.permissions, requiredPermissions)) {
                 respond(Render::makeForbidden(request));
