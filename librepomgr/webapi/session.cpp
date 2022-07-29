@@ -88,22 +88,19 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
                 return;
             }
             const auto userAuth = m_setup.auth.authenticate(std::string_view(authInfo->value().data(), authInfo->value().size()));
-            using PermissionFlags = std::underlying_type_t<UserPermissions>;
-            if (static_cast<PermissionFlags>(userAuth.permissions) & static_cast<PermissionFlags>(UserPermissions::TryAgain)) {
+            if (userAuth.permissions & UserPermissions::TryAgain) {
                 // send the 401 response again if credentials are 'try again' to show the password prompt for the XMLHttpRequest again
                 // note: This is kind of a hack. Maybe there's a better solution to make XMLHttpRequest forget wrongly entered credentials
                 //       and instead show the login prompt again?
                 respond(Render::makeAuthRequired(request));
                 return;
             }
-            if ((static_cast<PermissionFlags>(requiredPermissions) & static_cast<PermissionFlags>(userAuth.permissions))
-                != static_cast<PermissionFlags>(requiredPermissions)) {
+            if (!checkFlagEnum(userAuth.permissions, requiredPermissions)) {
                 respond(Render::makeForbidden(request));
                 return;
             }
             // prepare file with secrets for user
-            if (!userAuth.name.empty() && !userAuth.password.empty()
-                && (static_cast<PermissionFlags>(requiredPermissions) & static_cast<PermissionFlags>(UserPermissions::AccessSecrets))) {
+            if (!userAuth.name.empty() && !userAuth.password.empty() && (requiredPermissions & UserPermissions::AccessSecrets)) {
                 try {
                     if (m_secrets) {
                         m_secrets->clear();

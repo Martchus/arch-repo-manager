@@ -1,6 +1,8 @@
 #ifndef LIBREPOMGR_AUTHENTICATION_H
 #define LIBREPOMGR_AUTHENTICATION_H
 
+#include <c++utilities/misc/flagenumclass.h>
+
 #include <cstdint>
 #include <string>
 
@@ -23,11 +25,11 @@ struct UserAuth {
     UserPermissions permissions = UserPermissions::DefaultPermissions;
 };
 
-constexpr UserPermissions operator|(UserPermissions lhs, UserPermissions rhs)
-{
-    return static_cast<UserPermissions>(
-        static_cast<std::underlying_type_t<UserPermissions>>(lhs) | static_cast<std::underlying_type_t<UserPermissions>>(rhs));
-}
+} // namespace LibRepoMgr
+
+CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibPkg, LibRepoMgr::UserPermissions)
+
+namespace LibRepoMgr {
 
 struct UserInfo {
     std::string passwordSha512;
