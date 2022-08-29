@@ -961,6 +961,10 @@ std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size
         package->upstreamUrl = std::move(result.URL);
         package->licenses = std::move(result.License);
         package->groups = std::move(result.Groups);
+        package->provides.reserve(result.Provides.size());
+        for (const auto &provide : result.Provides) {
+            package->provides.emplace_back(provide.data(), provide.size());
+        }
         for (auto &dependencyName : result.Depends) {
             package->dependencies.emplace_back(dependencyName.data(), dependencyName.size());
         }
