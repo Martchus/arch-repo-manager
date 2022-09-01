@@ -27,7 +27,9 @@ struct LIBPKG_EXPORT AurRpcResult : public ReflectiveRapidJSON::JsonSerializable
     std::int64_t FirstSubmitted = 0;
     std::int64_t LastModified = 0;
     std::string URLPath;
+    std::vector<std::string> Conflicts;
     std::vector<std::string> Provides;
+    std::vector<std::string> Replaces;
     std::vector<std::string> Depends;
     std::vector<std::string> MakeDepends;
     std::vector<std::string> CheckDepends;
