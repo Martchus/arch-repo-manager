@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "@mdi/font": "^6.6.96",
-    "xterm": "^4.16.0",
-    "xterm-addon-search": "^0.8.2"
+    "xterm": "^5.0.0",
+    "xterm-addon-search": "^0.10.0"
   }
 }

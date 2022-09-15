@@ -8,6 +8,7 @@ const SearchAddon = exports.SearchAddon.SearchAddon;
 export function makeTerminal()
 {
     const terminal = new Terminal({
+        allowProposedApi: true,
         disableStdin: true,
         convertEol: true,
         scrollback: 500000,
