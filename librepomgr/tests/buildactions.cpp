@@ -585,7 +585,7 @@ void BuildActionsTests::testConductingBuild()
     // conduct build with staging
     writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
     runBuildAction("conduct build with staging");
-    //CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: success", BuildActionResult::Success, m_buildAction->result);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: success", BuildActionResult::Success, m_buildAction->result);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: no result data present", ""s, std::get<std::string>(m_buildAction->resultData));
     internalData = internalBuildAction<ConductBuild>();
     const auto &rebuildList = internalData->m_buildProgress.rebuildList;
