@@ -418,6 +418,28 @@ void BuildActionsTests::testPreparingBuild()
     }
 }
 
+static void ensureEmptyDir(const std::filesystem::path &path)
+{
+    if (std::filesystem::exists(path)) {
+        std::filesystem::remove_all(path);
+    }
+    std::filesystem::create_directories(path);
+}
+
+static void createPackageDirs(bool empty = true)
+{
+    constexpr auto buildDir = "building/build-data/conduct-build-test/"sv;
+    for (const auto pkg : { "foo"sv, "bar"sv, "baz"sv }) {
+        ensureEmptyDir(argsToString(buildDir, pkg, "/src"sv));
+        ensureEmptyDir(argsToString(buildDir, pkg, "/pkg"sv));
+        if (!empty) {
+            writeFile(argsToString(buildDir, pkg, "/src/PKGBUILD"sv), pkg);
+            writeFile(argsToString(buildDir, pkg, "/src/"sv, pkg, "-1-1.src.tar.gz"sv), pkg);
+            writeFile(argsToString(buildDir, pkg, "/src/"sv, pkg, "-1-1-x86_64.pkg.tar.zst"sv), pkg);
+        }
+    }
+}
+
 /*!
  * \brief Tests the ConductBuild build action.
  */
@@ -582,12 +604,55 @@ void BuildActionsTests::testConductingBuild()
     m_setup.printDatabases();
     logTestSetup();
 
-    // conduct build with staging
+    // conduct build with staging only with boost
     {
         writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
         runBuildAction("conduct build with staging");
         CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: success", BuildActionResult::Success, m_buildAction->result);
         CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: no result data present", ""s, std::get<std::string>(m_buildAction->resultData));
+        internalData = internalBuildAction<ConductBuild>();
+        const auto &rebuildList = internalData->m_buildProgress.rebuildList;
+        const auto rebuildInfoForMisc = rebuildList.find("misc");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: rebuild list contains 1 database", 1_st, rebuildList.size());
+        CPPUNIT_ASSERT_MESSAGE("staging needed: rebuild info for misc present", rebuildInfoForMisc != rebuildList.end());
+        const auto rebuildInfoForSourceHighlight = rebuildInfoForMisc->second.find("source-highlight");
+        const auto expectedLibprovides = std::vector<std::string>{ "elf-x86_64::libboost_regex.so.1.72.0" };
+        CPPUNIT_ASSERT_MESSAGE(
+            "staging needed: rebuild info for source-highlight present", rebuildInfoForSourceHighlight != rebuildInfoForMisc->second.end());
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "staging needed: libprovides for source-highlight present", expectedLibprovides, rebuildInfoForSourceHighlight->second.libprovides);
+
+        // check whether log files have been created accordingly
+        TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
+            "fake repo-add: boost-staging.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
+            readFile("building/build-data/conduct-build-test/boost/pkg/repo-add.log"));
+
+        // check whether package have been added to staging repo
+        CPPUNIT_ASSERT_MESSAGE(
+            "staging needed: package added to repo (0)", std::filesystem::is_regular_file("repos/boost-staging/os/src/boost-1.73.0-1.src.tar.gz"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (1)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (2)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (0)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+    }
+
+    // create directories for further packages with dummy PKGBUILDs and build results
+    createPackageDirs(false);
+
+    // conduct build with staging and multiple batches
+    // FIXME: verify behavior of packages other than boost
+    {
+        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the packages are re-considered
+        m_buildAction->packageNames.clear(); // don't build only "boost"
+        runBuildAction("conduct build with staging");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "staging needed: failure (as most build results are just dummies here)", BuildActionResult::Failure, m_buildAction->result);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "staging needed: no result data present", "failed to build packages: foo, bar, baz"s, std::get<std::string>(m_buildAction->resultData));
         internalData = internalBuildAction<ConductBuild>();
         const auto &rebuildList = internalData->m_buildProgress.rebuildList;
         const auto rebuildInfoForMisc = rebuildList.find("misc");
@@ -624,14 +689,12 @@ void BuildActionsTests::testConductingBuild()
     const auto expectedBazError = "not all source/binary packages exist after the build as expected: baz-3-1.src.tar.gz, baz-3-1-x86_64.pkg.tar.zst"s;
     const auto expectedDependencyError = "unable to build because dependency failed"s;
 
+    // empty directories for further packages again, further tests are conducted with empty src dirs to let builds fail
+    createPackageDirs();
+
     // conduct build again with all packages/batches
     {
-        for (const auto *pkg : { "foo", "bar", "baz" }) {
-            std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/src"));
-            std::filesystem::create_directories(argsToString("building/build-data/conduct-build-test/", pkg, "/pkg"));
-        }
-        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
-        m_buildAction->packageNames.clear(); // don't build only "boost"
+        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the packages are re-considered
         m_buildAction->flags = noBuildActionFlags;
         runBuildAction("conduct build with all packages");
         CPPUNIT_ASSERT_EQUAL_MESSAGE(
@@ -646,7 +709,7 @@ void BuildActionsTests::testConductingBuild()
 
     // conduct build again with all packages/batches, building as far as possible
     {
-        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
+        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the packages are re-considered
         m_buildAction->flags = static_cast<BuildActionFlagType>(ConductBuildFlags::BuildAsFarAsPossible);
         runBuildAction("conduct build with all packages, building as far as possible");
         CPPUNIT_ASSERT_EQUAL_MESSAGE("failure, same as before", BuildActionResult::Failure, m_buildAction->result);
@@ -659,7 +722,7 @@ void BuildActionsTests::testConductingBuild()
 
     // conduct build again with all packages/batches, building as far as possible assuming dependency between packages
     {
-        // reset "build-progress.json" so the package is re-considered
+        // reset "build-progress.json" so the packages are re-considered
         writeFile(progressFile.native(), progressData);
 
         // introduce dependencies
@@ -684,7 +747,7 @@ void BuildActionsTests::testConductingBuild()
 
     // conduct build again with all packages/batches, building as far as possible assuming dependency between packages
     {
-        // reset "build-progress.json" so the package is re-considered
+        // reset "build-progress.json" so the packages are re-considered
         writeFile(progressFile.native(), progressData);
 
         // assume boost fails as well
