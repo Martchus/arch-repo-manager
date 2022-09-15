@@ -583,38 +583,40 @@ void BuildActionsTests::testConductingBuild()
     logTestSetup();
 
     // conduct build with staging
-    writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
-    runBuildAction("conduct build with staging");
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: success", BuildActionResult::Success, m_buildAction->result);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: no result data present", ""s, std::get<std::string>(m_buildAction->resultData));
-    internalData = internalBuildAction<ConductBuild>();
-    const auto &rebuildList = internalData->m_buildProgress.rebuildList;
-    const auto rebuildInfoForMisc = rebuildList.find("misc");
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: rebuild list contains 1 database", 1_st, rebuildList.size());
-    CPPUNIT_ASSERT_MESSAGE("staging needed: rebuild info for misc present", rebuildInfoForMisc != rebuildList.end());
-    const auto rebuildInfoForSourceHighlight = rebuildInfoForMisc->second.find("source-highlight");
-    const auto expectedLibprovides = std::vector<std::string>{ "elf-x86_64::libboost_regex.so.1.72.0" };
-    CPPUNIT_ASSERT_MESSAGE(
-        "staging needed: rebuild info for source-highlight present", rebuildInfoForSourceHighlight != rebuildInfoForMisc->second.end());
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "staging needed: libprovides for source-highlight present", expectedLibprovides, rebuildInfoForSourceHighlight->second.libprovides);
+    {
+        writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
+        runBuildAction("conduct build with staging");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: success", BuildActionResult::Success, m_buildAction->result);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: no result data present", ""s, std::get<std::string>(m_buildAction->resultData));
+        internalData = internalBuildAction<ConductBuild>();
+        const auto &rebuildList = internalData->m_buildProgress.rebuildList;
+        const auto rebuildInfoForMisc = rebuildList.find("misc");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: rebuild list contains 1 database", 1_st, rebuildList.size());
+        CPPUNIT_ASSERT_MESSAGE("staging needed: rebuild info for misc present", rebuildInfoForMisc != rebuildList.end());
+        const auto rebuildInfoForSourceHighlight = rebuildInfoForMisc->second.find("source-highlight");
+        const auto expectedLibprovides = std::vector<std::string>{ "elf-x86_64::libboost_regex.so.1.72.0" };
+        CPPUNIT_ASSERT_MESSAGE(
+            "staging needed: rebuild info for source-highlight present", rebuildInfoForSourceHighlight != rebuildInfoForMisc->second.end());
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "staging needed: libprovides for source-highlight present", expectedLibprovides, rebuildInfoForSourceHighlight->second.libprovides);
 
-    // check whether log files have been created accordingly
-    TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
-        "fake repo-add: boost-staging.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
-        readFile("building/build-data/conduct-build-test/boost/pkg/repo-add.log"));
+        // check whether log files have been created accordingly
+        TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
+            "fake repo-add: boost-staging.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
+            readFile("building/build-data/conduct-build-test/boost/pkg/repo-add.log"));
 
-    // check whether package have been added to staging repo
-    CPPUNIT_ASSERT_MESSAGE(
-        "staging needed: package added to repo (0)", std::filesystem::is_regular_file("repos/boost-staging/os/src/boost-1.73.0-1.src.tar.gz"));
-    CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (1)",
-        std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst"));
-    CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (2)",
-        std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"));
-    CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (0)",
-        std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
-    CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
-        std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+        // check whether package have been added to staging repo
+        CPPUNIT_ASSERT_MESSAGE(
+            "staging needed: package added to repo (0)", std::filesystem::is_regular_file("repos/boost-staging/os/src/boost-1.73.0-1.src.tar.gz"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (1)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (2)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (0)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+    }
 
     // define expected errors for subsequent tests
     const auto expectedFooError = "not all source/binary packages exist after the build as expected: foo-1-1.src.tar.gz, foo-1-1-x86_64.pkg.tar.zst"s;
