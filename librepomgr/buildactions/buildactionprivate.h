@@ -527,6 +527,7 @@ private:
     bool m_skipBatchesAfterFailure;
     bool m_hasFailuresInPreviousBatches;
     std::atomic_bool m_enableStagingInNextBatch;
+    std::atomic_bool m_enableStagingInThisBatch;
     std::atomic_bool m_stagingEnabled;
 };
 

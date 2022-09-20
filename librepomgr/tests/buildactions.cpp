@@ -429,13 +429,19 @@ static void ensureEmptyDir(const std::filesystem::path &path)
 static void createPackageDirs(bool empty = true)
 {
     constexpr auto buildDir = "building/build-data/conduct-build-test/"sv;
-    for (const auto pkg : { "foo"sv, "bar"sv, "baz"sv }) {
-        ensureEmptyDir(argsToString(buildDir, pkg, "/src"sv));
-        ensureEmptyDir(argsToString(buildDir, pkg, "/pkg"sv));
+    for (const auto pkg : { "foo-1-1"sv, "bar-2-1"sv, "baz-3-1"sv }) {
+        const auto pkgName = pkg.substr(0, 3);
+        ensureEmptyDir(argsToString(buildDir, pkgName, "/src"sv));
+        ensureEmptyDir(argsToString(buildDir, pkgName, "/pkg"sv));
         if (!empty) {
-            writeFile(argsToString(buildDir, pkg, "/src/PKGBUILD"sv), pkg);
-            writeFile(argsToString(buildDir, pkg, "/src/"sv, pkg, "-1-1.src.tar.gz"sv), pkg);
-            writeFile(argsToString(buildDir, pkg, "/src/"sv, pkg, "-1-1-x86_64.pkg.tar.zst"sv), pkg);
+            const auto relativeFakePackagePath = argsToString(buildDir, pkgName, "/src/"sv, pkg, "-x86_64.pkg.tar.zst"sv);
+            try {
+                std::filesystem::copy_file(testFilePath(relativeFakePackagePath), relativeFakePackagePath);
+            } catch (const std::runtime_error &) {
+                writeFile(relativeFakePackagePath, pkg);
+            }
+            writeFile(argsToString(buildDir, pkgName, "/src/PKGBUILD"sv), pkg);
+            writeFile(argsToString(buildDir, pkgName, "/src/"sv, pkg, ".src.tar.gz"sv), pkg);
         }
     }
 }
@@ -644,15 +650,14 @@ void BuildActionsTests::testConductingBuild()
     createPackageDirs(false);
 
     // conduct build with staging and multiple batches
-    // FIXME: verify behavior of packages other than boost
     {
         writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the packages are re-considered
         m_buildAction->packageNames.clear(); // don't build only "boost"
         runBuildAction("conduct build with staging");
         CPPUNIT_ASSERT_EQUAL_MESSAGE(
-            "staging needed: failure (as most build results are just dummies here)", BuildActionResult::Failure, m_buildAction->result);
+            "staging needed: failure as build result of baz is no valid archive", BuildActionResult::Failure, m_buildAction->result);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(
-            "staging needed: no result data present", "failed to build packages: foo, bar, baz"s, std::get<std::string>(m_buildAction->resultData));
+            "staging needed: failed packages listed", "failed to build packages: baz"s, std::get<std::string>(m_buildAction->resultData));
         internalData = internalBuildAction<ConductBuild>();
         const auto &rebuildList = internalData->m_buildProgress.rebuildList;
         const auto rebuildInfoForMisc = rebuildList.find("misc");
@@ -671,16 +676,24 @@ void BuildActionsTests::testConductingBuild()
             readFile("building/build-data/conduct-build-test/boost/pkg/repo-add.log"));
 
         // check whether package have been added to staging repo
-        CPPUNIT_ASSERT_MESSAGE(
-            "staging needed: package added to repo (0)", std::filesystem::is_regular_file("repos/boost-staging/os/src/boost-1.73.0-1.src.tar.gz"));
-        CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (1)",
+        CPPUNIT_ASSERT_MESSAGE("staging needed: boost package added to staging repo (0)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/src/boost-1.73.0-1.src.tar.gz"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: boost package added to staging repo (1)",
             std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst"));
-        CPPUNIT_ASSERT_MESSAGE("staging needed: package added to repo (2)",
+        CPPUNIT_ASSERT_MESSAGE("staging needed: boost package added to staging repo (2)",
             std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"));
-        CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (0)",
+        CPPUNIT_ASSERT_MESSAGE("staging needed: boost signature added to staging repo (0)",
             std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
-        CPPUNIT_ASSERT_MESSAGE("staging needed: signature added to repo (1)",
+        CPPUNIT_ASSERT_MESSAGE("staging needed: boost signature added to staging repo (1)",
             std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: foo package from first batch still added to normal repo (0)",
+            std::filesystem::is_regular_file("repos/boost/os/src/foo-1-1.src.tar.gz"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: foo package from first batch still added to normal repo (1)",
+            std::filesystem::is_regular_file("repos/boost/os/x86_64/foo-1-1-x86_64.pkg.tar.zst"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: bar package from next batch added to staging repo as well (0)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/src/bar-2-1.src.tar.gz"));
+        CPPUNIT_ASSERT_MESSAGE("staging needed: bar package from next batch added to staging repo as well (1)",
+            std::filesystem::is_regular_file("repos/boost-staging/os/x86_64/bar-2-1-x86_64.pkg.tar.zst"));
     }
 
     // define expected errors for subsequent tests

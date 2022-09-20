@@ -81,6 +81,7 @@ BatchProcessingSession::BatchProcessingSession(const std::unordered_set<string_v
     , m_skipBatchesAfterFailure(skipBatchesAfterFailure)
     , m_hasFailuresInPreviousBatches(false)
     , m_enableStagingInNextBatch(false)
+    , m_enableStagingInThisBatch(false)
     , m_stagingEnabled(false)
 {
 }
@@ -98,6 +99,9 @@ bool BatchProcessingSession::isValid() const
 
 /*!
  * \brief Returns whether staging is now active after a previous call to enableStagingInNextBatch().
+ * \remarks
+ * This function's return value relates to the package returned by getCurrentPackageNameIfValidAndRelevantAndSelectNext()
+ * despite that function selecting the next package.
  */
 bool BatchProcessingSession::isStagingEnabled() const
 {
@@ -128,6 +132,7 @@ void BatchProcessingSession::selectNextPackage()
 {
     if (++m_packageIterator != m_packageEnd) {
         m_firstPackageInBatch = false;
+        m_stagingEnabled = m_stagingEnabled || m_enableStagingInThisBatch;
         return; // select the next package within the current batch
     }
     if ((m_hasFailuresInPreviousBatches = !allResponses().empty()) && m_skipBatchesAfterFailure) {
@@ -140,7 +145,7 @@ void BatchProcessingSession::selectNextPackage()
     m_packageIterator = m_batchIterator->begin();
     m_packageEnd = m_batchIterator->end();
     m_firstPackageInBatch = true;
-    m_stagingEnabled = m_stagingEnabled || m_enableStagingInNextBatch;
+    m_enableStagingInThisBatch.store(m_enableStagingInNextBatch);
 }
 
 /*!

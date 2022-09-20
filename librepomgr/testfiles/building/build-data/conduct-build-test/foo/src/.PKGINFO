@@ -1,0 +1,3 @@
+pkgname = foo
+pkgver = 1-1
+pkgdesc = fake package for testing

@@ -1,0 +1,3 @@
+pkgname = bar
+pkgver = 2-1
+pkgdesc = another fake package for testing
