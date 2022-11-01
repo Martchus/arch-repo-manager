@@ -132,9 +132,12 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
 
             // log/skip
             auto lastModified = parseLastModified(log, message, dbName, dbArch);
+            auto loadingLogged = false;
             if (lastModified.isNull()) {
-                log(Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch, "\" from mirror response\n");
+                log(Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch,
+                    "\" from mirror response; assuming last modification time to be now\n");
                 lastModified = DateTime::gmtNow();
+                loadingLogged = true;
             } else if (!force) {
                 auto configReadLock = setup.config.lockToRead();
                 if (auto *const destinationDb = setup.config.findDatabase(dbName, dbArch)) {
@@ -146,7 +149,8 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
                         return;
                     }
                 }
-            } else {
+            }
+            if (!loadingLogged) {
                 log(Phrases::InfoMessage, "Loading database \"", dbName, '@', dbArch,
                     "\" from mirror response; last modification time: ", lastModified.toString(), '\n');
             }
