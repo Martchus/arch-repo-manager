@@ -177,39 +177,36 @@ static void removeLibDependency(LibraryDependencyStorage::RWTransaction &txn, St
     }
 }
 
-void Database::removePackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package)
+static void removePackageDependencies(DatabaseStorage &storage, const std::shared_ptr<LMDBSafe::MDBRWTransaction> &txnHandle, StorageID packageID,
+    const std::shared_ptr<Package> &package)
 {
     {
-        auto txn = m_storage->providedDeps.getRWTransaction();
+        auto txn = storage.providedDeps.getRWTransaction(txnHandle);
         removeDependency(txn, packageID, package->name);
         for (const auto &dep : package->provides) {
             removeDependency(txn, packageID, dep.name);
         }
-        txn.commit();
     }
     {
-        auto txn = m_storage->requiredDeps.getRWTransaction();
+        auto txn = storage.requiredDeps.getRWTransaction(txnHandle);
         for (const auto &dep : package->dependencies) {
             removeDependency(txn, packageID, dep.name);
         }
         for (const auto &dep : package->optionalDependencies) {
             removeDependency(txn, packageID, dep.name);
         }
-        txn.commit();
     }
     {
-        auto txn = m_storage->providedLibs.getRWTransaction();
+        auto txn = storage.providedLibs.getRWTransaction(txnHandle);
         for (const auto &lib : package->libprovides) {
             removeLibDependency(txn, packageID, lib);
         }
-        txn.commit();
     }
     {
-        auto txn = m_storage->requiredLibs.getRWTransaction();
+        auto txn = storage.requiredLibs.getRWTransaction(txnHandle);
         for (const auto &lib : package->libdepends) {
             removeLibDependency(txn, packageID, lib);
         }
-        txn.commit();
     }
 }
 
@@ -253,39 +250,36 @@ static void addLibDependency(LibraryDependencyStorage::RWTransaction &txn, Stora
     txn.put(newDependency);
 }
 
-void Database::addPackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package)
+static void addPackageDependencies(DatabaseStorage &storage, const std::shared_ptr<LMDBSafe::MDBRWTransaction> &txnHandle, StorageID packageID,
+    const std::shared_ptr<Package> &package)
 {
     {
-        auto txn = m_storage->providedDeps.getRWTransaction();
+        auto txn = storage.providedDeps.getRWTransaction(txnHandle);
         addDependency(txn, packageID, package->name, package->version);
         for (const auto &dep : package->provides) {
             addDependency(txn, packageID, dep.name, dep.version, dep.mode);
         }
-        txn.commit();
     }
     {
-        auto txn = m_storage->requiredDeps.getRWTransaction();
+        auto txn = storage.requiredDeps.getRWTransaction(txnHandle);
         for (const auto &dep : package->dependencies) {
             addDependency(txn, packageID, dep.name, dep.version, dep.mode);
         }
         for (const auto &dep : package->optionalDependencies) {
             addDependency(txn, packageID, dep.name, dep.version, dep.mode);
         }
-        txn.commit();
     }
     {
-        auto txn = m_storage->providedLibs.getRWTransaction();
+        auto txn = storage.providedLibs.getRWTransaction(txnHandle);
         for (const auto &lib : package->libprovides) {
             addLibDependency(txn, packageID, lib);
         }
-        txn.commit();
     }
     {
-        auto txn = m_storage->requiredLibs.getRWTransaction();
+        auto txn = storage.requiredLibs.getRWTransaction(txnHandle);
         for (const auto &lib : package->libdepends) {
             addLibDependency(txn, packageID, lib);
         }
-        txn.commit();
     }
 }
 
@@ -472,9 +466,11 @@ StorageID Database::findBasePackageWithID(const std::string &packageName, Packag
 void Database::removePackage(const std::string &packageName)
 {
     const auto lock = std::unique_lock(m_storage->updateMutex);
-    const auto [packageID, package] = m_storage->packageCache.retrieve(*m_storage, packageName);
+    auto txn = m_storage->packages.getRWTransaction();
+    const auto [packageID, package] = m_storage->packageCache.retrieve(*m_storage, &txn, packageName);
     if (package) {
-        removePackageDependencies(packageID, package);
+        removePackageDependencies(*m_storage, txn.getTransactionHandle(), packageID, package);
+        txn.commit();
         m_storage->packageCache.invalidate(*m_storage, packageName);
     }
 }
@@ -485,14 +481,16 @@ StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
         return 0;
     }
     const auto lock = std::unique_lock(m_storage->updateMutex);
-    const auto res = m_storage->packageCache.store(*m_storage, package, false);
+    auto txn = m_storage->packages.getRWTransaction();
+    const auto res = m_storage->packageCache.store(*m_storage, txn, package, false);
     if (!res.updated) {
         return res.id;
     }
     if (res.oldEntry) {
-        removePackageDependencies(res.id, res.oldEntry);
+        removePackageDependencies(*m_storage, txn.getTransactionHandle(), res.id, res.oldEntry);
     }
-    addPackageDependencies(res.id, package);
+    addPackageDependencies(*m_storage, txn.getTransactionHandle(), res.id, package);
+    txn.commit();
     return res.id;
 }
 
@@ -502,11 +500,13 @@ StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
         return 0;
     }
     const auto lock = std::unique_lock(m_storage->updateMutex);
-    const auto res = m_storage->packageCache.store(*m_storage, package, true);
+    auto txn = m_storage->packages.getRWTransaction();
+    const auto res = m_storage->packageCache.store(*m_storage, txn, package, true);
     if (res.oldEntry) {
-        removePackageDependencies(res.id, res.oldEntry);
+        removePackageDependencies(*m_storage, txn.getTransactionHandle(), res.id, res.oldEntry);
     }
-    addPackageDependencies(res.id, package);
+    addPackageDependencies(*m_storage, txn.getTransactionHandle(), res.id, package);
+    txn.commit();
     return res.id;
 }
 
@@ -885,7 +885,7 @@ PackageSpec LibPkg::PackageUpdater::findPackageWithID(const std::string &package
 StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
 {
     const auto &storage = m_database.m_storage;
-    const auto res = storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package);
+    const auto res = storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package, true);
     m_d->update(res, package);
     return res.id;
 }

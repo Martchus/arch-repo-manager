@@ -194,10 +194,6 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     PackageLocation locatePackage(const std::string &packageName) const;
     std::string filesPathFromRegularPath() const;
 
-private:
-    void removePackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
-    void addPackageDependencies(StorageID packageID, const std::shared_ptr<Package> &package);
-
 public:
     std::string name;
     std::string path;

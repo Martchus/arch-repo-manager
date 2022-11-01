@@ -130,55 +130,8 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
 }
 
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
-auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &storage, const std::shared_ptr<Entry> &entry, bool force) -> StoreResult
-{
-    // check for package in cache
-    using CacheEntry = typename Entries::StorageEntry;
-    using CacheRef = typename Entries::Ref;
-    const auto ref = CacheRef(storage, entry);
-    auto res = StorageCache::StoreResult();
-    auto lock = std::unique_lock(m_mutex);
-    auto *cacheEntry = m_entries.find(ref);
-    if (cacheEntry) {
-        res.id = cacheEntry->id;
-        res.oldEntry = cacheEntry->entry;
-        if (cacheEntry->entry == entry && !force) {
-            // do nothing if cached package is the same as specified one
-            return res;
-        } else {
-            // retain certain information obtained from package contents if this is actually the same package as before
-            entry->addDepsAndProvidesFromOtherPackage(*cacheEntry->entry);
-        }
-    }
-    lock.unlock();
-    // check for package in storage
-    auto txn = storage.packages.getRWTransaction();
-    if (!res.oldEntry) {
-        res.oldEntry = std::make_shared<Entry>();
-        if ((res.id = txn.template get<0>(entry->name, *res.oldEntry))) {
-            entry->addDepsAndProvidesFromOtherPackage(*res.oldEntry);
-        } else {
-            res.oldEntry.reset();
-        }
-    }
-    // update package in storage
-    res.id = txn.put(*entry, res.id);
-    // update cache entry
-    lock = std::unique_lock(m_mutex);
-    if (cacheEntry) {
-        cacheEntry->ref.entryName = &entry->name;
-    } else {
-        cacheEntry = &m_entries.insert(CacheEntry(ref, res.id));
-    }
-    cacheEntry->entry = entry;
-    lock.unlock();
-    txn.commit();
-    res.updated = true;
-    return res;
-}
-
-template <typename StorageEntriesType, typename StorageType, typename SpecType>
-auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &storage, RWTxn &txn, const std::shared_ptr<Entry> &entry) -> StoreResult
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &storage, RWTxn &txn, const std::shared_ptr<Entry> &entry, bool force)
+    -> StoreResult
 {
     // check for package in cache
     using CacheEntry = typename Entries::StorageEntry;
@@ -191,6 +144,10 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &sto
     auto lock = std::unique_lock(m_mutex);
     auto *cacheEntry = m_entries.find(ref);
     if (cacheEntry) {
+        if (cacheEntry->entry == entry && !force) {
+            // do nothing if cached package is the same as specified one
+            return res;
+        }
         // retain certain information obtained from package contents if this is actually the same package as before
         res.id = cacheEntry->id;
         entry->addDepsAndProvidesFromOtherPackage(*(res.oldEntry = cacheEntry->entry));
