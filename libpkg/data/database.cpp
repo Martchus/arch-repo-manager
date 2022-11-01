@@ -906,6 +906,7 @@ void PackageUpdater::commit()
 {
     const auto &storage = m_database.m_storage;
     auto &pkgTxn = m_d->packagesTxn;
+    auto txnHandle = pkgTxn.getTransactionHandle();
     if (m_d->clear) {
         const auto &toPreserve = m_d->handledIds;
         for (auto i = pkgTxn.begin<std::unique_ptr>(); i != pkgTxn.end(); ++i) {
@@ -914,47 +915,43 @@ void PackageUpdater::commit()
             }
         }
     }
-    pkgTxn.commit();
     {
-        auto txn = storage->providedDeps.getRWTransaction();
+        auto txn = storage->providedDeps.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }
         for (auto &[dependencyName, affected] : m_d->affectedProvidedDeps) {
             m_d->submit(dependencyName, affected, txn);
         }
-        txn.commit();
     }
     {
-        auto txn = storage->requiredDeps.getRWTransaction();
+        auto txn = storage->requiredDeps.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }
         for (auto &[dependencyName, affected] : m_d->affectedRequiredDeps) {
             m_d->submit(dependencyName, affected, txn);
         }
-        txn.commit();
     }
     {
-        auto txn = storage->providedLibs.getRWTransaction();
+        auto txn = storage->providedLibs.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }
         for (auto &[libraryName, affected] : m_d->affectedProvidedLibs) {
             m_d->submit(libraryName, affected, txn);
         }
-        txn.commit();
     }
     {
-        auto txn = storage->requiredLibs.getRWTransaction();
+        auto txn = storage->requiredLibs.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }
         for (auto &[libraryName, affected] : m_d->affectedRequiredLibs) {
             m_d->submit(libraryName, affected, txn);
         }
-        txn.commit();
     }
+    pkgTxn.commit();
     m_d->lock.unlock();
 }
 
