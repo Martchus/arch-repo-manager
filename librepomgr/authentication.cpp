@@ -89,11 +89,8 @@ UserAuth ServiceSetup::Authentication::authenticate(std::string_view authorizati
     }
 
     // hash password
-    SHA512_CTX sha512;
-    SHA512_Init(&sha512);
-    SHA512_Update(&sha512, password.data(), password.size());
     unsigned char hash[SHA512_DIGEST_LENGTH];
-    SHA512_Final(hash, &sha512);
+    SHA512(reinterpret_cast<const unsigned char *>(password.data()), password.size(), hash);
 
     // check whether password hash matches
     auto i = user->second.passwordSha512.cbegin();
