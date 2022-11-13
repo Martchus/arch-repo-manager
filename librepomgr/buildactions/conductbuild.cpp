@@ -1149,7 +1149,7 @@ void ConductBuild::addPackageToRepo(
     auto readLock = lockToRead();
     const auto &buildData = m_buildPreparation.buildData[packageName];
     const auto &firstPackage = buildData.packages.front().pkg;
-    auto sourcePackageName = packageName % '-' % firstPackage->version + m_sourcePackageExtension;
+    auto sourcePackageName = buildData.sourceInfo->name % '-' % firstPackage->version + m_sourcePackageExtension;
 
     // determine names of binary packages to be copied
     binaryPackages.reserve(buildData.packages.size());
