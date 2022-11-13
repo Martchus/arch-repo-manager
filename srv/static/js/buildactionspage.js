@@ -793,7 +793,9 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
 
 function renderPackageList(packageList)
 {
-    return GenericRendering.renderCustomList(packageList, PackageRendering.renderPackage);
+    return GenericRendering.renderCustomList(packageList, function(packageObj) {
+        return PackageRendering.renderPackage(packageObj);
+    });
 }
 
 function renderBuildPreparationBuildData(buildDataForPackage)
