@@ -538,7 +538,7 @@ void postCloneBuildActions(const Params &params, ResponseHandler &&handler)
     for (const auto &orig : buildActionsSearchResult.actions) {
         const auto id = params.setup.building.allocateBuildActionID();
         auto clone = make_shared<BuildAction>(id);
-        clone->taskName = orig->taskName.empty() ? "Clone" : "Clone of " + orig->taskName;
+        clone->taskName = orig->taskName.empty() ? "Clone" : (orig->taskName.starts_with("Clone") ? orig->taskName : "Clone of " + orig->taskName);
         clone->directory = orig->directory;
         clone->packageNames = orig->packageNames;
         clone->sourceDbs = orig->sourceDbs;
