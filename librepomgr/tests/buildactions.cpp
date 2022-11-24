@@ -46,7 +46,8 @@ class BuildActionsTests : public TestFixture {
     CPPUNIT_TEST(testParsingInfoFromPkgFiles);
     CPPUNIT_TEST(testPreparingBuild);
     CPPUNIT_TEST(testConductingBuild);
-    CPPUNIT_TEST(testCleanup);
+    CPPUNIT_TEST(testRepoCleanup);
+    CPPUNIT_TEST(testBuildServiceCleanup);
     CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -60,7 +61,8 @@ public:
     void testParsingInfoFromPkgFiles();
     void testPreparingBuild();
     void testConductingBuild();
-    void testCleanup();
+    void testRepoCleanup();
+    void testBuildServiceCleanup();
 
 private:
     void initStorage();
@@ -823,7 +825,7 @@ static std::set<std::string> listFiles(const std::filesystem::path &dir)
     return res;
 }
 
-void BuildActionsTests::testCleanup()
+void BuildActionsTests::testRepoCleanup()
 {
     // create a working copy of the test repo "misc" which this test is going to run the cleanup on
     const auto workingDir = std::filesystem::absolute(TestApplication::instance()->workingDirectory()) / "cleanup-test";
@@ -934,4 +936,16 @@ void BuildActionsTests::testCleanup()
         "x86_64/archive/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz.sig",
     });
     CPPUNIT_ASSERT_EQUAL_MESSAGE("files preserved/archived/deleted", expectedFiles2, presentFiles2);
+}
+
+void BuildActionsTests::testBuildServiceCleanup()
+{
+    initStorage();
+
+    // create and run build action
+    // TODO: add build actions so it'll actually delete something
+    m_buildAction = std::make_shared<BuildAction>(0, &m_setup);
+    m_buildAction->type = BuildActionType::BuildServiceCleanup;
+    runBuildAction("buildservice cleanup");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("success", BuildActionResult::Success, m_buildAction->result);
 }
