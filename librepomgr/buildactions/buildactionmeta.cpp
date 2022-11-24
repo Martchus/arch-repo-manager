@@ -373,6 +373,18 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .destinationDb = false,
             .packageNames = false,
         },
+        BuildActionTypeMetaInfo{
+            .id = BuildActionType::BuildServiceCleanup,
+            .category = "Misc",
+            .name = "Clean build-service-internal data",
+            .type = "build-service-cleanup",
+            .flags = {},
+            .settings = {},
+            .directory = false,
+            .sourceDb = false,
+            .destinationDb = false,
+            .packageNames = false,
+        },
     })
     , states({
         BuildActionStatusMetaInfo{

@@ -323,6 +323,9 @@ LibPkg::StorageID BuildAction::start(ServiceSetup &setup, std::unique_ptr<Io::Pa
     case BuildActionType::CustomCommand:
         post<CustomCommand>();
         break;
+    case BuildActionType::BuildServiceCleanup:
+        post<BuildServiceCleanup>();
+        break;
     default:
         resultData = "not implemented yet or invalid type";
         return conclude(BuildActionResult::Failure);
@@ -407,6 +410,43 @@ LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
         m_concludeHandler();
     }
     return id;
+}
+
+BuildServiceCleanup::BuildServiceCleanup(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction)
+    : InternalBuildAction(setup, buildAction)
+{
+}
+
+void BuildServiceCleanup::run()
+{
+    // validate parameter
+    if (auto error = validateParameter(RequiredDatabases::None, RequiredParameters::None); !error.empty()) {
+        reportError(move(error));
+        return;
+    }
+
+    // iterate though build actions and delete those that are unlikely to be relevant anymore
+    auto count = std::size_t();
+    constexpr auto stopAt = 150;
+    m_setup.building.forEachBuildAction(
+        [this, &count, twoWeeksAgo = DateTime::gmtNow() - TimeSpan::fromDays(14)](
+            LibPkg::StorageID id, BuildAction &action, ServiceSetup::BuildSetup::VisitorBehavior &visitorBehavior) {
+            if (count <= stopAt) {
+                return true; // abort deletion if under 150 build actions anyways
+            }
+            if (m_buildAction->id == id || action.finished.isNull()) {
+                return false; // avoid deleting cleanup action itself as well as any unfinished actions
+            }
+            if (action.result != BuildActionResult::Success || action.finished > twoWeeksAgo) {
+                return false; // delete only successful actions that are at least two weeks old
+            }
+            visitorBehavior = ServiceSetup::BuildSetup::VisitorBehavior::Delete;
+            return --count <= stopAt;
+        },
+        &count);
+
+    const auto buildActionLock = m_setup.building.lockToWrite();
+    reportSuccess();
 }
 
 #ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED

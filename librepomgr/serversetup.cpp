@@ -417,22 +417,30 @@ void ServiceSetup::BuildSetup::forEachBuildAction(
     }
 }
 
-void ServiceSetup::BuildSetup::forEachBuildAction(ServiceSetup::BuildSetup::BuildActionVisitorWriteable &&func)
+void ServiceSetup::BuildSetup::forEachBuildAction(ServiceSetup::BuildSetup::BuildActionVisitorWriteable &&func, std::size_t *count)
 {
     auto txn = m_storage->buildActions.getRWTransaction();
+    if (count) {
+        *count = txn.size();
+    }
     for (auto i = txn.begin(); i != txn.end(); ++i) {
         const auto running = m_runningActions.find(i.getID());
         auto &action = running != m_runningActions.end() ? *running->second : i.value();
-        auto save = false;
-        const auto stop = func(i.getID(), action, save);
-        if (save) {
+        auto visitorBehavior = VisitorBehavior::DiscardChanges;
+        const auto stop = func(i.getID(), action, visitorBehavior);
+        if (visitorBehavior == VisitorBehavior::SaveChanges) {
             if (running != m_runningActions.end() && !action.isExecuting()) {
                 m_runningActions.erase(running);
             }
             txn.put(action, i.getID());
+        } else if (visitorBehavior == VisitorBehavior::Delete && !action.isExecuting()) {
+            if (running != m_runningActions.end()) {
+                m_runningActions.erase(running);
+            }
+            txn.del(i.getID());
         }
         if (stop) {
-            return;
+            break;
         }
     }
     txn.commit();
@@ -713,12 +721,12 @@ void ServiceSetup::restoreState()
     building.initStorage(building.dbPath.data());
 
     // ensure no build actions are considered running anymore and populate follow up actions
-    building.forEachBuildAction([this](LibPkg::StorageID, BuildAction &buildAction, bool &save) {
+    building.forEachBuildAction([this](LibPkg::StorageID, BuildAction &buildAction, BuildSetup::VisitorBehavior &visitorBehavior) {
         if (buildAction.isExecuting()) {
             buildAction.status = BuildActionStatus::Finished;
             buildAction.result = BuildActionResult::Failure;
             buildAction.resultData = "service crashed while exectuing";
-            save = true;
+            visitorBehavior = BuildSetup::VisitorBehavior::SaveChanges;
         } else if (buildAction.isScheduled()) {
             for (const auto previousBuildActionId : buildAction.startAfter) {
                 building.m_followUpActions[previousBuildActionId].emplace(buildAction.id);
@@ -809,11 +817,11 @@ int ServiceSetup::run()
     try {
 #endif
         saveState();
-        building.forEachBuildAction([](LibPkg::StorageID, BuildAction &buildAction, bool &save) {
+        building.forEachBuildAction([](LibPkg::StorageID, BuildAction &buildAction, BuildSetup::VisitorBehavior &visitorBehavior) {
             if (buildAction.isExecuting()) {
                 buildAction.status = BuildActionStatus::Finished;
                 buildAction.result = BuildActionResult::Aborted;
-                save = true;
+                visitorBehavior = BuildSetup::VisitorBehavior::SaveChanges;
             }
             return false;
         });

@@ -92,6 +92,12 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
             BuildSetup &setup;
         };
 
+        enum class VisitorBehavior {
+            DiscardChanges,
+            SaveChanges,
+            Delete,
+        };
+
         explicit BuildSetup();
         BuildSetup(BuildSetup &&) = delete;
         ~BuildSetup();
@@ -148,8 +154,8 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         void rebuildDb();
         using BuildActionVisitorBase = std::function<bool(LibPkg::StorageID, BuildActionBase &&)>;
         void forEachBuildAction(std::function<void(std::size_t)> count, BuildActionVisitorBase &&func, std::size_t limit, std::size_t start);
-        using BuildActionVisitorWriteable = std::function<bool(LibPkg::StorageID, BuildAction &, bool &)>;
-        void forEachBuildAction(BuildActionVisitorWriteable &&func);
+        using BuildActionVisitorWriteable = std::function<bool(LibPkg::StorageID, BuildAction &, VisitorBehavior &)>;
+        void forEachBuildAction(BuildActionVisitorWriteable &&func, std::size_t *count = nullptr);
         std::vector<std::shared_ptr<BuildAction>> followUpBuildActions(BuildActionIdType forId);
 
     private:

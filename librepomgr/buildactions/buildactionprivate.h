@@ -656,6 +656,13 @@ private:
     bool m_useContainer;
 };
 
+struct LIBREPOMGR_EXPORT BuildServiceCleanup : public InternalBuildAction {
+    BuildServiceCleanup(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction);
+    void run();
+
+private:
+};
+
 #ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED
 struct LIBREPOMGR_EXPORT DummyBuildAction : public InternalBuildAction {
     DummyBuildAction(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction);
