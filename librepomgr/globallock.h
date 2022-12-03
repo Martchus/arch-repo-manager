@@ -3,6 +3,8 @@
 
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
+#include <list>
 #include <mutex>
 #include <shared_mutex>
 
@@ -16,17 +18,23 @@ struct LogContext;
 struct GlobalSharedMutex {
     void lock();
     bool try_lock();
+    void lock_async(std::function<void()> &&callback);
     void unlock();
 
     void lock_shared();
     bool try_lock_shared();
+    void lock_shared_async(std::function<void()> &&callback);
     void unlock_shared();
 
 private:
+    void notify(std::unique_lock<std::mutex> &lock);
+
     std::mutex m_mutex;
     std::condition_variable m_cv;
     std::uint32_t m_sharedOwners = 0;
     bool m_exclusivelyOwned = false;
+    std::list<std::function<void()>> m_sharedCallbacks;
+    std::function<void()> m_exclusiveCallback;
 };
 
 inline void GlobalSharedMutex::lock()
@@ -48,12 +56,23 @@ inline bool GlobalSharedMutex::try_lock()
     }
 }
 
+inline void GlobalSharedMutex::lock_async(std::function<void()> &&callback)
+{
+    auto lock = std::unique_lock<std::mutex>(m_mutex);
+    if (m_sharedOwners || m_exclusivelyOwned) {
+        m_exclusiveCallback = std::move(callback);
+    } else {
+        m_exclusivelyOwned = true;
+        lock.unlock();
+        callback();
+    }
+}
+
 inline void GlobalSharedMutex::unlock()
 {
     auto lock = std::unique_lock<std::mutex>(m_mutex);
     m_exclusivelyOwned = false;
-    lock.unlock();
-    m_cv.notify_one();
+    notify(lock);
 }
 
 inline void GlobalSharedMutex::lock_shared()
@@ -75,13 +94,51 @@ inline bool GlobalSharedMutex::try_lock_shared()
     }
 }
 
+inline void GlobalSharedMutex::lock_shared_async(std::function<void()> &&callback)
+{
+    auto lock = std::unique_lock<std::mutex>(m_mutex);
+    if (m_exclusivelyOwned) {
+        m_sharedCallbacks.emplace_back(std::move(callback));
+    } else {
+        ++m_sharedOwners;
+        lock.unlock();
+        callback();
+    }
+}
+
 inline void GlobalSharedMutex::unlock_shared()
 {
     auto lock = std::unique_lock<std::mutex>(m_mutex);
     if (!--m_sharedOwners) {
-        lock.unlock();
-        m_cv.notify_one();
+        notify(lock);
     }
+}
+
+inline void GlobalSharedMutex::notify(std::unique_lock<std::mutex> &lock)
+{
+    // invoke callbacks for lock_shared_async()
+    if (!m_sharedCallbacks.empty() && !m_exclusivelyOwned) {
+        auto callbacks = std::move(m_sharedCallbacks);
+        m_sharedOwners += static_cast<std::uint32_t>(callbacks.size());
+        lock.unlock();
+        for (auto &callback : callbacks) {
+            callback();
+        }
+        return;
+    }
+    // invoke callbacks for lock_async()
+    if (m_exclusiveCallback) {
+        if (!m_sharedOwners && !m_exclusivelyOwned) {
+            auto callback = std::move(m_exclusiveCallback);
+            m_exclusivelyOwned = true;
+            lock.unlock();
+            callback();
+            return;
+        }
+    }
+    // resume threads blocked in lock() and lock_shared()
+    lock.unlock();
+    m_cv.notify_one();
 }
 
 /// \brief A wrapper around a standard lock which logs acquisition/release.
