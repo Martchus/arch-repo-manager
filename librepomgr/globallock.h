@@ -18,12 +18,12 @@ struct LogContext;
 struct GlobalSharedMutex {
     void lock();
     bool try_lock();
-    void lock_async(std::function<void()> &&callback);
+    void lock_async(std::move_only_function<void()> &&callback);
     void unlock();
 
     void lock_shared();
     bool try_lock_shared();
-    void lock_shared_async(std::function<void()> &&callback);
+    void lock_shared_async(std::move_only_function<void()> &&callback);
     void unlock_shared();
 
 private:
@@ -33,8 +33,8 @@ private:
     std::condition_variable m_cv;
     std::uint32_t m_sharedOwners = 0;
     bool m_exclusivelyOwned = false;
-    std::list<std::function<void()>> m_sharedCallbacks;
-    std::function<void()> m_exclusiveCallback;
+    std::list<std::move_only_function<void()>> m_sharedCallbacks;
+    std::move_only_function<void()> m_exclusiveCallback;
 };
 
 inline void GlobalSharedMutex::lock()
@@ -56,7 +56,7 @@ inline bool GlobalSharedMutex::try_lock()
     }
 }
 
-inline void GlobalSharedMutex::lock_async(std::function<void()> &&callback)
+inline void GlobalSharedMutex::lock_async(std::move_only_function<void()> &&callback)
 {
     auto lock = std::unique_lock<std::mutex>(m_mutex);
     if (m_sharedOwners || m_exclusivelyOwned) {
@@ -94,7 +94,7 @@ inline bool GlobalSharedMutex::try_lock_shared()
     }
 }
 
-inline void GlobalSharedMutex::lock_shared_async(std::function<void()> &&callback)
+inline void GlobalSharedMutex::lock_shared_async(std::move_only_function<void()> &&callback)
 {
     auto lock = std::unique_lock<std::mutex>(m_mutex);
     if (m_exclusivelyOwned) {
@@ -143,7 +143,9 @@ inline void GlobalSharedMutex::notify(std::unique_lock<std::mutex> &lock)
 
 /// \brief A wrapper around a standard lock which logs acquisition/release.
 template <typename UnderlyingLockType> struct LoggingLock {
-    template <typename... Args> LoggingLock(LogContext &log, std::string &&name, Args &&...args);
+    using LockType = UnderlyingLockType;
+    explicit LoggingLock(LogContext &log, std::string &&name);
+    template <typename... Args> explicit LoggingLock(LogContext &log, std::string &&name, Args &&...args);
     LoggingLock(LoggingLock &&) = default;
     ~LoggingLock();
 
@@ -169,6 +171,14 @@ constexpr std::string_view lockName(std::shared_lock<GlobalSharedMutex> &)
 constexpr std::string_view lockName(std::unique_lock<GlobalSharedMutex> &)
 {
     return "exclusive";
+}
+
+template <typename UnderlyingLockType>
+inline LoggingLock<UnderlyingLockType>::LoggingLock(LogContext &log, std::string &&name)
+    : m_log(log)
+    , m_name(std::move(name))
+{
+    m_log("Acquiring ", lockName(m_lock), " lock \"", m_name, "\"\n");
 }
 
 template <typename UnderlyingLockType>
@@ -202,6 +212,8 @@ struct GlobalLockable {
     [[nodiscard]] SharedLoggingLock tryLockToRead(LogContext &log, std::string &&name) const;
     [[nodiscard]] UniqueLoggingLock tryLockToWrite(LogContext &log, std::string &&name);
     [[nodiscard]] UniqueLoggingLock lockToWrite(LogContext &log, std::string &&name, SharedLoggingLock &readLock);
+    void lockToRead(LogContext &log, std::string &&name, std::move_only_function<void(SharedLoggingLock &&lock)> &&callback) const;
+    void lockToWrite(LogContext &log, std::string &&name, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback);
 
 private:
     mutable GlobalSharedMutex m_mutex;
@@ -231,6 +243,24 @@ inline UniqueLoggingLock GlobalLockable::lockToWrite(LogContext &log, std::strin
 {
     readLock.lock().unlock();
     return UniqueLoggingLock(log, std::move(name), m_mutex);
+}
+
+inline void LibRepoMgr::GlobalLockable::lockToRead(
+    LogContext &log, std::string &&name, std::move_only_function<void(SharedLoggingLock &&)> &&callback) const
+{
+    m_mutex.lock_shared_async([this, lock = SharedLoggingLock(log, std::move(name)), cb = std::move(callback)]() mutable {
+        lock.lock() = SharedLoggingLock::LockType(m_mutex, std::adopt_lock);
+        cb(std::move(lock));
+    });
+}
+
+inline void LibRepoMgr::GlobalLockable::lockToWrite(
+    LogContext &log, std::string &&name, std::move_only_function<void(UniqueLoggingLock &&)> &&callback)
+{
+    m_mutex.lock_async([this, lock = UniqueLoggingLock(log, std::move(name)), cb = std::move(callback)]() mutable {
+        lock.lock() = UniqueLoggingLock::LockType(m_mutex, std::adopt_lock);
+        cb(std::move(lock));
+    });
 }
 
 } // namespace LibRepoMgr

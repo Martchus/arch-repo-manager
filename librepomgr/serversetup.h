@@ -16,6 +16,7 @@
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ssl/context.hpp>
 
+#include <functional>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -178,6 +179,8 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         [[nodiscard]] SharedLoggingLock acquireToRead(LogContext &log, std::string &&lockName);
         [[nodiscard]] UniqueLoggingLock acquireToWrite(LogContext &log, std::string &&lockName);
         [[nodiscard]] std::pair<LockTable *, std::unique_lock<std::shared_mutex>> acquireLockTable();
+        void acquireToRead(LogContext &log, std::string &&name, std::move_only_function<void(SharedLoggingLock &&lock)> &&callback);
+        void acquireToWrite(LogContext &log, std::string &&name, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback);
         void clear();
         static std::string forDatabase(std::string_view dbName, std::string_view dbArch);
         static std::string forDatabase(const LibPkg::Database &db);
@@ -215,6 +218,20 @@ inline UniqueLoggingLock ServiceSetup::Locks::acquireToWrite(LogContext &log, st
 {
     const auto locktableLock = std::shared_lock(m_cleanupMutex);
     return namedLock(lockName).lockToWrite(log, std::move(lockName));
+}
+
+inline void ServiceSetup::Locks::acquireToRead(
+    LogContext &log, std::string &&lockName, std::move_only_function<void(SharedLoggingLock &&lock)> &&callback)
+{
+    const auto locktableLock = std::shared_lock(m_cleanupMutex);
+    namedLock(lockName).lockToRead(log, std::move(lockName), std::move(callback));
+}
+
+inline void ServiceSetup::Locks::acquireToWrite(
+    LogContext &log, std::string &&lockName, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback)
+{
+    const auto locktableLock = std::shared_lock(m_cleanupMutex);
+    namedLock(lockName).lockToWrite(log, std::move(lockName), std::move(callback));
 }
 
 inline std::pair<ServiceSetup::Locks::LockTable *, std::unique_lock<std::shared_mutex>> ServiceSetup::Locks::acquireLockTable()
