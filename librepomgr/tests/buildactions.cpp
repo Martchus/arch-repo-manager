@@ -295,7 +295,7 @@ void BuildActionsTests::testBuildActionProcess()
     CPPUNIT_ASSERT_EQUAL("printing some numbers"sv, logLines.front());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("trailing line break", ""sv, logLines.back());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("last line", "line 5000"sv, logLines[logLines.size() - 2u]);
-    TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*Launched \"test\", PID\\: [0-9]+.*\n.*"s, std::regex::extended, output);
+    TESTUTILS_ASSERT_LIKE_FLAGS("PID logged", ".*Launched \"test\", PID: [0-9]+.*\n.*"s, std::regex::extended, output);
 }
 
 /*!
