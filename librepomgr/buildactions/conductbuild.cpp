@@ -781,38 +781,46 @@ void ConductBuild::enqueueDownloads(const BatchProcessingSession::SharedPointerT
     }
 }
 
-void ConductBuild::enqueueMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, size_t maxParallelInvocations)
+void ConductBuild::enqueueMakechrootpkg(
+    const BatchProcessingSession::SharedPointerType &makepkgchrootSession, std::size_t maxParallelInvocations, std::size_t invocation)
 {
     if (reportAbortedIfAborted()) {
         return;
     }
     assert(maxParallelInvocations == 1); // FIXME: parallel builds not implemented yet (required unique working copies and locking repo-add)
-    for (std::size_t invocations = 0; invocations < maxParallelInvocations;) {
-        const auto hasFailuresInPreviousBatches = makepkgchrootSession->hasFailuresInPreviousBatches();
-        const auto *const packageName = makepkgchrootSession->getCurrentPackageNameIfValidAndRelevantAndSelectNext();
-        if (!packageName) {
-            break;
-        }
-        switch (invokeMakechrootpkg(makepkgchrootSession, *packageName, hasFailuresInPreviousBatches)) {
-        case InvocationResult::Ok:
-            invocations += 1;
-            break;
-        case InvocationResult::Error:
-            makepkgchrootSession->addResponse(string(*packageName));
-            {
-                auto lock = lockToRead();
-                auto errorMessage = formattedPhraseString(Phrases::ErrorMessage) % "Unable to start build of " % *packageName
-                        % formattedPhraseString(Phrases::End) % "->  reason: " % m_buildProgress.progressByPackage[*packageName].error
-                    + '\n';
-                lock.unlock();
-                m_buildAction->log()(std::move(errorMessage));
-            }
-            break;
-        default:;
-        }
+
+    // invoke makechrootpkg for the next package, handle result and continue or return early if there's no next package
+    const auto hasFailuresInPreviousBatches = makepkgchrootSession->hasFailuresInPreviousBatches();
+    const auto *const packageName = makepkgchrootSession->getCurrentPackageNameIfValidAndRelevantAndSelectNext();
+    if (!packageName) {
+        return;
     }
-    const auto lock = lockToRead();
-    dumpBuildProgress();
+    invokeMakechrootpkg(makepkgchrootSession, *packageName, hasFailuresInPreviousBatches,
+        [buildAction = m_buildAction, this, makepkgchrootSession, packageName, maxParallelInvocations, invocation](auto res) mutable {
+            switch (res) {
+            case InvocationResult::Ok:
+                invocation += 1;
+                break;
+            case InvocationResult::Error:
+                makepkgchrootSession->addResponse(string(*packageName));
+                {
+                    auto lock = lockToRead();
+                    auto errorMessage = formattedPhraseString(Phrases::ErrorMessage) % "Unable to start build of " % *packageName
+                            % formattedPhraseString(Phrases::End) % "->  reason: " % m_buildProgress.progressByPackage[*packageName].error
+                        + '\n';
+                    lock.unlock();
+                    m_buildAction->log()(std::move(errorMessage));
+                }
+                break;
+            default:;
+            }
+            if (invocation < maxParallelInvocations) {
+                enqueueMakechrootpkg(makepkgchrootSession, maxParallelInvocations, invocation);
+            } else {
+                const auto lock = lockToRead();
+                dumpBuildProgress();
+            }
+        });
 }
 
 bool ConductBuild::checkForFailedDependency(
@@ -939,8 +947,8 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
     return InvocationResult::Ok;
 }
 
-InvocationResult ConductBuild::invokeMakechrootpkg(
-    const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, bool hasFailuresInPreviousBatches)
+void ConductBuild::invokeMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+    bool hasFailuresInPreviousBatches, std::move_only_function<void(InvocationResult)> &&cb)
 {
     auto lock = lockToRead();
     auto &packageProgress = m_buildProgress.progressByPackage[packageName];
@@ -951,14 +959,15 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         if (m_autoStaging && packageProgress.stagingNeeded == PackageStagingNeeded::Yes) {
             makepkgchrootSession->enableStagingInNextBatch();
         }
-        return InvocationResult::Skipped;
+        lock.unlock();
+        return cb(InvocationResult::Skipped);
     }
 
     // add package immediately to repository if it has already been built
     if (!packageProgress.finished.isNull()) {
         lock.unlock();
         addPackageToRepo(makepkgchrootSession, packageName, packageProgress);
-        return InvocationResult::Ok;
+        return cb(InvocationResult::Ok);
     }
 
     // check whether we can build this package when building as far as possible or when the build order has been
@@ -974,9 +983,10 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
             dependencies.emplace_back(&package->dependencies);
         }
         if (checkForFailedDependency(packageName, dependencies)) {
-            const auto writeLock = lockToWrite(lock);
+            auto writeLock = lockToWrite(lock);
             packageProgress.error = "unable to build because dependency failed";
-            return InvocationResult::Error;
+            writeLock.unlock();
+            return cb(InvocationResult::Error);
         }
     }
 
@@ -986,7 +996,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
             const auto writeLock = lockToWrite(lock);
             packageProgress.error = "unable to build because sources are missing";
         }
-        return InvocationResult::Error;
+        return cb(InvocationResult::Error);
     }
 
     // determine options/variables to pass
@@ -1017,7 +1027,7 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
 
     // invoke makecontainerpkg instead if container-flag set
     if (m_useContainer) {
-        return invokeMakecontainerpkg(makepkgchrootSession, packageName, packageProgress, makepkgFlags);
+        return invokeMakecontainerpkg(makepkgchrootSession, packageName, packageProgress, makepkgFlags, std::move(lock), std::move(cb));
     }
 
     // do some sanity checks with the chroot
@@ -1027,12 +1037,14 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         if (!std::filesystem::is_directory(buildRoot)) {
             auto writeLock = lockToWrite(lock);
             packageProgress.error = "Chroot directory \"" % buildRoot + "\" is no directory.";
-            return InvocationResult::Error;
+            writeLock.unlock();
+            return cb(InvocationResult::Error);
         }
         if (!std::filesystem::is_regular_file(buildRoot + "/.arch-chroot")) {
             auto writeLock = lockToWrite(lock);
             packageProgress.error = "Chroot directory \"" % buildRoot + "\" does not contain .arch-chroot file.";
-            return InvocationResult::Error;
+            writeLock.unlock();
+            return cb(InvocationResult::Error);
         }
         for (const auto *const dir : { "/usr/bin", "/usr/lib", "/usr/include", "/etc" }) {
             if (std::filesystem::is_directory(buildRoot + dir)) {
@@ -1040,12 +1052,14 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
             }
             auto writeLock = lockToWrite(lock);
             packageProgress.error = "Chroot directory \"" % buildRoot % "\" does not contain directory \"" % dir + "\".";
-            return InvocationResult::Error;
+            writeLock.unlock();
+            return cb(InvocationResult::Error);
         }
     } catch (const std::filesystem::filesystem_error &e) {
         auto writeLock = lockToWrite(lock);
         packageProgress.error = "Unable to check chroot directory \"" % buildRoot % "\": " + e.what();
-        return InvocationResult::Error;
+        writeLock.unlock();
+        return cb(InvocationResult::Error);
     }
 
     // lock the chroot directory to prevent other build tasks from using it
@@ -1059,9 +1073,10 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
         std::filesystem::copy_file(m_makepkgConfigPath, buildRoot + "/etc/makepkg.conf", std::filesystem::copy_options::overwrite_existing);
     } catch (const std::filesystem::filesystem_error &e) {
         chrootLock.lock().unlock();
-        const auto writeLock = lockToWrite(lock);
+        auto writeLock = lockToWrite(lock);
         packageProgress.error = "Unable to configure chroot \"" % buildRoot % "\": " + e.what();
-        return InvocationResult::Error;
+        writeLock.unlock();
+        return cb(InvocationResult::Error);
     }
 
     // prepare process session (after configuring chroot so we don't get stuck if configuring chroot fails)
@@ -1085,11 +1100,13 @@ InvocationResult ConductBuild::invokeMakechrootpkg(
     processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, sudoArgs, makechrootpkgFlags, "-C",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
         packageProgress.makepkgFlags, boost::process::std_in < boost::asio::buffer(m_sudoPassword));
-    return InvocationResult::Ok;
+    lock.unlock();
+    return cb(InvocationResult::Ok);
 }
 
-InvocationResult ConductBuild::invokeMakecontainerpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
-    const std::string &packageName, PackageBuildProgress &packageProgress, const std::vector<std::string> &makepkgFlags)
+void ConductBuild::invokeMakecontainerpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+    PackageBuildProgress &packageProgress, const std::vector<std::string> &makepkgFlags, std::shared_lock<std::shared_mutex> &&lock,
+    std::move_only_function<void(InvocationResult)> &&cb)
 {
     // skip initial checks as this function is only supposed to be called from within invokeMakechrootpkg
 
@@ -1100,8 +1117,10 @@ InvocationResult ConductBuild::invokeMakecontainerpkg(const BatchProcessingSessi
         std::filesystem::copy_file(
             m_makepkgConfigPath, packageProgress.buildDirectory + "/makepkg.conf", std::filesystem::copy_options::overwrite_existing);
     } catch (const std::filesystem::filesystem_error &e) {
+        auto writeLock = lockToWrite(lock);
         packageProgress.error = "Unable to copy config files into build directory \"" % packageProgress.buildDirectory % "\": " + e.what();
-        return InvocationResult::Error;
+        writeLock.unlock();
+        return cb(InvocationResult::Error);
     }
 
     // determine options/variables to pass
@@ -1135,7 +1154,8 @@ InvocationResult ConductBuild::invokeMakecontainerpkg(const BatchProcessingSessi
         ps(Phrases::SubMessage), "build dir: ", packageProgress.buildDirectory, '\n');
     processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeContainerPkgPath, makecontainerpkgFlags, "--",
         makepkgFlags, packageProgress.makepkgFlags);
-    return InvocationResult::Ok;
+    lock.unlock();
+    return cb(InvocationResult::Ok);
 }
 
 void ConductBuild::addPackageToRepo(

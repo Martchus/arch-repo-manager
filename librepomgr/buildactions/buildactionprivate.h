@@ -586,17 +586,19 @@ private:
     void makeConfigFiles();
     void downloadSourcesAndContinueBuilding();
     void enqueueDownloads(const BatchProcessingSession::SharedPointerType &downloadsSession, std::size_t maxParallelDownloads);
-    void enqueueMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, std::size_t maxParallelInvocations);
+    void enqueueMakechrootpkg(
+        const BatchProcessingSession::SharedPointerType &makepkgchrootSession, std::size_t maxParallelInvocations, std::size_t invocation = 0);
     bool checkForFailedDependency(
         const std::string &packageNameToCheck, const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const;
     InvocationResult invokeUpdatePkgSums(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeMakepkgToMakeSourcePackage(const BatchProcessingSession::SharedPointerType &downloadsSession,
         const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
-    InvocationResult invokeMakechrootpkg(
-        const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, bool hasFailuresInPreviousBatches);
-    InvocationResult invokeMakecontainerpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
-        PackageBuildProgress &packageProgress, const std::vector<std::string> &makepkgFlags);
+    void invokeMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+        bool hasFailuresInPreviousBatches, std::move_only_function<void(InvocationResult)> &&cb);
+    void invokeMakecontainerpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+        PackageBuildProgress &packageProgress, const std::vector<std::string> &makepkgFlags, std::shared_lock<std::shared_mutex> &&lock,
+        std::move_only_function<void(InvocationResult)> &&cb);
     void addPackageToRepo(
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName, PackageBuildProgress &packageProgress);
     void invokeGpg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
