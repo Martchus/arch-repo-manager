@@ -345,9 +345,56 @@ void BuildAction::assignStartAfter(const std::vector<std::shared_ptr<BuildAction
 void BuildAction::abort()
 {
     m_aborted.store(true);
-    if (m_setup && m_stopHandler) {
+    if (!m_setup) {
+        return;
+    }
+    if (m_stopHandler) {
         boost::asio::post(m_setup->building.ioContext.get_executor(), m_stopHandler);
     }
+    if (m_waitingOnAsyncLock) {
+        const auto buildActionLock = m_setup->building.lockToWrite();
+        if (isExecuting()) {
+            conclude(BuildActionResult::Aborted);
+        }
+    }
+}
+
+void LibRepoMgr::BuildAction::acquireToWrite(std::string &&lockName, std::move_only_function<void(UniqueLoggingLock &&)> &&callback)
+{
+    // flag this action as "waiting for async lock" so the abort() function is allowed to conclude the action right away (and thus the
+    // build action is not stuck in "running" until the lock is acquired)
+    m_waitingOnAsyncLock.store(true);
+
+    // handle abortion if aborted (instead of acquiring the lock)
+    if (m_aborted) {
+        auto buildActionLock = m_setup->building.lockToWrite();
+        if (isExecuting()) {
+            conclude(BuildActionResult::Aborted);
+        }
+        return;
+    }
+
+    // acquire the lock asynchronously
+    m_setup->locks.acquireToWrite(
+        log(), std::move(lockName), [t = shared_from_this(), callback = std::move(callback)](UniqueLoggingLock &&lock) mutable {
+            // stop the abort() function from immediately concluding the build action again
+            t->m_waitingOnAsyncLock.store(false);
+
+            // execute the callback in another building thread to avoid interferances with the thread that invoked this callback (when releasing its own lock)
+            boost::asio::post(t->m_setup->building.ioContext.get_executor(), [t = t, callback = std::move(callback), lock = std::move(lock)] mutable {
+                // conclude the action as aborted if it has been aborted meanwhile
+                auto buildActionLock = t->m_setup->building.lockToWrite();
+                if (t->m_aborted && t->isExecuting()) {
+                    t->conclude(BuildActionResult::Aborted);
+                }
+
+                // execute the callback only if the action hasn't been aborted
+                if (!t->m_aborted) {
+                    buildActionLock.unlock();
+                    callback(std::move(lock));
+                }
+            });
+        });
 }
 
 template <typename InternalBuildActionType> void BuildAction::post()

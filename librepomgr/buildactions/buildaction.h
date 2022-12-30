@@ -215,6 +215,7 @@ public:
     LibPkg::StorageID start(ServiceSetup &setup, std::unique_ptr<Io::PasswordFile> &&secrets);
     void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
     void abort();
+    void acquireToWrite(std::string &&lockName, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback);
     void appendOutput(std::string_view output);
     void appendOutput(std::string &&output);
     template <typename... Args> void appendOutput(Args &&...args);
@@ -254,6 +255,7 @@ private:
     LogContext m_log;
     ServiceSetup *m_setup = nullptr;
     std::atomic_bool m_aborted = false;
+    std::atomic_bool m_waitingOnAsyncLock = false;
     std::function<void(void)> m_stopHandler;
     std::function<void(void)> m_concludeHandler;
     std::mutex m_processesMutex;

@@ -596,6 +596,14 @@ private:
         const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     void invokeMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
         bool hasFailuresInPreviousBatches, std::move_only_function<void(InvocationResult)> &&cb);
+    void invokeMakechrootpkgStep2(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+        UniqueLoggingLock &&chrootLock, const std::string &chrootDir, const std::string &buildRoot,
+        const std::vector<std::string> &makechrootpkgFlags, const std::vector<std::string> &makepkgFlags, const std::vector<std::string> &sudoArgs,
+        std::move_only_function<void(InvocationResult)> &&cb);
+    void invokeMakechrootpkgStep3(std::shared_ptr<BuildProcessSession> &processSession, const std::string &packageName,
+        UniqueLoggingLock &&chrootLock, UniqueLoggingLock &&chrootUserLock, const std::string &chrootDir,
+        const std::vector<std::string> &makechrootpkgFlags, const std::vector<std::string> &makepkgFlags, const std::vector<std::string> &sudoArgs,
+        std::move_only_function<void(InvocationResult)> &&cb);
     void invokeMakecontainerpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, const std::vector<std::string> &makepkgFlags, std::shared_lock<std::shared_mutex> &&lock,
         std::move_only_function<void(InvocationResult)> &&cb);

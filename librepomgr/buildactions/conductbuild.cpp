@@ -1063,9 +1063,21 @@ void ConductBuild::invokeMakechrootpkg(const BatchProcessingSession::SharedPoint
     }
 
     // lock the chroot directory to prevent other build tasks from using it
+    auto lockName = std::string(buildRoot);
     m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, '\n');
-    auto chrootLock = m_setup.locks.acquireToWrite(m_buildAction->log(), std::string(buildRoot));
+    m_buildAction->acquireToWrite(std::move(lockName),
+        [this, makepkgchrootSession, &packageName, chrootDir = std::move(chrootDir), buildRoot = std::move(buildRoot),
+            makechrootpkgFlags = std::move(makechrootpkgFlags), makepkgFlags = std::move(makepkgFlags), sudoArgs = std::move(sudoArgs),
+            cb = std::move(cb)](UniqueLoggingLock &&chrootLock) mutable {
+            invokeMakechrootpkgStep2(makepkgchrootSession, packageName, std::move(chrootLock), chrootDir, buildRoot, makechrootpkgFlags, makepkgFlags,
+                sudoArgs, std::move(cb));
+        });
+}
 
+void ConductBuild::invokeMakechrootpkgStep2(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+    UniqueLoggingLock &&chrootLock, const std::string &chrootDir, const std::string &buildRoot, const std::vector<std::string> &makechrootpkgFlags,
+    const std::vector<std::string> &makepkgFlags, const std::vector<std::string> &sudoArgs, std::move_only_function<void(InvocationResult)> &&cb)
+{
     // copy config files into chroot directory
     try {
         std::filesystem::copy_file(makepkgchrootSession->isStagingEnabled() ? m_pacmanStagingConfigPath : m_pacmanConfigPath,
@@ -1073,13 +1085,15 @@ void ConductBuild::invokeMakechrootpkg(const BatchProcessingSession::SharedPoint
         std::filesystem::copy_file(m_makepkgConfigPath, buildRoot + "/etc/makepkg.conf", std::filesystem::copy_options::overwrite_existing);
     } catch (const std::filesystem::filesystem_error &e) {
         chrootLock.lock().unlock();
-        auto writeLock = lockToWrite(lock);
-        packageProgress.error = "Unable to configure chroot \"" % buildRoot % "\": " + e.what();
+        auto writeLock = lockToWrite();
+        m_buildProgress.progressByPackage[packageName].error = "Unable to configure chroot \"" % buildRoot % "\": " + e.what();
         writeLock.unlock();
         return cb(InvocationResult::Error);
     }
 
     // prepare process session (after configuring chroot so we don't get stuck if configuring chroot fails)
+    auto lock = lockToRead();
+    auto &packageProgress = m_buildProgress.progressByPackage[packageName];
     auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
         std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
             std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
@@ -1088,6 +1102,7 @@ void ConductBuild::invokeMakechrootpkg(const BatchProcessingSession::SharedPoint
             &ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2)));
     processSession->registerNewDataHandler(BufferSearch("Synchronizing chroot copy", "\n", std::string_view(),
         [processSession = processSession.get()](BufferSearch &, std::string &&) { processSession->locks().pop_back(); }));
+    lock.unlock();
 
     // invoke makechrootpkg to build package
     m_buildAction->log()(Phrases::InfoMessage, "Invoking makechrootpkg for ", packageName, " via ", m_makeChrootPkgPath.string(), '\n',
@@ -1095,8 +1110,26 @@ void ConductBuild::invokeMakechrootpkg(const BatchProcessingSession::SharedPoint
         ps(Phrases::SubMessage), "chroot user: ", packageProgress.chrootUser, '\n');
     auto &locks = processSession->locks();
     locks.reserve(2);
-    locks.emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(), chrootDir % '/' + packageProgress.chrootUser));
+    m_buildAction->acquireToWrite(chrootDir % '/' + packageProgress.chrootUser,
+        [this, processSession, &packageName, chrootLock = std::move(chrootLock), chrootDir = std::move(chrootDir),
+            makechrootpkgFlags = std::move(makechrootpkgFlags), makepkgFlags = std::move(makepkgFlags), sudoArgs = std::move(sudoArgs),
+            cb = std::move(cb)](UniqueLoggingLock &&chrootUserLock) mutable {
+            invokeMakechrootpkgStep3(processSession, packageName, std::move(chrootLock), std::move(chrootUserLock), chrootDir, makechrootpkgFlags,
+                makepkgFlags, sudoArgs, std::move(cb));
+        });
+}
+
+void ConductBuild::invokeMakechrootpkgStep3(std::shared_ptr<BuildProcessSession> &processSession, const std::string &packageName,
+    UniqueLoggingLock &&chrootLock, UniqueLoggingLock &&chrootUserLock, const std::string &chrootDir,
+    const std::vector<std::string> &makechrootpkgFlags, const std::vector<std::string> &makepkgFlags, const std::vector<std::string> &sudoArgs,
+    std::move_only_function<void(InvocationResult)> &&cb)
+{
+    // invoke makechrootpkg to build package
+    auto &locks = processSession->locks();
+    locks.emplace_back(std::move(chrootUserLock));
     locks.emplace_back(std::move(chrootLock));
+    auto lock = lockToRead();
+    auto &packageProgress = m_buildProgress.progressByPackage[packageName];
     processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, sudoArgs, makechrootpkgFlags, "-C",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
         packageProgress.makepkgFlags, boost::process::std_in < boost::asio::buffer(m_sudoPassword));
