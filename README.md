@@ -380,7 +380,7 @@ npm install --save xterm-addon-search
 ```
 
 ## Copyright notice and license
-Copyright © 2017-2022 Marius Kittler
+Copyright © 2017-2023 Marius Kittler
 
 All code is licensed under [GPL-2-or-later](LICENSE). This does *not* apply to
 code contained in Git repositories included as Git submodule (which contain
