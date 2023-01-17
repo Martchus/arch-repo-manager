@@ -1436,13 +1436,17 @@ void ConductBuild::invokeRepoAdd(const BatchProcessingSession::SharedPointerType
     auto processSession = m_buildAction->makeBuildProcess("repo-add for " + packageName, packageProgress.buildDirectory + "/repo-add.log",
         std::bind(&ConductBuild::handleRepoAddErrorsAndMakeNextPackage, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress),
             std::placeholders::_1, std::placeholders::_2));
-    processSession->locks().emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(),
+    m_setup.locks.acquireToWrite(m_buildAction->log(),
         ServiceSetup::Locks::forDatabase(
-            buildResult.needsStaging ? m_buildPreparation.stagingDb : m_buildPreparation.targetDb, m_buildPreparation.targetArch)));
-    processSession->launch(boost::process::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);
-    m_buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage), "repo path: ", buildResult.repoPath,
-        '\n', ps(Phrases::SubMessage), "db path: ", buildResult.dbFilePath, '\n', ps(Phrases::SubMessage),
-        "package(s): ", joinStrings(buildResult.binaryPackageNames), '\n');
+            buildResult.needsStaging ? m_buildPreparation.stagingDb : m_buildPreparation.targetDb, m_buildPreparation.targetArch),
+        [this, &packageName, processSession, buildAction = m_buildAction, &buildResult](UniqueLoggingLock &&lock) {
+            processSession->locks().emplace_back(std::move(lock));
+            processSession->launch(
+                boost::process::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);
+            buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage),
+                "repo path: ", buildResult.repoPath, '\n', ps(Phrases::SubMessage), "db path: ", buildResult.dbFilePath, '\n',
+                ps(Phrases::SubMessage), "package(s): ", joinStrings(buildResult.binaryPackageNames), '\n');
+        });
 }
 
 void ConductBuild::checkDownloadErrorsAndMakePackages(BatchProcessingSession::ContainerType &&failedPackages)
