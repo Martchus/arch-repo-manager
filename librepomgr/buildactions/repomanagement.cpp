@@ -153,13 +153,16 @@ void RemovePackages::run()
     }
 
     // remove package from database file
-    auto repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
-        std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2));
-    repoRemoveProcess->locks().emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName)));
-    repoRemoveProcess->launch(
-        boost::process::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
-    m_buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", m_destinationRepoDirectory, "\" for \"", m_destinationDatabaseFile,
-        "\", see logfile for details\n");
+    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName),
+        [this, buildAction = m_buildAction,
+            repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
+                std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2))](UniqueLoggingLock &&lock) {
+            repoRemoveProcess->locks().emplace_back(std::move(lock));
+            repoRemoveProcess->launch(
+                boost::process::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
+            buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", m_destinationRepoDirectory, "\" for \"",
+                m_destinationDatabaseFile, "\", see logfile for details\n");
+        });
 }
 
 void RemovePackages::handleRepoRemoveResult(boost::process::child &&child, ProcessResult &&result)
@@ -298,20 +301,29 @@ void MovePackages::run()
     const auto processSession = MultiSession<void>::create(m_setup.building.ioContext, std::bind(&MovePackages::conclude, this));
 
     // add packages to database file of destination repo
-    auto repoAddProcess = m_buildAction->makeBuildProcess("repo-add", m_workingDirectory + "/repo-add.log",
-        std::bind(&MovePackages::handleRepoAddResult, this, processSession, std::placeholders::_1, std::placeholders::_2));
-    repoAddProcess->locks().emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName)));
-    repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
+    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName),
+        [this, buildAction = m_buildAction,
+            repoAddProcess = m_buildAction->makeBuildProcess("repo-add", m_workingDirectory + "/repo-add.log",
+                std::bind(&MovePackages::handleRepoAddResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
+            UniqueLoggingLock &&lock) {
+            repoAddProcess->locks().emplace_back(std::move(lock));
+            repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
+            m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", m_destinationRepoDirectory, "\" for \"",
+                m_destinationDatabaseFile, "\", see logfile for details\n");
+        });
 
     // remove package from database file of source repo
-    auto repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
-        std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2));
-    repoRemoveProcess->locks().emplace_back(m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_sourceDatabaseLockName)));
-    repoRemoveProcess->launch(boost::process::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
-
-    m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", m_destinationRepoDirectory, "\" for \"", m_destinationDatabaseFile,
-        "\", see logfile for details\n", ps(Phrases::InfoMessage), "Invoking repo-remove within \"", m_sourceRepoDirectory, "\" for \"",
-        m_sourceDatabaseFile, "\", see logfile for details\n");
+    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName),
+        [this, buildAction = m_buildAction,
+            repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
+                std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
+            UniqueLoggingLock &&lock) {
+            repoRemoveProcess->locks().emplace_back(std::move(lock));
+            repoRemoveProcess->launch(
+                boost::process::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
+            m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", m_sourceRepoDirectory, "\" for \"", m_sourceDatabaseFile,
+                "\", see logfile for details\n");
+        });
 }
 
 void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::child &&child, ProcessResult &&result)
