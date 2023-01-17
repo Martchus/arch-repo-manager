@@ -381,7 +381,16 @@ struct LIBREPOMGR_EXPORT CustomCommand : public InternalBuildAction {
     void run();
 
 private:
+    void acquireNextSharedLock();
+    void acquireNextExclusiveLock();
+
     std::string m_workingDirectory;
+    const std::string *m_command;
+    std::shared_ptr<BuildProcessSession> m_process;
+    std::set<std::string_view> m_sharedLockNames;
+    std::set<std::string_view> m_exclusiveLockNames;
+    std::set<std::string_view>::iterator m_sharedLockNamesIterator;
+    std::set<std::string_view>::iterator m_exclusiveLockNamesIterator;
 };
 
 struct LIBREPOMGR_EXPORT ReloadDatabase : public InternalBuildAction {
