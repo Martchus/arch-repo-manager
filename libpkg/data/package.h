@@ -482,7 +482,7 @@ inline DependencyDetail::DependencyDetail(
 }
 
 inline DependencyDetail::DependencyDetail(std::string &&version, DependencyMode mode)
-    : version(move(version))
+    : version(std::move(version))
     , mode(mode)
 {
 }

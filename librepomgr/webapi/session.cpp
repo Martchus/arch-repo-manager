@@ -168,7 +168,7 @@ void Session::respond(std::shared_ptr<Response> &&response)
             m_strand, std::bind(&Session::responded, shared_from_this(), std::placeholders::_1, std::placeholders::_2, response->need_eof())));
 
     // keep message alive as long as the session exists
-    m_res = move(response);
+    m_res = std::move(response);
 }
 
 void Session::respond(
