@@ -159,7 +159,9 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
 #endif
     const auto methodString = request.method_string();
     const auto targetString = request.target();
-    respond(Render::makeNotFound(request, argsToString("route \"", std::string_view(methodString.data(), methodString.size()), ' ', std::string_view(targetString.data(), targetString.size()), '\"')));
+    respond(Render::makeNotFound(request,
+        argsToString("route \"", std::string_view(methodString.data(), methodString.size()), ' ',
+            std::string_view(targetString.data(), targetString.size()), '\"')));
 }
 
 void Session::respond(std::shared_ptr<Response> &&response)
