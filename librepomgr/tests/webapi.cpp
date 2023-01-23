@@ -150,23 +150,26 @@ void WebAPITests::testBasicNetworking()
         { "/foo",
             [](const WebClient::Session &session, const WebClient::HttpClientError &error) {
                 const auto &response = get<Response>(session.response);
+                const auto contentType = response[boost::beast::http::field::content_type];
                 CPPUNIT_ASSERT(!error);
-                CPPUNIT_ASSERT_EQUAL("text/plain"s, response[boost::beast::http::field::content_type].to_string());
+                CPPUNIT_ASSERT_EQUAL("text/plain"sv, std::string_view(contentType.data(), contentType.size()));
                 CPPUNIT_ASSERT_EQUAL("The resource 'route \"GET /foo\"' was not found."s, response.body());
             } },
         { "/api/v0/version",
             [](const WebClient::Session &session, const WebClient::HttpClientError &error) {
                 const auto &response = get<Response>(session.response);
+                const auto contentType = response[boost::beast::http::field::content_type];
                 CPPUNIT_ASSERT(!error);
-                CPPUNIT_ASSERT_EQUAL("text/plain"s, response[boost::beast::http::field::content_type].to_string());
+                CPPUNIT_ASSERT_EQUAL("text/plain"sv, std::string_view(contentType.data(), contentType.size()));
                 CPPUNIT_ASSERT_EQUAL(string(APP_VERSION), response.body());
             } },
         { "/api/v0/status",
             [](const WebClient::Session &session, const WebClient::HttpClientError &error) {
                 const auto &response = get<Response>(session.response);
+                const auto contentType = response[boost::beast::http::field::content_type];
                 CPPUNIT_ASSERT(!error);
                 CPPUNIT_ASSERT(!response.body().empty());
-                CPPUNIT_ASSERT_EQUAL("application/json"s, response[boost::beast::http::field::content_type].to_string());
+                CPPUNIT_ASSERT_EQUAL("application/json"sv, std::string_view(contentType.data(), contentType.size()));
             } },
     });
 }
