@@ -27,10 +27,29 @@ export function initBuildActionsForm()
     };
     listFormElements.showselected.onclick = showSelectedActions;
     listFormElements.deleteselected.onclick = deleteSelectedActions;
+
+    // allow selecting build action type / unselecting pre-defined action more easily
+    document.getElementById('build-action-type').parentNode.onclick = function() {
+        document.getElementById('build-action-task').selectedIndex = 0;
+        handleBuildActionPresetChange();
+    };
+
     queryBuildActions();
     handleBuildActionTypeChange();
     buildActionsForm.dataset.initialized = true;
     return true;
+}
+
+function setBuildActionTypeState(enabled)
+{
+    const e = document.getElementById('build-action-type');
+    if (!enabled) {
+        e.disabled = true;
+        e.style.pointerEvents = 'none';
+    } else {
+        e.disabled = false;
+        e.style.pointerEvents = 'auto';
+    }
 }
 
 function queryBuildActions(additionalParams)
@@ -163,13 +182,13 @@ export function handleBuildActionPresetChange()
     const taskInfoElement = Utils.getAndEmptyElement('build-action-task-info');
     const actionSelect = document.getElementById('build-action-type');
     if (!taskInfo) {
-        actionSelect.disabled = false;
+        setBuildActionTypeState(true);
         taskInfoElement.style.fontStyle = 'italic';
         taskInfoElement.appendChild(document.createTextNode('Start a single action (no predefined task selected)'));
         handleBuildActionTypeChange();
         return;
     }
-    actionSelect.disabled = true;
+    setBuildActionTypeState(false);
     taskInfoElement.style.fontStyle = 'normal';
     taskInfoElement.appendChild(document.createTextNode(taskInfo.desc || taskInfo.name));
     document.getElementById('build-action-directory').disabled = false;
