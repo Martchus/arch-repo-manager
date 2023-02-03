@@ -20,6 +20,7 @@
 
 #include <boost/asio/read.hpp>
 
+#include <boost/process/env.hpp>
 #include <boost/process/start_dir.hpp>
 
 #include <rapidjson/error/en.h>
@@ -939,8 +940,9 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
     m_buildAction->log()(Phrases::InfoMessage, "Making source package for ", packageName, " via ", m_makePkgPath.string(), '\n',
         ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
     if (m_useContainer) {
-        processSession->launch(
-            boost::process::start_dir(buildDirectory), m_makeContainerPkgPath, "--", "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+        const auto debugFlag = m_saveChrootDirsOfFailures ? "on-failure" : "";
+        processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["DEBUG"] = debugFlag, m_makeContainerPkgPath, "--",
+            "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     } else {
         processSession->launch(boost::process::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     }
