@@ -215,7 +215,7 @@ void ConductBuild::run()
 {
     // validate and read parameter/settings
     if (auto error = validateParameter(RequiredDatabases::None, RequiredParameters::MaybePackages); !error.empty()) {
-        reportError(move(error));
+        reportError(std::move(error));
         return;
     }
     if (m_buildAction->directory.empty()) {
