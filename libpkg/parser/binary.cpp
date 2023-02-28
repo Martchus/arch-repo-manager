@@ -204,7 +204,11 @@ void Binary::load(std::string_view fileContent, std::string_view fileName, std::
 {
     stringstream fileStream(ios_base::in | ios_base::out | ios_base::binary);
     fileStream.exceptions(ios_base::failbit | ios_base::badbit);
+#if defined(__GLIBCXX__) && !defined(_LIBCPP_VERSION)
     fileStream.rdbuf()->pubsetbuf(const_cast<char *>(fileContent.data()), static_cast<streamoff>(fileContent.size()));
+#else
+    fileStream.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
+#endif
     parse(fileStream, &fileContent);
     switch (type) {
     case BinaryType::Pe:
