@@ -686,7 +686,7 @@ private:
     boost::filesystem::path m_paccachePath;
     std::vector<std::pair<std::string, boost::filesystem::path>> m_concreteCacheDirs;
     std::vector<std::pair<std::string, boost::filesystem::path>>::iterator m_concreteCacheDirsIterator;
-    std::vector<std::string> m_errors;
+    BuildActionMessages m_messages;
     bool m_dryCacheCleanup;
     bool m_dbCleanupConcluded, m_cacheCleanupConcluded;
 };

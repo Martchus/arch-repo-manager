@@ -484,15 +484,19 @@ void BuildServiceCleanup::run()
 
     // find concrete cache dirs (packageCachePath does not contain arch subdir) and start invoking paccache
     m_concreteCacheDirs.reserve(8);
-    for (auto i = boost::filesystem::directory_iterator(packageCachePath, boost::filesystem::directory_options::follow_directory_symlink);
-         auto entry : i) {
-        if (entry.path().filename_is_dot() || entry.path().filename_is_dot_dot()) {
-            continue;
+    try {
+        for (auto i = boost::filesystem::directory_iterator(packageCachePath, boost::filesystem::directory_options::follow_directory_symlink);
+             auto entry : i) {
+            if (entry.path().filename_is_dot() || entry.path().filename_is_dot_dot()) {
+                continue;
+            }
+            auto canonical = boost::filesystem::canonical(entry.path());
+            if (boost::filesystem::is_directory(canonical)) {
+                m_concreteCacheDirs.emplace_back(entry.path().filename().string(), std::move(canonical));
+            }
         }
-        auto canonical = boost::filesystem::canonical(entry.path());
-        if (boost::filesystem::is_directory(canonical)) {
-            m_concreteCacheDirs.emplace_back(entry.path().filename().string(), std::move(canonical));
-        }
+    } catch (const boost::filesystem::filesystem_error &e) {
+        m_messages.errors.emplace_back(argsToString("unable to locate package cache directories: ", e.what()));
     }
     m_concreteCacheDirsIterator = m_concreteCacheDirs.begin();
     invokePaccache();
@@ -536,9 +540,9 @@ void BuildServiceCleanup::invokePaccache()
             CPP_UTILITIES_UNUSED(child)
             if (result.errorCode) {
                 const auto errorMessage = result.errorCode.message();
-                m_errors.emplace_back("unable to invoke paccache: " + errorMessage);
+                m_messages.errors.emplace_back("unable to invoke paccache: " + errorMessage);
             } else if (result.exitCode != 0) {
-                m_errors.emplace_back(argsToString("paccache returned with exit code ", result.exitCode));
+                m_messages.errors.emplace_back(argsToString("paccache returned with exit code ", result.exitCode));
             }
             invokePaccache();
         });
@@ -552,8 +556,11 @@ void BuildServiceCleanup::conclude(std::unique_lock<std::shared_mutex> &&lock)
         return;
     }
     lock.unlock();
-    const auto buildActionLock = m_setup.building.lockToWrite();
-    reportSuccess();
+
+    const auto res = m_messages.errors.empty() ? BuildActionResult::Success : BuildActionResult::Failure;
+    const auto buildLock = m_setup.building.lockToWrite();
+    m_buildAction->resultData = std::move(m_messages);
+    reportResult(res);
 }
 
 #ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED
