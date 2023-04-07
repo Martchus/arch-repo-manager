@@ -268,7 +268,7 @@ void PrepareBuild::populateDbConfig(const std::vector<LibPkg::Database *> &dbOrd
             scopeData.emplace(make_pair("Server", mirror));
         }
         if (m_sourceDbs.empty() || m_baseDbs.find(db->name) != m_baseDbs.cend() || (forStaging && endsWith(db->name, "-staging"))) {
-            dbConfig.emplace_back(IniFile::Scope(db->name, move(scopeData)));
+            dbConfig.emplace_back(IniFile::Scope(db->name, std::move(scopeData)));
         }
     }
 }
@@ -322,13 +322,13 @@ void PrepareBuild::processSrcInfo(WebClient::AurSnapshotQuerySession &multiSessi
 {
     if (result.errorCode) {
         multiSession.addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
-            .errorOutput = move(result.error),
+            .errorOutput = std::move(result.error),
             .error = argsToString("Unable to invoke makepkg --printsourceinfo: ", result.errorCode.message()) });
         return;
     }
     if (child.exit_code() != 0) {
         multiSession.addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
-            .errorOutput = move(result.error),
+            .errorOutput = std::move(result.error),
             .error = argsToString("makepkg --printsourceinfo exited with non-zero exit code: ", child.exit_code()) });
         return;
     }
@@ -596,7 +596,7 @@ bool BatchItem::addNeededItemForRequiredDependencyFromOtherItems(
 
     if (relevantItem) {
         // FIXME: actually, we need to handle the case when the item is already present as the alternative items might differ
-        neededItems.emplace(relevantItem, move(alternativeItems));
+        neededItems.emplace(relevantItem, std::move(alternativeItems));
         return true;
     }
     return false;
@@ -631,7 +631,7 @@ void BatchItem::determineNeededItems(LibPkg::Config &config, const std::unordere
             foundPackage = true;
         }
         if (!foundPackage) {
-            missingDependencies.emplace_back(MissingDependency{ .dependency = move(dependency), .requiredBy = LibPkg::Dependency(*name) });
+            missingDependencies.emplace_back(MissingDependency{ .dependency = std::move(dependency), .requiredBy = LibPkg::Dependency(*name) });
         }
     }
 }
@@ -803,7 +803,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     // find databases again
     auto configReadLock = m_setup.config.lockToRead();
     if (auto error = findDatabases(); !error.empty()) {
-        reportError(move(error));
+        reportError(std::move(error));
         return;
     }
 
@@ -817,7 +817,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
             if (!error.empty()) {
                 error += '\n';
             }
-            error = response.error.empty() ? "got response with no package name (internal error)" : move(response.error);
+            error = response.error.empty() ? "got response with no package name (internal error)" : std::move(response.error);
             sourcesMissing = true;
             continue;
         }
@@ -825,8 +825,8 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         if (!response.packages.empty() && response.packages.front().pkg) {
             buildData.sourceInfo = response.packages.front().pkg->sourceInfo;
         }
-        buildData.packages = move(response.packages);
-        buildData.error = move(response.error);
+        buildData.packages = std::move(response.packages);
+        buildData.error = std::move(response.error);
         buildData.hasSource = buildData.sourceInfo && !buildData.packages.empty() && buildData.error.empty();
         if (buildData.hasSource) {
             const auto buildActionsWriteLock = m_setup.building.lockToWrite();
@@ -945,7 +945,7 @@ void PrepareBuild::computeBatches()
     auto batchItems = prepareBatches();
     auto configReadLock2 = m_setup.config.lockToRead();
     if (auto error = findDatabases(); !error.empty()) {
-        reportError(move(error));
+        reportError(std::move(error));
         return;
     }
 
