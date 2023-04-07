@@ -461,16 +461,41 @@ LibPkg::StorageID BuildAction::conclude(BuildActionResult result)
 
 BuildServiceCleanup::BuildServiceCleanup(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction)
     : InternalBuildAction(setup, buildAction)
+    , m_dbCleanupConcluded(false)
+    , m_cacheCleanupConcluded(false)
 {
 }
 
 void BuildServiceCleanup::run()
 {
-    // validate parameter
+    // validate parameter and read parameter/settings
     if (auto error = validateParameter(RequiredDatabases::None, RequiredParameters::None); !error.empty()) {
         reportError(std::move(error));
         return;
     }
+    const auto flags = static_cast<BuildServiceCleanupFlags>(m_buildAction->flags);
+    m_dryCacheCleanup = flags & BuildServiceCleanupFlags::DryPackageCacheCleanup;
+
+    // get variables from setup
+    auto setupLock = m_setup.lockToRead();
+    m_paccachePath = findExecutable(m_setup.building.paccachePath);
+    const auto packageCachePath = m_setup.building.packageCacheDir;
+    setupLock.unlock();
+
+    // find concrete cache dirs (packageCachePath does not contain arch subdir) and start invoking paccache
+    m_concreteCacheDirs.reserve(8);
+    for (auto i = boost::filesystem::directory_iterator(packageCachePath, boost::filesystem::directory_options::follow_directory_symlink);
+         auto entry : i) {
+        if (entry.path().filename_is_dot() || entry.path().filename_is_dot_dot()) {
+            continue;
+        }
+        auto canonical = boost::filesystem::canonical(entry.path());
+        if (boost::filesystem::is_directory(canonical)) {
+            m_concreteCacheDirs.emplace_back(entry.path().filename().string(), std::move(canonical));
+        }
+    }
+    m_concreteCacheDirsIterator = m_concreteCacheDirs.begin();
+    invokePaccache();
 
     // iterate though build actions and delete those that are unlikely to be relevant anymore
     auto count = std::size_t();
@@ -491,7 +516,42 @@ void BuildServiceCleanup::run()
             return --count <= stopAt;
         },
         &count);
+    auto lock = lockToWrite();
+    m_dbCleanupConcluded = true;
+    conclude(std::move(lock));
+}
 
+void BuildServiceCleanup::invokePaccache()
+{
+    if (m_concreteCacheDirsIterator == m_concreteCacheDirs.end()) {
+        auto lock = lockToWrite();
+        m_cacheCleanupConcluded = true;
+        conclude(std::move(lock));
+        return;
+    }
+    const auto &cacheDirArch = m_concreteCacheDirsIterator->first;
+    const auto &cacheDirPath = m_concreteCacheDirsIterator->second;
+    auto processSession = m_buildAction->makeBuildProcess(
+        "paccache-" + cacheDirArch, "paccache-" % cacheDirArch + ".log", [this](boost::process::child &&child, ProcessResult &&result) {
+            CPP_UTILITIES_UNUSED(child)
+            if (result.errorCode) {
+                const auto errorMessage = result.errorCode.message();
+                m_errors.emplace_back("unable to invoke paccache: " + errorMessage);
+            } else if (result.exitCode != 0) {
+                m_errors.emplace_back(argsToString("paccache returned with exit code ", result.exitCode));
+            }
+            invokePaccache();
+        });
+    ++m_concreteCacheDirsIterator;
+    processSession->launch(m_paccachePath, m_dryCacheCleanup ? "--dryrun" : "--remove", "--cachedir", cacheDirPath.string());
+}
+
+void BuildServiceCleanup::conclude(std::unique_lock<std::shared_mutex> &&lock)
+{
+    if (!m_dbCleanupConcluded || !m_cacheCleanupConcluded) {
+        return;
+    }
+    lock.unlock();
     const auto buildActionLock = m_setup.building.lockToWrite();
     reportSuccess();
 }

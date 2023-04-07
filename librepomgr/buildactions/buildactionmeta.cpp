@@ -378,7 +378,14 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .category = "Misc",
             .name = "Clean build-service-internal data",
             .type = "build-service-cleanup",
-            .flags = {},
+            .flags = {
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(BuildServiceCleanupFlags::DryPackageCacheCleanup),
+                    .name = "Dry package cache cleanup",
+                    .desc = "Use --dryrun (instead of --remove) when invoking paccache",
+                    .param = "dry-package-cache-cleanup",
+                },
+            },
             .settings = {},
             .directory = false,
             .sourceDb = false,

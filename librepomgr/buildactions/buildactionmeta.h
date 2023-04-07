@@ -94,6 +94,10 @@ enum class CleanRepositoryFlags : BuildActionFlagType {
     None,
     DryRun = (1 << 0),
 };
+enum class BuildServiceCleanupFlags : BuildActionFlagType {
+    None,
+    DryPackageCacheCleanup = (1 << 0),
+};
 enum class ReloadLibraryDependenciesSettings : std::size_t { PackageExcludeRegex };
 enum class CheckForProblemsSettings : std::size_t { IgnoreDeps, IgnoreLibDeps };
 enum class PrepareBuildSettings : std::size_t { PKGBUILDsDirs };
@@ -197,6 +201,7 @@ CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ReloadLibraryDependen
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::PrepareBuildFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::ConductBuildFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::CleanRepositoryFlags)
+CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::BuildServiceCleanupFlags)
 CPP_UTILITIES_MARK_FLAG_ENUM_CLASS(LibRepoMgr, LibRepoMgr::CheckForProblemsFlags)
 
 #endif // LIBREPOMGR_BUILD_ACTION_META_H

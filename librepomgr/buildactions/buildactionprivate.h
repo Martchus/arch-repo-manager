@@ -675,11 +675,20 @@ private:
     bool m_useContainer;
 };
 
-struct LIBREPOMGR_EXPORT BuildServiceCleanup : public InternalBuildAction {
+struct LIBREPOMGR_EXPORT BuildServiceCleanup : public InternalBuildAction, private LibPkg::Lockable {
     BuildServiceCleanup(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction);
     void run();
 
 private:
+    void invokePaccache();
+    void conclude(std::unique_lock<std::shared_mutex> &&lock);
+
+    boost::filesystem::path m_paccachePath;
+    std::vector<std::pair<std::string, boost::filesystem::path>> m_concreteCacheDirs;
+    std::vector<std::pair<std::string, boost::filesystem::path>>::iterator m_concreteCacheDirsIterator;
+    std::vector<std::string> m_errors;
+    bool m_dryCacheCleanup;
+    bool m_dbCleanupConcluded, m_cacheCleanupConcluded;
 };
 
 #ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED
