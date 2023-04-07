@@ -131,7 +131,7 @@ typename InternalBuildAction::InitReturnType InternalBuildAction::init(
 {
     InitReturnType configLock;
     if (auto error = validateParameter(requiredDatabases, requiredParameters); !error.empty()) {
-        reportError(move(error));
+        reportError(std::move(error));
         return configLock;
     }
     switch (access) {
@@ -144,7 +144,7 @@ typename InternalBuildAction::InitReturnType InternalBuildAction::init(
     }
     if (auto error = findDatabases(); !error.empty()) {
         configLock = monostate();
-        reportError(move(error));
+        reportError(std::move(error));
         return configLock;
     }
     return configLock;
@@ -407,7 +407,7 @@ template <typename InternalBuildActionType> void BuildAction::post()
 template <typename Callback> void BuildAction::post(Callback &&codeToRun)
 {
     assert(m_setup);
-    boost::asio::post(m_setup->building.ioContext.get_executor(), forward<Callback>(codeToRun));
+    boost::asio::post(m_setup->building.ioContext.get_executor(), std::forward<Callback>(codeToRun));
 }
 
 /*!
@@ -468,7 +468,7 @@ void BuildServiceCleanup::run()
 {
     // validate parameter
     if (auto error = validateParameter(RequiredDatabases::None, RequiredParameters::None); !error.empty()) {
-        reportError(move(error));
+        reportError(std::move(error));
         return;
     }
 
@@ -509,7 +509,7 @@ void DummyBuildAction::run()
 {
     // validate parameter
     if (auto error = validateParameter(RequiredDatabases::None, RequiredParameters::None); !error.empty()) {
-        reportError(move(error));
+        reportError(std::move(error));
         return;
     }
     if (m_buildAction->directory.empty()) {
