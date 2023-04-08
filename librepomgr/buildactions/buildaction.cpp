@@ -520,6 +520,7 @@ void BuildServiceCleanup::run()
             return --count <= stopAt;
         },
         &count);
+    m_messages.notes.emplace_back(argsToString("deleted ", count, " build actions"));
     auto lock = lockToWrite();
     m_dbCleanupConcluded = true;
     conclude(std::move(lock));
