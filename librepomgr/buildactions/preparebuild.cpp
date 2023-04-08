@@ -75,6 +75,7 @@ void PrepareBuild::run()
     m_keepOrder = flags & PrepareBuildFlags::KeepOrder;
     m_keepPkgRelAndEpoch = flags & PrepareBuildFlags::KeepPkgRelAndEpoch;
     m_resetChrootSettings = flags & PrepareBuildFlags::ResetChrootSettings;
+    m_pullingInFurtherDependenciesUnexpected = flags & PrepareBuildFlags::PullingInFurtherDependenciesUnexpected;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -859,6 +860,9 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     }
 
     // pull missing dependencies if all sources could be retrieved so far
+    if (furtherDependenciesNeeded) {
+        m_pulledInFurtherDependencies = true;
+    }
     if (!sourcesMissing && furtherDependenciesNeeded) {
         fetchMissingBuildData();
         return;
@@ -893,7 +897,13 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         computeBatches();
     }
 
-    auto resultData = makeResultData();
+    // provoke an error if previously pulled-in further dependencies and that's not wanted
+    auto error = std::string();
+    if (m_pulledInFurtherDependencies && m_pullingInFurtherDependenciesUnexpected) {
+        error = "Had to pull-in further dependencies which is considered unexpected";
+    }
+
+    auto resultData = makeResultData(std::move(error));
     auto buildActionWriteLock = m_setup.building.lockToWrite();
     m_buildAction->resultData = std::move(resultData);
     if (resultData.error.empty() && resultData.cyclicLeftovers.empty()) {

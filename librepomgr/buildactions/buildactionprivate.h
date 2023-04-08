@@ -512,6 +512,8 @@ private:
     bool m_keepOrder = false;
     bool m_keepPkgRelAndEpoch = false;
     bool m_resetChrootSettings = false;
+    bool m_pullingInFurtherDependenciesUnexpected = false;
+    bool m_pulledInFurtherDependencies = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {

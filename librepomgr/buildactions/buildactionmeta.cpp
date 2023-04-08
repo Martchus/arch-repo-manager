@@ -166,6 +166,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Resets chroot dir, chroot user and related flags",
                     .param = "reset-chroot-cfg",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::PullingInFurtherDependenciesUnexpected),
+                    .name = "Pulling-in further dependencies unexpected",
+                    .desc = "Whether pulling-in further dependencies leads to an error causing subsequent build actions not to be executed automatically; useful to be able to review packages added to the build before conducting the build",
+                    .param = "pulling-in-new-deps-unexpected",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{
