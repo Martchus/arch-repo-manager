@@ -495,7 +495,7 @@ void BuildServiceCleanup::run()
                 m_concreteCacheDirs.emplace_back(entry.path().filename().string(), std::move(canonical));
             }
         }
-    } catch (const boost::filesystem::filesystem_error &e) {
+    } catch (const std::exception &e) {
         m_messages.errors.emplace_back(argsToString("unable to locate package cache directories: ", e.what()));
     }
     m_concreteCacheDirsIterator = m_concreteCacheDirs.begin();
