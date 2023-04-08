@@ -929,7 +929,7 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
     auto lock = lockToRead();
     if (const auto &sourceInfo = m_buildPreparation.buildData[packageName].sourceInfo) {
         for (const auto &source : sourceInfo->sources) {
-            if (source.path.find(".git?signed") != std::string::npos) {
+            if (source.path.find("git") != std::string::npos && source.path.find("?signed") != std::string::npos) {
                 // skip the GPG check at this point as makepkg won't actually clone the repository here
                 additionalFlags.emplace_back("--skippgpcheck");
                 break;
