@@ -120,6 +120,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::string repoRemovePath = "repo-remove";
         std::string pacmanPath = "pacman";
         std::string paccachePath = "paccache";
+        std::string pkgctlPath = "pkgctl";
         std::string gpgPath = "gpg";
         std::string ccacheDir;
         std::string chrootDir;
