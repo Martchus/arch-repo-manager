@@ -115,7 +115,8 @@ add_reflection_generator_invocation(
     JSON_VISIBILITY
     ${META_PROJECT_VARNAME}_EXPORT
     BINARY_VISBILITY
-    ${META_PROJECT_VARNAME}_EXPORT)
+    ${META_PROJECT_VARNAME}_EXPORT
+    ERROR_RESILIENT)
 
 # include modules to apply configuration
 include(WindowsResources)
