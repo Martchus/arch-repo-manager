@@ -507,6 +507,7 @@ private:
     std::vector<std::vector<std::string>> m_batches;
     std::vector<std::string> m_cyclicLeftovers;
     std::vector<std::string> m_warnings;
+    std::unordered_set<std::string> m_cleanedSourceDirs;
     bool m_forceBumpPackageVersion = false;
     bool m_cleanSourceDirectory = false;
     bool m_keepOrder = false;
@@ -514,6 +515,7 @@ private:
     bool m_resetChrootSettings = false;
     bool m_pullingInFurtherDependenciesUnexpected = false;
     bool m_pulledInFurtherDependencies = false;
+    bool m_fetchOfficialSources = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {

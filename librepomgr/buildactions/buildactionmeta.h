@@ -78,6 +78,7 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     KeepPkgRelAndEpoch = (1 << 3),
     ResetChrootSettings = (1 << 4),
     PullingInFurtherDependenciesUnexpected = (1 << 5),
+    FetchOfficialPackageSources = (1 << 6),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,

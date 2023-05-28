@@ -85,7 +85,7 @@ std::shared_ptr<AurQuerySession> queryAurPackagesInternal(LogContext &log, Servi
     log("Retrieving ", packages.size(), " packages from the AUR\n");
 
     constexpr auto packagesPerQuery = 100;
-    auto multiSession = AurQuerySession::create(ioContext, move(handler));
+    auto multiSession = AurQuerySession::create(ioContext, std::move(handler));
 
     for (auto i = packages.cbegin(), end = packages.cend(); i != end;) {
         auto session = make_shared<WebClient::Session>(ioContext, setup.webServer.sslContext,
@@ -137,7 +137,7 @@ std::shared_ptr<AurQuerySession> queryAurPackagesInternal(LogContext &log, Servi
 std::shared_ptr<AurQuerySession> queryAurPackages(LogContext &log, ServiceSetup &setup, const std::vector<string> &packages,
     boost::asio::io_context &ioContext, typename AurQuerySession::HandlerType &&handler)
 {
-    return queryAurPackagesInternal(log, setup, packages, ioContext, move(handler));
+    return queryAurPackagesInternal(log, setup, packages, ioContext, std::move(handler));
 }
 
 /*!
@@ -149,7 +149,7 @@ std::shared_ptr<AurQuerySession> queryAurPackages(LogContext &log, ServiceSetup 
     const std::unordered_map<string, std::shared_ptr<Package>> &packages, boost::asio::io_context &ioContext,
     typename AurQuerySession::HandlerType &&handler)
 {
-    return queryAurPackagesInternal(log, setup, packages, ioContext, move(handler));
+    return queryAurPackagesInternal(log, setup, packages, ioContext, std::move(handler));
 }
 
 /*!
@@ -181,11 +181,16 @@ std::shared_ptr<AurQuerySession> queryAurPackagesForDatabase(LogContext &log, Se
         return nullptr;
     }
     configReadLock->unlock();
-    return queryAurPackages(log, setup, missingPackages, ioContext, move(handler));
+    return queryAurPackages(log, setup, missingPackages, ioContext, std::move(handler));
 }
 
 /*!
  * \brief Queries the AUR asynchronously to get the latest snapshot for the specified \a packageNames.
+ * \remarks
+ * If the "tryOfficial" flag in the parameter is set then this function attempts to download the sources from official Git repositories
+ * first. If the official repositories are unavailable or the package cannot be found there it will still fallback to downloading the
+ * sources from AUR.
+ *
  */
 void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<AurSnapshotQueryParams> &queryParams,
     boost::asio::io_context &ioContext, std::shared_ptr<AurSnapshotQuerySession> &multiSession)
@@ -193,8 +198,15 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
     CPP_UTILITIES_UNUSED(log)
     for (const auto &params : queryParams) {
         auto session = std::make_shared<WebClient::Session>(ioContext, setup.webServer.sslContext,
-            [multiSession, params](WebClient::Session &session2, const WebClient::HttpClientError &error) mutable {
+            [multiSession, params = params, &log, &setup, &ioContext](WebClient::Session &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode.message() != "stream truncated") {
+                    // download from AUR after all if the sources cannot be found in the official Arch Linux Git repositories
+                    if (params.tryOfficial) {
+                        params.tryOfficial = false;
+                        queryAurSnapshots(log, setup, { params }, ioContext, multiSession);
+                        return;
+                    }
+
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
                         .error = "Unable to retrieve AUR snapshot tarball for package " % *params.packageName % ": " + error.what() });
                     return;
@@ -203,6 +215,12 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 // parse retrieved archive
                 const auto &response = get<Response>(session2.response);
                 if (response.result() != boost::beast::http::status::ok) {
+                    // download from AUR after all if the sources cannot be found in the official Arch Linux Git repositories
+                    if (response.result() != boost::beast::http::status::not_found && params.tryOfficial) {
+                        params.tryOfficial = false;
+                        queryAurSnapshots(log, setup, { params }, ioContext, multiSession);
+                        return;
+                    }
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
                         .error
                         = "Unable to retrieve AUR snapshot tarball for package " % *params.packageName % ": AUR returned " % response.result_int()
@@ -225,7 +243,10 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     if (!startsWith(directory.first, *params.packageName)) {
                         continue;
                     }
-                    const auto directoryPath = string_view{ directory.first }.substr(params.packageName->size());
+                    auto directoryPath = string_view{ directory.first }.substr(params.packageName->size());
+                    if (directoryPath.starts_with("-main")) {
+                        directoryPath = directoryPath.substr(5);
+                    }
                     if (directoryPath.empty()) {
                         for (const auto &rootFile : directory.second) {
                             if (rootFile.name == ".SRCINFO") {
@@ -274,23 +295,33 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 }
 
                 // validate what we've got and add response
-                if (!haveSrcFileInfo) {
-                    result.error = ".SRCINFO is missing";
-                }
                 if (!havePkgbuild) {
                     result.error = "PKGINFO is missing";
                 }
-                if (result.packages.empty() || result.packages.front().pkg->name.empty()) {
-                    result.error = "Unable to parse .SRCINFO: no package name present";
-                } else if (!result.packages.front().pkg->sourceInfo.has_value()) {
-                    result.error = "Unable to parse .SRCINFO: no source info present";
+                if (params.tryOfficial) {
+                    result.isOfficial = true;
+                } else {
+                    if (!haveSrcFileInfo) {
+                        result.error = ".SRCINFO is missing";
+                    }
+                    if (result.packages.empty() || result.packages.front().pkg->name.empty()) {
+                        result.error = "Unable to parse .SRCINFO: no package name present";
+                    } else if (!result.packages.front().pkg->sourceInfo.has_value()) {
+                        result.error = "Unable to parse .SRCINFO: no source info present";
+                    }
                 }
-                multiSession->addResponse(move(result));
+                multiSession->addResponse(std::move(result));
             });
 
         // run query, e.g. https: //aur.archlinux.org/cgit/aur.git/snapshot/mingw-w64-configure.tar.gz
-        const auto url = "/cgit/aur.git/snapshot/" % WebAPI::Url::encodeValue(*params.packageName) + ".tar.gz";
-        session->run("aur.archlinux.org", "443", boost::beast::http::verb::get, url.data(), 11);
+        const auto encodedPackageName = WebAPI::Url::encodeValue(*params.packageName);
+        if (params.tryOfficial) {
+            const auto url = "/archlinux/packaging/packages/" % encodedPackageName % "/-/archive/main/" % encodedPackageName + "-main.tar.gz";
+            session->run("gitlab.archlinux.org", "443", boost::beast::http::verb::get, url.data(), 11);
+        } else {
+            const auto url = "/cgit/aur.git/snapshot/" % encodedPackageName + ".tar.gz";
+            session->run("aur.archlinux.org", "443", boost::beast::http::verb::get, url.data(), 11);
+        }
     }
 }
 

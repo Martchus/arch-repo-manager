@@ -172,6 +172,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Whether pulling-in further dependencies leads to an error causing subsequent build actions not to be executed automatically; useful to be able to review packages added to the build before conducting the build",
                     .param = "pulling-in-new-deps-unexpected",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::FetchOfficialPackageSources),
+                    .name = "Fetch official package sources",
+                    .desc = "Whether PKGBUILDs from official Arch Linux Git repositories should be downloaded (if not present, the AUR will still be checked; local PKGBUILDs still have precedence)",
+                    .param = "fetch-official-pkgbuilds",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

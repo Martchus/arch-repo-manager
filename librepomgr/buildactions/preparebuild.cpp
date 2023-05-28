@@ -76,6 +76,7 @@ void PrepareBuild::run()
     m_keepPkgRelAndEpoch = flags & PrepareBuildFlags::KeepPkgRelAndEpoch;
     m_resetChrootSettings = flags & PrepareBuildFlags::ResetChrootSettings;
     m_pullingInFurtherDependenciesUnexpected = flags & PrepareBuildFlags::PullingInFurtherDependenciesUnexpected;
+    m_fetchOfficialSources = flags & PrepareBuildFlags::FetchOfficialPackageSources;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -384,7 +385,7 @@ void PrepareBuild::fetchMissingBuildData()
         // clean existing source directory if cleanup is enabled
         try {
             const auto sourceDirectoryExists = filesystem::exists(buildData.sourceDirectory);
-            if (m_cleanSourceDirectory && sourceDirectoryExists) {
+            if (m_cleanSourceDirectory && sourceDirectoryExists && m_cleanedSourceDirs.emplace(buildData.sourceDirectory).second) {
                 filesystem::remove_all(buildData.sourceDirectory);
             } else if (sourceDirectoryExists) {
                 // verify the PKGBUILD file exists
@@ -400,7 +401,7 @@ void PrepareBuild::fetchMissingBuildData()
                     makeSrcInfo(multiSession, buildData.sourceDirectory, packageName);
                     needToGeneratedSrcInfo = true;
                 } else {
-                    string srcInfo;
+                    auto srcInfo = std::string();
                     try {
                         srcInfo = readFile(srcInfoPath, 0x10000);
                     } catch (const std::ios_base::failure &e) {
@@ -472,6 +473,7 @@ void PrepareBuild::fetchMissingBuildData()
             snapshotQueries.emplace_back(WebClient::AurSnapshotQueryParams{
                 .packageName = &packageName,
                 .targetDirectory = &buildData.sourceDirectory,
+                .tryOfficial = m_fetchOfficialSources,
             });
             addPackageToLogLine(logLines[1], packageName);
         }
@@ -811,6 +813,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     // populate build data from responses and add further dependencies
     auto furtherDependenciesNeeded = false;
     auto sourcesMissing = false;
+    auto needToFetchAgain = false;
     for (auto &response : responses) {
         if (response.packageName.empty()) {
             auto &buildData = m_buildDataByPackage["?"];
@@ -832,6 +835,10 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         if (buildData.hasSource) {
             const auto buildActionsWriteLock = m_setup.building.lockToWrite();
             m_buildAction->artefacts.emplace_back(buildData.sourceDirectory + "/PKGBUILD"); // FIXME: add all files as artefacts
+            continue;
+        }
+        if (response.isOfficial && buildData.error.empty()) {
+            needToFetchAgain = true;
             continue;
         }
         if (buildData.error.empty()) {
@@ -863,7 +870,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     if (furtherDependenciesNeeded) {
         m_pulledInFurtherDependencies = true;
     }
-    if (!sourcesMissing && furtherDependenciesNeeded) {
+    if (!sourcesMissing && (furtherDependenciesNeeded || needToFetchAgain)) {
         fetchMissingBuildData();
         return;
     }

@@ -21,10 +21,12 @@ struct AurSnapshotResult {
     std::string errorOutput;
     std::vector<LibPkg::PackageSpec> packages;
     std::string error;
+    bool isOfficial = false;
 };
 struct AurSnapshotQueryParams {
-    const std::string *packageName;
-    const std::string *targetDirectory;
+    const std::string *packageName = nullptr;
+    const std::string *targetDirectory = nullptr;
+    bool tryOfficial = false;
 };
 
 using AurQuerySession = MultiSession<LibPkg::PackageSpec>;
