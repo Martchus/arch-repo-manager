@@ -503,9 +503,10 @@ void BuildServiceCleanup::run()
 
     // iterate though build actions and delete those that are unlikely to be relevant anymore
     auto count = std::size_t();
+    auto deleted = std::size_t();
     constexpr auto stopAt = 150;
     m_setup.building.forEachBuildAction(
-        [this, &count, twoWeeksAgo = DateTime::gmtNow() - TimeSpan::fromDays(14)](
+        [this, &count, &deleted, twoWeeksAgo = DateTime::gmtNow() - TimeSpan::fromDays(14)](
             LibPkg::StorageID id, BuildAction &action, ServiceSetup::BuildSetup::VisitorBehavior &visitorBehavior) {
             if (count <= stopAt) {
                 return true; // abort deletion if under 150 build actions anyways
@@ -517,10 +518,11 @@ void BuildServiceCleanup::run()
                 return false; // delete only successful actions that are at least two weeks old
             }
             visitorBehavior = ServiceSetup::BuildSetup::VisitorBehavior::Delete;
+            ++deleted;
             return --count <= stopAt;
         },
         &count);
-    m_messages.notes.emplace_back(argsToString("deleted ", count, " build actions"));
+    m_messages.notes.emplace_back(argsToString("deleted ", deleted, " build actions"));
     auto lock = lockToWrite();
     m_dbCleanupConcluded = true;
     conclude(std::move(lock));
