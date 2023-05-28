@@ -153,7 +153,8 @@ add_reflection_generator_invocation(
     JSON_VISIBILITY
     ${META_PROJECT_VARNAME}_EXPORT
     BINARY_VISBILITY
-    ${META_PROJECT_VARNAME}_EXPORT)
+    ${META_PROJECT_VARNAME}_EXPORT
+    ERROR_RESILIENT)
 
 # disable Boost's support for concepts to avoid compile errors
 # /usr/include/boost/asio/async_result.hpp:70:20: error: concept cannot have associated constraints
