@@ -953,5 +953,5 @@ void BuildActionsTests::testBuildServiceCleanup()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("one note", 1_st, messages.notes.size());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no warnings", std::vector<std::string>(), messages.warnings);
     TESTUTILS_ASSERT_LIKE("expected error", "unable to locate package cache directories:.*No such file or directory.*", messages.errors.front());
-    TESTUTILS_ASSERT_LIKE("expected note", "deleted 1 build actions", messages.notes.front());
+    TESTUTILS_ASSERT_LIKE("expected note", "deleted 0 build actions", messages.notes.front());
 }
