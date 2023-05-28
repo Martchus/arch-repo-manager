@@ -145,10 +145,13 @@ expects a directory layout like this:
 
 So there's a "root" chroot for every architecture and config files for that architecture
 in dedicated directories. To achieve this one just has to call `mkarchroot` for each architecture.
-It is invoked like this:
+It is generally invoked like this:
 
 ```
-mkarchroot -C /path/to/pacman.conf -M /path/to/makepkg.conf /directory/to/store/the/tree base-devel
+cd /the/chroot/directory
+mkarchroot -C config-x86_64/pacman.conf -M config-x86_64/makepkg.conf arch-x86_64/root base-devel
+sudo vim arch-x86_64/root/etc/pacman.d/mirrorlist  # uncomment at least one mirror
+arch-nspawn arch-x86_64/root  # enter bash shell within chroot
 ```
 
 Note that `makechrootpkg` will not use the "root" chroot directories directly. It will create a
