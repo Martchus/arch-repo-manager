@@ -162,7 +162,7 @@ export function renderTimeSpan(startTimeStamp, endTimeStamp)
 export function renderLink(value, row, handler, tooltip, href, middleClickHref)
 {
     const linkElement = document.createElement('a');
-    const linkText = typeof value === 'object' ? value : document.createTextNode(value);
+    const linkText = typeof value === 'object' ? value : renderNoneInGrey(value);
     linkElement.appendChild(linkText);
     linkElement.href = middleClickHref || href || '#';
     if (tooltip !== undefined) {

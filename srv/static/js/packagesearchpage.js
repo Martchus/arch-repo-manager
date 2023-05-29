@@ -4,26 +4,33 @@ import * as PackageRendering from './packagerendering.js';
 import * as SinglePageHelper from './singlepage.js';
 import * as Utils from './utils.js';
 
-export function initPackageSearch(sectionElement, sectionData, newParams)
+export function initSearchForm()
 {
     const searchForm = document.getElementById('package-search-form');
-    if (!searchForm.dataset.initialized) {
-        searchForm.onsubmit = function() {
-            searchForPackages();
-            return false;
-        };
-        const packageResultsFormElements = document.getElementById('package-results-form').elements;
-        packageResultsFormElements.selectall.onclick = function () {
-            Utils.alterFormSelection(this.form, 'check-all');
-        };
-        packageResultsFormElements.unselectall.onclick = function () {
-            Utils.alterFormSelection(this.form, 'uncheck-all');
-        };
-        packageResultsFormElements.startselected.onclick = function () {
-            fillBuildActionFromPackageSearch();
-        };
-        searchForm.dataset.initialized = true;
+    if (searchForm.dataset.initialized) {
+        return searchForm;
     }
+    searchForm.onsubmit = function() {
+        searchForPackages();
+        return false;
+    };
+    const packageResultsFormElements = document.getElementById('package-results-form').elements;
+    packageResultsFormElements.selectall.onclick = function () {
+        Utils.alterFormSelection(this.form, 'check-all');
+    };
+    packageResultsFormElements.unselectall.onclick = function () {
+        Utils.alterFormSelection(this.form, 'uncheck-all');
+    };
+    packageResultsFormElements.startselected.onclick = function () {
+        fillBuildActionFromPackageSearch();
+    };
+    searchForm.dataset.initialized = true;
+    return searchForm;
+}
+
+export function initPackageSearch(sectionElement, sectionData, newParams)
+{
+    initSearchForm();
     let currentParams = sectionData.state.params;
     if (currentParams && currentParams.startsWith('?')) {
         currentParams = currentParams.substr(1);
@@ -83,7 +90,7 @@ function searchForPackagesFromParams(searchParams)
     return res;
 }
 
-function searchForPackages()
+export function searchForPackages()
 {
     const res = AjaxHelper.startFormQueryEx('package-search-form', showPackageSearchResults);
     const params = SinglePageHelper.sections['package-search'].state.params = res.params.substr(1);

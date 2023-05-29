@@ -1,5 +1,6 @@
 import * as AjaxHelper from './ajaxhelper.js';
 import * as BuildActionsPage from './buildactionspage.js';
+import * as PackageSearchPage from './packagesearchpage.js';
 import * as CustomRendering from './customrendering.js';
 import * as GenericRendering from './genericrendering.js';
 import * as Utils from './utils.js';
@@ -40,7 +41,7 @@ function handleGlobalStatusUpdate(ajaxRequest)
         columnAccessors: ['arch', 'name', 'packageCount', 'lastUpdate', 'syncFromMirror'],
         customRenderer: {
             name: function (value, row) {
-                return GenericRendering.renderLink(value, row, showRepository);
+                return GenericRendering.renderLink(value, row, searchRepository, undefined, undefined, hashToSearchRepository(row));
             },
             lastUpdate: GenericRendering.renderShortTimeStamp,
             note: function(rows) {
@@ -50,6 +51,9 @@ function handleGlobalStatusUpdate(ajaxRequest)
                 note.appendChild(document.createTextNode(rows.length + ' databases and ' + totalPackageCount + ' packages '));
                 note.appendChild(CustomRendering.renderReloadButton(queryGlobalStatus));
                 return note;
+            },
+            syncFromMirror: function (value, row) {
+                return GenericRendering.renderLink(value, row, showRepository);
             },
         },
     });
@@ -227,14 +231,30 @@ function handleGlobalStatusUpdate(ajaxRequest)
     BuildActionsPage.handleBuildActionPresetChange();
 }
 
-function showRepository(dbName, dbInfo)
+function showRepository(value, dbInfo)
 {
     const mirror = dbInfo.mainMirror;
     if (!mirror) {
-        window.alert('No mirror configured for ' + dbName + '.');
+        window.alert('No mirror configured for ' + dbInfo.name + '.');
     } else {
         window.open(mirror);
     }
+}
+
+function searchRepository(value, dbInfo)
+{
+    const form = PackageSearchPage.initSearchForm();
+    form.name.value = '';
+    form.db.value = Utils.makeRepoName(dbInfo.name, dbInfo.arch);
+    form.mode.value = 'name-contains'; 
+    PackageSearchPage.searchForPackages();
+}
+
+function hashToSearchRepository(dbInfo)
+{
+    return '#package-search-section?'
+        + encodeURIComponent('name=&mode=name-contains&db='
+        + encodeURIComponent(Utils.makeRepoName(dbInfo.name, dbInfo.arch)));
 }
 
 window.globalInfo = undefined;
