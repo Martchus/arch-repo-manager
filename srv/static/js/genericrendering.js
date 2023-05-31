@@ -177,11 +177,11 @@ export function renderLink(value, row, handler, tooltip, href, middleClickHref)
     };
     linkElement.onmouseup = function (e) {
         // treat middle-click as regular click
+        e.preventDefault();
+        e.stopPropagation();
         if (e.which !== 2) {
             return true;
         }
-        e.preventDefault();
-        e.stopPropagation();
         if (!middleClickHref) {
             handler(value, row);
         }

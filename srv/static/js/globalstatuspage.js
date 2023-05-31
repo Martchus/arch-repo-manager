@@ -53,7 +53,14 @@ function handleGlobalStatusUpdate(ajaxRequest)
                 return note;
             },
             syncFromMirror: function (value, row) {
-                return GenericRendering.renderLink(value, row, showRepository);
+                const mirror = row.mainMirror;
+                if (mirror) {
+                    const link = GenericRendering.renderLink(value, row, undefined, mirror, mirror);
+                    link.target = 'blank';
+                    return link;
+                } else {
+                    return GenericRendering.renderNoneInGrey(value);
+                }
             },
         },
     });
@@ -229,16 +236,6 @@ function handleGlobalStatusUpdate(ajaxRequest)
 
     BuildActionsPage.handleBuildActionTypeChange();
     BuildActionsPage.handleBuildActionPresetChange();
-}
-
-function showRepository(value, dbInfo)
-{
-    const mirror = dbInfo.mainMirror;
-    if (!mirror) {
-        window.alert('No mirror configured for ' + dbInfo.name + '.');
-    } else {
-        window.open(mirror);
-    }
 }
 
 function searchRepository(value, dbInfo)
