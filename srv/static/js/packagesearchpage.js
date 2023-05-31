@@ -112,6 +112,9 @@ function showPackageSearchResults(ajaxRequest)
         columnAccessors: ['checkbox', 'arch', 'db', 'name', 'version', 'description', 'buildDate'],
         rowsPerPage: 40,
         customRenderer: {
+            db: function (value, row) {
+                return document.createTextNode(Utils.makeRepoName(row.db, row.dbArch));
+            },
             name: function (value, row) {
                 return PackageRendering.renderPackageDetailsLink(row);
             },
