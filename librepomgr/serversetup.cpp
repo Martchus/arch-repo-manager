@@ -785,36 +785,38 @@ int ServiceSetup::run()
     }
 #endif
 
-    printDatabases();
-
-    cout << Phrases::SuccessMessage << "Initializing SSL" << Phrases::End;
-    webServer.initSsl();
-
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    try {
+#else
     {
+#endif
+        printDatabases();
+
+        cout << Phrases::SuccessMessage << "Initializing SSL" << Phrases::End;
+        webServer.initSsl();
+
         cout << Phrases::SuccessMessage << "Allocating worker thread pool (thread count: " << building.threadCount << ")" << Phrases::End;
         const auto buildWorker = building.allocateBuildWorker();
 
+        cout << Phrases::SuccessMessage << "Starting web server (thread count: " << webServer.threadCount << "):" << TextAttribute::Reset
+             << " http://" << webServer.address << ':' << webServer.port << endl;
+        WebAPI::Server::serve(*this);
+        cout << Phrases::SuccessMessage << "Web server stopped." << Phrases::EndFlush;
 #ifndef CPP_UTILITIES_DEBUG_BUILD
-        try {
-#endif
-            cout << Phrases::SuccessMessage << "Starting web server (thread count: " << webServer.threadCount << "):" << TextAttribute::Reset
-                 << " http://" << webServer.address << ':' << webServer.port << endl;
-            WebAPI::Server::serve(*this);
-            cout << Phrases::SuccessMessage << "Web server stopped." << Phrases::EndFlush;
-#ifndef CPP_UTILITIES_DEBUG_BUILD
-        } catch (const boost::exception &e) {
-            cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << boost::diagnostic_information(e)
-                 << Phrases::EndFlush;
-            return -3;
-        } catch (const std::exception &e) {
-            cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
-            return -3;
-        } catch (...) {
-            cerr << Phrases::ErrorMessage << "Server terminated due to an unknown error." << Phrases::EndFlush;
-            return -4;
-        }
-#endif
+    } catch (const boost::exception &e) {
+        cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << boost::diagnostic_information(e)
+             << Phrases::EndFlush;
+        return -3;
+    } catch (const std::exception &e) {
+        cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        return -3;
+    } catch (...) {
+        cerr << Phrases::ErrorMessage << "Server terminated due to an unknown error." << Phrases::EndFlush;
+        return -4;
     }
+#else
+    }
+#endif
 
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     try {
