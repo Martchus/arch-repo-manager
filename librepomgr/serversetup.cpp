@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string_view>
@@ -778,10 +779,10 @@ int ServiceSetup::run()
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
         cerr << Phrases::SubError << e.what() << endl;
-        return -1;
+        return EXIT_FAILURE + 1;
     } catch (...) {
         cerr << Phrases::SubError << "An unknown error occurred." << endl;
-        return -2;
+        return EXIT_FAILURE + 1;
     }
 #endif
 
@@ -806,13 +807,13 @@ int ServiceSetup::run()
     } catch (const boost::exception &e) {
         cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << boost::diagnostic_information(e)
              << Phrases::EndFlush;
-        return -3;
+        return EXIT_FAILURE + 2;
     } catch (const std::exception &e) {
         cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
-        return -3;
+        return EXIT_FAILURE + 2;
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Server terminated due to an unknown error." << Phrases::EndFlush;
-        return -4;
+        return EXIT_FAILURE + 2;
     }
 #else
     }
@@ -833,14 +834,14 @@ int ServiceSetup::run()
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
         cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
-        return -5;
+        return EXIT_FAILURE + 3;
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Unknown error occurred when terminating server." << Phrases::EndFlush;
-        return -6;
+        return EXIT_FAILURE + 3;
     }
 #endif
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int ServiceSetup::fixDb()
@@ -855,13 +856,13 @@ int ServiceSetup::fixDb()
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
         cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
-        return -5;
+        return EXIT_FAILURE + 4;
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Unknown error occurred when terminating server." << Phrases::EndFlush;
-        return -6;
+        return EXIT_FAILURE + 4;
     }
 #endif
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 void ServiceSetup::Locks::clear()
