@@ -77,19 +77,24 @@ void LibPkg::Database::rebuildDb()
     auto txn = m_storage->packages.getRWTransaction();
     auto processed = std::size_t();
     auto ok = std::size_t();
-    txn.rebuild([count = txn.size(), &processed, &ok](StorageID id, Package *package) mutable {
-        std::cerr << "Processing package " << ++processed << " / " << count << '\n';
+    auto lastOk = false;
+    txn.rebuild([count = txn.size(), &processed, &ok, &lastOk](StorageID id, Package *package) mutable {
+        std::cerr << "Processing package " << ++processed << " / " << count << "          ";
         if (!package) {
-            std::cerr << "Deleting package " << id << ": unable to deserialize\n";
-            return false;
+            std::cerr << "\nDeleting package " << id << ": unable to deserialize\n";
+            return lastOk = false;
         }
         if (package->name.empty()) {
-            std::cerr << "Deleting package " << id << ": name is empty\n";
-            return false;
+            std::cerr << "\nDeleting package " << id << ": name is empty\n";
+            return lastOk = false;
         }
+        std::cerr << '\r';
         ++ok;
-        return true;
+        return lastOk = true;
     });
+    if (lastOk) {
+        std::cerr << '\n';
+    }
     if (ok < processed) {
         std::cerr << "Discarding " << (processed - ok) << " invalid packages from \"" << name << "\".\n";
     } else {
