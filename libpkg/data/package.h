@@ -417,6 +417,7 @@ struct LIBPKG_EXPORT Package : public PackageBase,
     std::vector<std::string> processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);
     bool isArchAny() const;
+    std::vector<std::string> validate() const;
     using ReflectiveRapidJSON::JsonSerializable<Package>::fromJson;
     using ReflectiveRapidJSON::JsonSerializable<Package>::toJson;
     using ReflectiveRapidJSON::JsonSerializable<Package>::toJsonDocument;

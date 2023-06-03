@@ -443,6 +443,84 @@ bool Package::isArchAny() const
     return true;
 }
 
+static bool containsUnexpectedCharacters(std::string_view value)
+{
+    for (auto c : value) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            continue;
+        }
+        switch (c) {
+        case '+':
+        case '-':
+        case '_':
+        case '.':
+            continue;
+        default:
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool containsUnprintableCharacters(std::string_view value)
+{
+    for (auto c : value) {
+        if (c < ' ' || c >= 127) {
+            return true;
+        }
+    }
+    return false;
+}
+
+#define CHECK_FIELD_EMPTY(field) \
+    if (field.empty()) { \
+        problems.emplace_back(#field " is empty"); \
+    }
+#define CHECK_FIELD_FOR_UNEXPECTED_CHARS(field) \
+    if (containsUnexpectedCharacters(field)) { \
+        problems.emplace_back(#field " contains unexpected characters"); \
+    }
+#define CHECK_FIELD_FOR_UNPRINTABLE_CHARS(field) \
+    if (containsUnprintableCharacters(field)) { \
+        problems.emplace_back(#field " contains unprintable or non-ASCII characters"); \
+    }
+#define CHECK_FIELD_STRICT(field) \
+    CHECK_FIELD_EMPTY(field) \
+    CHECK_FIELD_FOR_UNEXPECTED_CHARS(field)
+#define CHECK_FIELD_RELAXED(field) \
+    CHECK_FIELD_EMPTY(field) \
+    CHECK_FIELD_FOR_UNPRINTABLE_CHARS(field)
+
+/*!
+ * \brief Performs a basic sanity check of the package's fields.
+ * \returns Returns an empty vector if no problems were found; otherwise returns the problem descriptions.
+ */
+std::vector<std::string> Package::validate() const
+{
+    // check basic fields
+    auto problems = std::vector<std::string>();
+    CHECK_FIELD_STRICT(name)
+    CHECK_FIELD_RELAXED(version)
+    CHECK_FIELD_STRICT(arch)
+
+    // check dependencies
+    const auto checkDeps = sourceInfo ? sourceInfo->checkDependencies : std::vector<Dependency>();
+    const auto makeDeps = sourceInfo ? sourceInfo->makeDependencies : std::vector<Dependency>();
+    for (const auto &deps : { dependencies, optionalDependencies, provides, conflicts, replaces, checkDeps, makeDeps }) {
+        for (const auto &dep : deps) {
+            if (dep.name.empty()) {
+                problems.emplace_back("dependency is empty");
+                return problems;
+            }
+            if (containsUnexpectedCharacters(dep.name)) {
+                problems.emplace_back("dependency contains unexpected characters");
+                return problems;
+            }
+        }
+    }
+    return problems;
+}
+
 DependencySetBase::iterator DependencySet::find(const Dependency &dependency)
 {
     for (auto range = equal_range(dependency.name); range.first != range.second; ++range.first) {
