@@ -43,6 +43,7 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
 {
     // iterate through all archive entries
     struct archive_entry *const entry = archive_entry_new();
+    auto fileContent = std::string();
     while (archive_read_next_header2(ar, entry) == ARCHIVE_OK) {
         // check entry type (only dirs, files and symlinks relevant here)
         const auto entryType(archive_entry_filetype(entry));
@@ -107,7 +108,7 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
 
         // determine file size to pre-allocate buffer for file content
         const la_int64_t fileSize = archive_entry_size(entry);
-        std::string fileContent;
+        fileContent.clear();
         if (fileSize > 0) {
             fileContent.reserve(static_cast<string::size_type>(fileSize));
         }
