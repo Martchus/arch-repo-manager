@@ -445,6 +445,7 @@ void DataTests::testLocatePackage()
     setupPackages();
     auto &db = m_config.databases.front();
     db.localPkgDir = std::filesystem::path(fakePkgPath).parent_path();
+    std::filesystem::create_symlink("does_not_exist", db.localPkgDir + "/missing-0-any.pkg.tar.zst");
 
     const auto emptyPkg = db.locatePackage(std::string());
     CPPUNIT_ASSERT_EQUAL(std::string(), emptyPkg.pathWithinRepo.string());

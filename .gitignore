@@ -43,6 +43,9 @@ Makefile*
 # clang-format
 .clang-format
 
+# dynamically created testfiles
+libpkg/testfiles/repo/foo/missing-0-any.pkg.tar.zst
+
 # node modules (only essential JavaScript and CSS files are force-added)
 /srv/static/package-lock.json
 /srv/static/node_modules/
