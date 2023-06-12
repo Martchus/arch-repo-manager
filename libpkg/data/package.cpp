@@ -472,23 +472,23 @@ static bool containsUnprintableCharacters(std::string_view value)
     return false;
 }
 
-#define CHECK_FIELD_EMPTY(field) \
-    if (field.empty()) { \
-        problems.emplace_back(#field " is empty"); \
+#define CHECK_FIELD_EMPTY(field)                                                                                                                     \
+    if (field.empty()) {                                                                                                                             \
+        problems.emplace_back(#field " is empty");                                                                                                   \
     }
-#define CHECK_FIELD_FOR_UNEXPECTED_CHARS(field) \
-    if (containsUnexpectedCharacters(field)) { \
-        problems.emplace_back(#field " contains unexpected characters"); \
+#define CHECK_FIELD_FOR_UNEXPECTED_CHARS(field)                                                                                                      \
+    if (containsUnexpectedCharacters(field)) {                                                                                                       \
+        problems.emplace_back(#field " contains unexpected characters");                                                                             \
     }
-#define CHECK_FIELD_FOR_UNPRINTABLE_CHARS(field) \
-    if (containsUnprintableCharacters(field)) { \
-        problems.emplace_back(#field " contains unprintable or non-ASCII characters"); \
+#define CHECK_FIELD_FOR_UNPRINTABLE_CHARS(field)                                                                                                     \
+    if (containsUnprintableCharacters(field)) {                                                                                                      \
+        problems.emplace_back(#field " contains unprintable or non-ASCII characters");                                                               \
     }
-#define CHECK_FIELD_STRICT(field) \
-    CHECK_FIELD_EMPTY(field) \
+#define CHECK_FIELD_STRICT(field)                                                                                                                    \
+    CHECK_FIELD_EMPTY(field)                                                                                                                         \
     CHECK_FIELD_FOR_UNEXPECTED_CHARS(field)
-#define CHECK_FIELD_RELAXED(field) \
-    CHECK_FIELD_EMPTY(field) \
+#define CHECK_FIELD_RELAXED(field)                                                                                                                   \
+    CHECK_FIELD_EMPTY(field)                                                                                                                         \
     CHECK_FIELD_FOR_UNPRINTABLE_CHARS(field)
 
 /*!
