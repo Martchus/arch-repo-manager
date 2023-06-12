@@ -445,7 +445,10 @@ void DataTests::testLocatePackage()
     setupPackages();
     auto &db = m_config.databases.front();
     db.localPkgDir = std::filesystem::path(fakePkgPath).parent_path();
-    std::filesystem::create_symlink("does_not_exist", db.localPkgDir + "/missing-0-any.pkg.tar.zst");
+    auto missingPath = std::filesystem::path(db.localPkgDir + "/missing-0-any.pkg.tar.zst");
+    if (!std::filesystem::exists(std::filesystem::symlink_status(missingPath))) {
+        std::filesystem::create_symlink("does_not_exist", missingPath);
+    }
 
     const auto emptyPkg = db.locatePackage(std::string());
     CPPUNIT_ASSERT_EQUAL(std::string(), emptyPkg.pathWithinRepo.string());
@@ -454,7 +457,7 @@ void DataTests::testLocatePackage()
     CPPUNIT_ASSERT(!emptyPkg.error.has_value());
 
     const auto missingPkg = db.locatePackage("missing-0-any.pkg.tar.zst");
-    CPPUNIT_ASSERT_EQUAL(db.localPkgDir + "/missing-0-any.pkg.tar.zst", missingPkg.pathWithinRepo.string());
+    CPPUNIT_ASSERT_EQUAL(missingPath, missingPkg.pathWithinRepo);
     CPPUNIT_ASSERT_EQUAL(db.localPkgDir + "/does_not_exist"s, missingPkg.storageLocation.string());
     CPPUNIT_ASSERT(!missingPkg.exists);
     CPPUNIT_ASSERT(!missingPkg.error.has_value());
