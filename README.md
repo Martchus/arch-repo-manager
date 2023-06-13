@@ -149,10 +149,18 @@ It is generally invoked like this:
 
 ```
 cd /the/chroot/directory
-mkarchroot -C config-x86_64/pacman.conf -M config-x86_64/makepkg.conf arch-x86_64/root base-devel
+sudo mkarchroot -C config-x86_64/pacman.conf -M config-x86_64/makepkg.conf arch-x86_64/root base-devel
 sudo vim arch-x86_64/root/etc/pacman.d/mirrorlist  # uncomment at least one mirror
 arch-nspawn arch-x86_64/root  # enter bash shell within chroot
 ```
+
+Use the same approach to create a chroot of a different architecture:
+```
+sudo mkarchroot -s -C config-i686/pacman.conf -M config-i686/makepkg.conf arch-i686/root base-devel  # create i686 chroot
+```
+
+In this case `pacman.conf` contains the mirrors from the Arch Linux 32 project and `makepkg.conf`
+contains `CARCH="i686" CHOST="i686-pc-linux-gnu"`.
 
 Note that `makechrootpkg` will not use the "root" chroot directories directly. It will create a
 working copy using `rsync -a --delete -q -W -x "$chrootdir/root/" "$copydir"` (when using btrfs
