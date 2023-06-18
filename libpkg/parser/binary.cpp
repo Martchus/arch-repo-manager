@@ -187,7 +187,7 @@ void Binary::load(std::string_view filePath)
     parse(file);
     switch (type) {
     case BinaryType::Pe:
-        // use name of library file as there's no soname filed in PEs
+        // use name of library file as there's no soname field in PEs
         name = fileName(filePath);
         break;
     case BinaryType::Elf:
@@ -212,7 +212,7 @@ void Binary::load(std::string_view fileContent, std::string_view fileName, std::
     parse(fileStream, &fileContent);
     switch (type) {
     case BinaryType::Pe:
-        // use name of library file as there's no soname filed in PEs
+        // use name of library file as there's no soname field in PEs
         name = fileName;
         break;
     case BinaryType::Elf:
