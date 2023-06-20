@@ -25,6 +25,7 @@ set(JAVA_SCRIPT_FILES
 set(CSS_FILES static/css/basics.css static/css/genericrendering.css static/css/layout.css static/css/log.css
               static/css/specifics.css static/node_modules/xterm/css/xterm.css)
 set(IMG_FILES
+    static/img/favicon.svg
     static/img/logo.svg
     static/img/icon/content-save.svg
     static/img/icon/chevron-left.svg
