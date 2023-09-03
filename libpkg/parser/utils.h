@@ -76,6 +76,7 @@ struct LIBPKG_EXPORT PackageAmendment {
 };
 
 struct LIBPKG_EXPORT AmendedVersions {
+    std::string newUpstreamVersion;
     std::string newPkgRel;
     std::string newEpoch;
 };

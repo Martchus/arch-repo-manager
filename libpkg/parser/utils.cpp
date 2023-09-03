@@ -262,7 +262,7 @@ static void overrideOverriddenVariableAssignment(string &pkgbuildContents, strin
  */
 AmendedVersions amendPkgbuild(const string &path, const PackageVersion &existingVersion, const PackageAmendment &amendment)
 {
-    AmendedVersions amendedVersions;
+    auto amendedVersions = AmendedVersions();
     if (amendment.isEmpty()) {
         return amendedVersions;
     }
@@ -273,6 +273,7 @@ AmendedVersions amendPkgbuild(const string &path, const PackageVersion &existing
     if (amendment.setUpstreamVersion) {
         static const auto pkgverRegex = regex{ "\npkgver=[^\n]*", regex::extended };
         pkgbuildContents = regex_replace(pkgbuildContents, pkgverRegex, "\npkgver=" + existingVersion.upstream);
+        amendedVersions.newUpstreamVersion = existingVersion.upstream;
     }
 
     // bump downstream version

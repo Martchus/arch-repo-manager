@@ -79,8 +79,9 @@ void UtilsTests::testAmendingPkgbuild()
         PackageAmendment{ .bumpDownstreamVersion = PackageAmendment::VersionBump::Epoch });
     CPPUNIT_ASSERT_EQUAL_MESSAGE("epoch bumped, pkgrel reset", readFile(testFilePath("c++utilities/PKGBUILD.newepoch")), readFile(pkgbuildPath));
 
-    amendPkgbuild(pkgbuildPath, PackageVersion{ .upstream = "5.0.2", .package = "3" }, PackageAmendment{ .setUpstreamVersion = true });
+    auto amendment = amendPkgbuild(pkgbuildPath, PackageVersion{ .upstream = "5.0.2", .package = "3" }, PackageAmendment{ .setUpstreamVersion = true });
     CPPUNIT_ASSERT_EQUAL_MESSAGE("upstream version set", readFile(testFilePath("c++utilities/PKGBUILD.newpkgver")), readFile(pkgbuildPath));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("new upstream version returned", "5.0.2"s, amendment.newUpstreamVersion);
 
     const auto pkgbuildWithQuotingPath = workingCopyPath("perl-data-dumper-concise/PKGBUILD");
     amendPkgbuild(pkgbuildWithQuotingPath, PackageVersion{ .upstream = "2.023", .package = "1" },

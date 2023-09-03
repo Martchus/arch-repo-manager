@@ -784,6 +784,9 @@ void PrepareBuild::bumpVersions()
             if (!amendedVersions.newEpoch.empty()) {
                 newVersion.epoch = std::move(amendedVersions.newEpoch);
             }
+            if (!amendedVersions.newUpstreamVersion.empty()) {
+                newVersion.upstream = std::move(amendedVersions.newUpstreamVersion);
+            }
             if (!amendedVersions.newPkgRel.empty()) {
                 newVersion.package = std::move(amendedVersions.newPkgRel);
             }
