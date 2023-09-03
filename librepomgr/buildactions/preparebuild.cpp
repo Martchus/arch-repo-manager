@@ -744,8 +744,8 @@ void PrepareBuild::bumpVersions()
             continue;
         }
         auto existingVersion = existingVersionStr.empty() ? LibPkg::PackageVersion{} : LibPkg::PackageVersion::fromString(existingVersionStr);
-        LibPkg::PackageAmendment amendment;
-        LibPkg::PackageVersion newVersion;
+        auto amendment = LibPkg::PackageAmendment();
+        auto newVersion = LibPkg::PackageVersion();
         for (const auto &[packageID, package] : buildData.packages) {
             newVersion = LibPkg::PackageVersion::fromString(package->version);
             if (existingVersionStr.empty()) {
@@ -760,18 +760,17 @@ void PrepareBuild::bumpVersions()
                 break;
             case LibPkg::PackageVersionComparison::SoftwareUpgrade:
                 if (package->decomposeName().isVcsPackage()) {
-                    // skip bumping epoch of VCS packages; the pkgver is supposed to be adjusted in pkgver()
-                    // note: Not skipping this in the pkgrel handling in the case above because when pkgver() returns a new version, pkgrel is
-                    //       reset automatically so there's no harm in bumping it and it might actually be needed if there's no no version.
-                    m_warnings.emplace_back("Version of package " % package->name % " is" % package->version
-                            % " which is older than existing version " % existingVersionStr
-                        + "; NOT bumping the epoch because it is a VCS package; be sure pkgver() actually yields a new version");
-                    break;
+                    amendment.setUpstreamVersion = true;
+                    amendment.bumpDownstreamVersion = LibPkg::PackageAmendment::VersionBump::PackageVersion;
+                    m_warnings.emplace_back("Bumping pkgver and pkgrel of VCS package " % package->name % "; its version " % package->version % " is older than existing version "
+                        + existingVersionStr);
+                } else {
+                    amendment.bumpDownstreamVersion = LibPkg::PackageAmendment::VersionBump::Epoch;
+                    m_warnings.emplace_back("Bumping epoch of " % package->name % "; its version " % package->version % " is older than existing version "
+                        + existingVersionStr);
+                    goto breakLoop;
                 }
-                amendment.bumpDownstreamVersion = LibPkg::PackageAmendment::VersionBump::Epoch;
-                m_warnings.emplace_back("Bumping epoch of " % package->name % "; its version " % package->version % " is older than existing version "
-                    + existingVersionStr);
-                goto breakLoop;
+                break;
             default:;
             }
         }
