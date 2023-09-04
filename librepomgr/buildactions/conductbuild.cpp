@@ -482,7 +482,9 @@ void ConductBuild::run()
         if (progress.makepkgFlags.empty()) {
             progress.makepkgFlags = m_setup.building.makepkgFlags;
         }
-        progress.updatedVersion.clear(); // reset as there must not be an old value from a previous run
+        if (!progress.finished.isNull()) {
+            progress.updatedVersion.clear(); // reset as there must not be an old value from a previous run
+        }
     }
     setupReadLock2.unlock();
     dumpBuildProgress();
