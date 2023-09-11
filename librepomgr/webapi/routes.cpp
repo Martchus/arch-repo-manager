@@ -255,13 +255,13 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                 = LibPkg::Config::parsePackageDenotation(name); // assume names are in the form "repo@arch/pkgname", eg. "core@i686/gcc"
             const auto &[dbName, dbArch, packageName] = packageDenotation;
             const auto isDbAur = dbName == "aur";
-            auto packageNameStr = std::string(packageName);
+            const auto packageNameStr = std::string(packageName);
             if (fromAur && (dbName.empty() || isDbAur)) {
                 if (const auto [aurPackageID, aurPackage] = aurDb.findPackageWithID(packageNameStr);
                     aurPackage && (!details || aurPackage->origin != PackageOrigin::AurRpcSearch)) {
                     aurPackages.emplace_back(aurDb, aurPackage, aurPackageID);
                 } else {
-                    neededAurPackages.emplace_back(std::move(packageNameStr));
+                    neededAurPackages.emplace_back(packageNameStr);
                 }
                 --limit;
             }
