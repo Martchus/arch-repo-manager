@@ -116,7 +116,7 @@ void getUnresolved(const Params &params, ResponseHandler &&handler)
         res.reserve(newPackageNames.size());
         for (const auto &name : newPackageNames) {
             for (auto &package : params.setup.config.findPackages(name)) {
-                res.emplace_back(move(package.pkg));
+                res.emplace_back(std::move(package.pkg));
             }
         }
         return res;
@@ -125,7 +125,7 @@ void getUnresolved(const Params &params, ResponseHandler &&handler)
         DependencySet removedProvides;
         for (const auto &dependencyString : params.target.decodeValues("remove")) {
             auto dependency(Dependency::fromString(dependencyString.data(), dependencyString.size()));
-            removedProvides.add(move(dependency.name), DependencyDetail(move(dependency.version), dependency.mode));
+            removedProvides.add(std::move(dependency.name), DependencyDetail(std::move(dependency.version), dependency.mode));
         }
         return removedProvides;
     }();
