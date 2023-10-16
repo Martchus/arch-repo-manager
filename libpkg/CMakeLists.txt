@@ -83,7 +83,7 @@ set_property(TARGET libarchive PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${LibArch
 use_target(TARGET_NAME libarchive)
 
 # find boost libraries (required by lmdb-safe's integration with reflective-rapidjson)
-option(BOOST_STATIC_LINKAGE "${STATIC_LINKAGE}" "link statically against Boost (instead of dynamically)")
+option(BOOST_STATIC_LINKAGE "link statically against Boost (instead of dynamically)" "${STATIC_LINKAGE}")
 set(Boost_USE_MULTITHREADED ON)
 if (BOOST_STATIC_LINKAGE)
     set(Boost_USE_STATIC_LIBS ON)
