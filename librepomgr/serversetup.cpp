@@ -35,6 +35,10 @@
 #include <sys/resource.h>
 #endif
 
+#ifdef USE_LIBSYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 #include <algorithm>
 #include <cerrno>
 #include <cstdlib>
@@ -768,6 +772,10 @@ void ServiceSetup::initStorage()
 
 int ServiceSetup::run()
 {
+#ifdef USE_LIBSYSTEMD
+    sd_notify(0, "STATUS=Loading databases");
+#endif
+
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     try {
 #endif
@@ -793,12 +801,21 @@ int ServiceSetup::run()
 #endif
         printDatabases();
 
+#ifdef USE_LIBSYSTEMD
+        sd_notify(0, "STATUS=Initializing SSL");
+#endif
         cout << Phrases::SuccessMessage << "Initializing SSL" << Phrases::End;
         webServer.initSsl();
 
+#ifdef USE_LIBSYSTEMD
+        sd_notify(0, "STATUS=Allocating worker thread pool");
+#endif
         cout << Phrases::SuccessMessage << "Allocating worker thread pool (thread count: " << building.threadCount << ")" << Phrases::End;
         const auto buildWorker = building.allocateBuildWorker();
 
+#ifdef USE_LIBSYSTEMD
+        sd_notify(0, "STATUS=Starting web server");
+#endif
         cout << Phrases::SuccessMessage << "Starting web server (thread count: " << webServer.threadCount << "):" << TextAttribute::Reset
              << " http://" << webServer.address << ':' << webServer.port << endl;
         WebAPI::Server::serve(*this);

@@ -104,6 +104,17 @@ if (BOOST_ASIO_IO_URING)
     use_pkg_config_module(PKG_CONFIG_MODULES "liburing" VISIBILITY PUBLIC)
 endif ()
 
+# find systemd library
+option(SYSTEMD_SUPPORT "enable use of libsystemd for signaling when the service is ready" ON)
+if (SYSTEMD_SUPPORT)
+    message(STATUS "Using libsystemd")
+    set_property(
+        SOURCE serversetup.cpp webapi/server.cpp
+        APPEND
+        PROPERTY COMPILE_DEFINITIONS USE_LIBSYSTEMD)
+    use_pkg_config_module(PKG_CONFIG_MODULES "libsystemd" VISIBILITY PRIVATE)
+endif ()
+
 # find reflective-rapidjson
 find_package(reflective_rapidjson${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
 use_reflective_rapidjson(VISIBILITY PUBLIC)

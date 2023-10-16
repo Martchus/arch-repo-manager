@@ -9,6 +9,10 @@
 
 #include <boost/asio/signal_set.hpp>
 
+#ifdef USE_LIBSYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 #include <iostream>
 #include <thread>
 
@@ -76,9 +80,19 @@ void Server::serve(ServiceSetup &setup)
         }
     });
 
+    // signal systemd that the service is ready
+#ifdef USE_LIBSYSTEMD
+    sd_notify(0, argsToString("READY=1\nSTATUS=Listening on http://", setup.webServer.address.to_string(), ':', setup.webServer.port).data());
+#endif
+
     // run the IO service on the requested number of threads
     const auto additionalThreads = ThreadPool("Web server", setup.webServer.ioContext, setup.webServer.threadCount - 1);
     setup.webServer.ioContext.run();
+
+    // signal systemd that the service is stopping
+#ifdef USE_LIBSYSTEMD
+    sd_notify(0, "STOPPING=1");
+#endif
 }
 
 void Server::stop()
