@@ -496,6 +496,7 @@ private:
     std::mutex m_mutex;
     std::string m_workingDirectory;
     boost::filesystem::path m_makePkgPath;
+    boost::filesystem::path m_makeContainerPkgPath;
     std::vector<std::string> m_pkgbuildsDirs;
     std::regex m_ignoreLocalPkgbuildsRegex;
     std::unordered_map<std::string, PackageBuildData> m_buildDataByPackage;
@@ -516,6 +517,7 @@ private:
     bool m_pullingInFurtherDependenciesUnexpected = false;
     bool m_pulledInFurtherDependencies = false;
     bool m_fetchOfficialSources = false;
+    bool m_useContainer;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {

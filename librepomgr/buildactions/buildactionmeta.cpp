@@ -178,6 +178,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Whether PKGBUILDs from official Arch Linux Git repositories should be downloaded (if not present, the AUR will still be checked; local PKGBUILDs still have precedence)",
                     .param = "fetch-official-pkgbuilds",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(ConductBuildFlags::UseContainer),
+                    .name = "Use container",
+                    .desc = "Uses `makecontainerpkg` instead of using `makepkg` when printing source info; eliminates the need to having pacman on the host by using docker/podman instead",
+                    .param = "use-container",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

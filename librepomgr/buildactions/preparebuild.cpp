@@ -77,6 +77,7 @@ void PrepareBuild::run()
     m_resetChrootSettings = flags & PrepareBuildFlags::ResetChrootSettings;
     m_pullingInFurtherDependenciesUnexpected = flags & PrepareBuildFlags::PullingInFurtherDependenciesUnexpected;
     m_fetchOfficialSources = flags & PrepareBuildFlags::FetchOfficialPackageSources;
+    m_useContainer = flags & PrepareBuildFlags::UseContainer;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -92,7 +93,11 @@ void PrepareBuild::run()
 
     // read values from global config
     auto setupReadLock = m_setup.lockToRead();
-    m_makePkgPath = findExecutable(m_setup.building.makePkgPath);
+    if (m_useContainer) {
+        m_makeContainerPkgPath = findExecutable(m_setup.building.makeContainerPkgPath);
+    } else {
+        m_makePkgPath = findExecutable(m_setup.building.makePkgPath);
+    }
     copySecondVectorIntoFirstVector(m_pkgbuildsDirs, m_setup.building.pkgbuildsDirs);
     m_ignoreLocalPkgbuildsRegex = m_setup.building.ignoreLocalPkgbuildsRegex;
     m_workingDirectory = determineWorkingDirectory(buildDataWorkingDirectory);
@@ -316,7 +321,8 @@ void PrepareBuild::makeSrcInfo(
         m_setup.building.ioContext, [multiSession, &sourceDirectory, &packageName](boost::process::child &&child, ProcessResult &&result) {
             processSrcInfo(*multiSession, sourceDirectory, packageName, std::move(child), std::move(result));
         });
-    processSession->launch(boost::process::start_dir(sourceDirectory), m_makePkgPath.string(), "--printsrcinfo");
+    processSession->launch(
+        boost::process::start_dir(sourceDirectory), (m_useContainer ? m_makeContainerPkgPath : m_makePkgPath).string(), "--printsrcinfo");
 }
 
 void PrepareBuild::processSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &sourceDirectory,

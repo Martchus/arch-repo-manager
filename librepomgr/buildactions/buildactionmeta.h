@@ -79,6 +79,7 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     ResetChrootSettings = (1 << 4),
     PullingInFurtherDependenciesUnexpected = (1 << 5),
     FetchOfficialPackageSources = (1 << 6),
+    UseContainer = (1 << 7),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,
