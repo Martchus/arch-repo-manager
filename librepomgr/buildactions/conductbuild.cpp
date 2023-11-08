@@ -281,14 +281,14 @@ void ConductBuild::run()
             reportError("Unable to find makechrootpkg executable \"" % m_setup.building.makeChrootPkgPath + "\" in PATH.");
             return;
         }
-    }
-    if (!checkExecutable(m_updatePkgSumsPath)) {
-        reportError("Unable to find updpkgsums executable \"" % m_setup.building.updatePkgSumsPath + "\" in PATH.");
-        return;
-    }
-    if (!checkExecutable(m_repoAddPath)) {
-        reportError("Unable to find repo-add executable \"" % m_setup.building.repoAddPath + "\" in PATH.");
-        return;
+        if (!checkExecutable(m_updatePkgSumsPath)) {
+            reportError("Unable to find updpkgsums executable \"" % m_setup.building.updatePkgSumsPath + "\" in PATH.");
+            return;
+        }
+        if (!checkExecutable(m_repoAddPath)) {
+            reportError("Unable to find repo-add executable \"" % m_setup.building.repoAddPath + "\" in PATH.");
+            return;
+        }
     }
 
     // assign paths
@@ -898,9 +898,16 @@ InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession:
                 break;
             }
         });
-    m_buildAction->log()(Phrases::InfoMessage, "Updating checksums of ", packageName, " via ", m_updatePkgSumsPath.string(), '\n',
-        ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
-    processSession->launch(boost::process::start_dir(buildDirectory), m_updatePkgSumsPath);
+    if (m_useContainer && !checkExecutable(m_updatePkgSumsPath)) {
+        m_buildAction->log()(Phrases::InfoMessage, "Updating checksums of ", packageName, " via ", m_makeContainerPkgPath.string(), '\n',
+            ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
+        processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["PKGNAME"] = packageName,
+            boost::process::env["TOOL"] = "updpkgsums", m_makeContainerPkgPath);
+    } else {
+        m_buildAction->log()(Phrases::InfoMessage, "Updating checksums of ", packageName, " via ", m_updatePkgSumsPath.string(), '\n',
+            ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
+        processSession->launch(boost::process::start_dir(buildDirectory), m_updatePkgSumsPath);
+    }
     return InvocationResult::Ok;
 }
 
@@ -1446,8 +1453,15 @@ void ConductBuild::invokeRepoAdd(const BatchProcessingSession::SharedPointerType
             buildResult.needsStaging ? m_buildPreparation.stagingDb : m_buildPreparation.targetDb, m_buildPreparation.targetArch),
         [this, &packageName, processSession, buildAction = m_buildAction, &buildResult](UniqueLoggingLock &&lock) {
             processSession->locks().emplace_back(std::move(lock));
-            processSession->launch(
-                boost::process::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);
+            if (m_useContainer && !checkExecutable(m_repoAddPath)) {
+                m_buildAction->log()(
+                    Phrases::InfoMessage, "Going to invoke repo-add for ", packageName, " via ", m_makeContainerPkgPath.string(), '\n');
+                processSession->launch(boost::process::start_dir(*buildResult.repoPath), boost::process::env["PKGNAME"] = packageName,
+                    boost::process::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath, buildResult.binaryPackageNames);
+            } else {
+                processSession->launch(
+                    boost::process::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);
+            }
             buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage),
                 "repo path: ", buildResult.repoPath, '\n', ps(Phrases::SubMessage), "db path: ", buildResult.dbFilePath, '\n',
                 ps(Phrases::SubMessage), "package(s): ", joinStrings(buildResult.binaryPackageNames), '\n');
