@@ -768,11 +768,13 @@ void PrepareBuild::bumpVersions()
                 if (package->decomposeName().isVcsPackage()) {
                     amendment.setUpstreamVersion = true;
                     amendment.bumpDownstreamVersion = LibPkg::PackageAmendment::VersionBump::PackageVersion;
-                    m_warnings.emplace_back("Bumping pkgver and pkgrel of VCS package " % package->name % "; its version " % package->version % " is older than existing version "
+                    m_warnings.emplace_back("Bumping pkgver and pkgrel of VCS package " % package->name % "; its version " % package->version
+                            % " is older than existing version "
                         + existingVersionStr);
                 } else {
                     amendment.bumpDownstreamVersion = LibPkg::PackageAmendment::VersionBump::Epoch;
-                    m_warnings.emplace_back("Bumping epoch of " % package->name % "; its version " % package->version % " is older than existing version "
+                    m_warnings.emplace_back(
+                        "Bumping epoch of " % package->name % "; its version " % package->version % " is older than existing version "
                         + existingVersionStr);
                     goto breakLoop;
                 }
