@@ -163,7 +163,8 @@ inline boost::filesystem::path findExecutable(const std::string &nameOrPath)
 
 inline bool checkExecutable(const boost::filesystem::path &path)
 {
-    return !path.empty() && boost::filesystem::exists(path);
+    auto ec = boost::system::error_code();
+    return !path.empty() && boost::filesystem::exists(path, ec);
 }
 
 } // namespace LibRepoMgr
