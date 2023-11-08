@@ -5,7 +5,7 @@ import * as CustomRendering from './customrendering.js';
 import * as GenericRendering from './genericrendering.js';
 import * as Utils from './utils.js';
 
-const status = {repoNames: undefined};
+const status = {repoNames: undefined, defaultArch: 'x86_64'};
 
 export function queryGlobalStatus(additionalParams)
 {
@@ -115,15 +115,26 @@ function handleGlobalStatusUpdate(ajaxRequest)
                 const filterOpt = document.createElement('option');
                 filterOpt.id = filterOptId;
                 filterOpt.text = dbInfo.arch;
+                filterOpt.defaultSelected = dbInfo.arch === status.defaultArch;
                 filterSel.add(filterOpt);
-                filterSel.onchange = function() {
-                    const filterVal = !filterSel.selectedIndex ? undefined : filterSel.value;
-                    Array.from(selection.options).forEach(function(option) {
-                       option.style.display = !filterVal || filterVal === option.dataset.arch ? 'block' : 'none';
-                    });
-                };
             }
         });
+    });
+
+    // make arch filters actually do something
+    repoSelections.forEach(function (selection) {
+        const filterSel = document.getElementById(selection.id + '-arch-filter');
+        if (!filterSel) {
+            return;
+        }
+        filterSel.onchange = function() {
+            const filterVal = !filterSel.selectedIndex ? undefined : filterSel.value;
+            Array.from(selection.options).forEach(function(option) {
+                option.selected = filterVal ? (filterVal === option.dataset.arch) : (!option.dataset.arch);
+                option.style.display = !filterVal || filterVal === option.dataset.arch ? 'block' : 'none';
+            });
+        };
+        filterSel.onchange();
     });
 
     // update lists of build action states, results and types
