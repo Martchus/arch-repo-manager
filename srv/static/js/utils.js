@@ -9,7 +9,7 @@ export function splitHashParts()
     return hashParts;
 }
 
-export function hashAsObject(hash)
+export function hashAsObject(hash, multipleValuesAsArray)
 {
     const hashObject = {};
     (hash || location.hash.substr(1)).split('&').forEach(function(hashPart) {
@@ -17,7 +17,18 @@ export function hashAsObject(hash)
         if (parts.length < 1) {
             return;
         }
-        hashObject[decodeURIComponent(parts[0])] = parts.length > 1 ? decodeURIComponent(parts[1]) : undefined;
+        const key = decodeURIComponent(parts[0]);
+        const thisValue = parts.length > 1 ? decodeURIComponent(parts[1]) : undefined;
+        const existingValue = hashObject[key];
+        if (multipleValuesAsArray && existingValue !== undefined) {
+            if (Array.isArray(existingValue)) {
+                existingValue.push(thisValue);
+            } else {
+                hashObject[key] = [existingValue, thisValue];
+            }
+        } else {
+            hashObject[key] = thisValue;
+        }
     });
     return hashObject;
 }

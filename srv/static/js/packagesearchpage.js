@@ -69,21 +69,27 @@ function searchForPackagesFromParams(searchParams)
 {
     const form = document.getElementById('package-search-form');
     form.reset();
-    for (const [key, value] of Object.entries(Utils.hashAsObject(searchParams))) {
+    const archFilter = document.getElementById('package-search-db-arch-filter');
+    if (archFilter) {
+        archFilter.selectedIndex = 0;
+        archFilter.onchange();
+    }
+    const params = Utils.hashAsObject(searchParams, true);
+    for (const [key, value] of Object.entries(params)) {
         const formElement = form[key];
         if (!formElement) {
-            return;
+            continue;
         }
-        if (formElement.multiple) {
-            Array.from(formElement.options).forEach(function(optionElement) {
-                if (optionElement.value === value) {
-                    optionElement.selected = true;
-                    return;
-                }
-            });
-        } else {
+        if (!formElement.multiple) {
             formElement.value = value;
+            continue;
         }
+        Array.from(formElement.options).forEach(function(optionElement) {
+            optionElement.selected = Array.isArray(value) ? value.includes(optionElement.value) : value === optionElement.value;
+        });
+    }
+    if (!params.db) {
+        form.db.selectedIndex = 0;
     }
     const res = AjaxHelper.startFormQueryEx('package-search-form', showPackageSearchResults);
     SinglePageHelper.sections['package-search'].state.params = res.params;
