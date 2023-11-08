@@ -5,7 +5,7 @@ import * as CustomRendering from './customrendering.js';
 import * as GenericRendering from './genericrendering.js';
 import * as Utils from './utils.js';
 
-const status = {repoNames: undefined, defaultArch: 'x86_64'};
+const status = {repoNames: undefined, defaultArch: undefined};
 
 export function queryGlobalStatus(additionalParams)
 {
@@ -97,6 +97,7 @@ function handleGlobalStatusUpdate(ajaxRequest)
         Utils.getAndEmptyElement('package-search-db', {'package-search-db-any': 'keep'}),
     ];
     status.repoNames = [];
+    status.defaultArch = responseJson.defaultArch || 'x86_64';
     dbStats.forEach(function (dbInfo) {
         const repoName = Utils.makeRepoName(dbInfo.name, dbInfo.arch);
         status.repoNames.push(repoName);

@@ -45,6 +45,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::string pacmanConfigFilePath = "/etc/pacman.conf";
     std::filesystem::path initialWorkingDirectory;
     std::string workingDirectory = "workingdir";
+    std::string defaultArch = "x86_64";
     std::string dbPath = "libpkg-1.db";
     std::uint32_t maxDbs = 512;
     std::size_t packageCacheLimit = 1000;
@@ -250,6 +251,7 @@ struct LIBREPOMGR_EXPORT ServiceStatus : public ReflectiveRapidJSON::JsonSeriali
     const LibPkg::Status config;
     const BuildActionMetaInfo &actions;
     const BuildPresets &presets;
+    const std::string &defaultArch;
     const ResourceUsage resourceUsage;
 };
 

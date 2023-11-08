@@ -486,6 +486,7 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
             if (iniEntry.first.empty()) {
                 convertValue(iniEntry.second, "pacman_config_file_path", pacmanConfigFilePath);
                 convertValue(iniEntry.second, "working_directory", workingDirectory);
+                convertValue(iniEntry.second, "default_arch", defaultArch);
                 convertValue(iniEntry.second, "max_dbs", maxDbs);
                 convertValue(iniEntry.second, "package_cache_limit", packageCacheLimit);
             }
@@ -912,6 +913,7 @@ ServiceStatus::ServiceStatus(ServiceSetup &setup)
     , config(setup.config.computeStatus())
     , actions(setup.building.metaInfo)
     , presets(setup.building.presets)
+    , defaultArch(setup.defaultArch)
     , resourceUsage(setup)
 {
 }
