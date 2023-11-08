@@ -944,8 +944,8 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
         ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
     if (m_useContainer) {
         const auto debugFlag = m_saveChrootDirsOfFailures ? "on-failure" : "";
-        processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["DEBUG"] = debugFlag, m_makeContainerPkgPath, "--",
-            "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+        processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["DEBUG"] = debugFlag,
+            boost::process::env["PKGNAME"] = packageName, m_makeContainerPkgPath, "--", "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     } else {
         processSession->launch(boost::process::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     }
