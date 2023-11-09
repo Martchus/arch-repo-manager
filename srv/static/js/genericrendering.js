@@ -225,6 +225,12 @@ export function renderTextPossiblyElidingTheEnd(value)
     return element;
 }
 
+/// \brief Rounds the specified \a num to two decimal places.
+function roundTwoDecimalPlaces(number)
+{
+    return Math.round((number + Number.EPSILON) * 100) / 100;
+}
+
 /// \brief Renders the specified \a sizeInByte using an appropriate unit.
 export function renderDataSize(sizeInByte, row, includeBytes)
 {
@@ -235,13 +241,13 @@ export function renderDataSize(sizeInByte, row, includeBytes)
     if (sizeInByte < 1024) {
         res = sizeInByte << " bytes";
     } else if (sizeInByte < 1048576) {
-        res = (sizeInByte / 1024.0) + " KiB";
+        res = roundTwoDecimalPlaces(sizeInByte / 1024.0) + " KiB";
     } else if (sizeInByte < 1073741824) {
-        res = (sizeInByte / 1048576.0) + " MiB";
+        res = roundTwoDecimalPlaces(sizeInByte / 1048576.0) + " MiB";
     } else if (sizeInByte < 1099511627776) {
-        res = (sizeInByte / 1073741824.0) + " GiB";
+        res = roundTwoDecimalPlaces(sizeInByte / 1073741824.0) + " GiB";
     } else {
-        res = (sizeInByte / 1099511627776.0) + " TiB";
+        res = roundTwoDecimalPlaces(sizeInByte / 1099511627776.0) + " TiB";
     }
     if (includeBytes && sizeInByte > 1024) {
         res += ' (' + sizeInByte + " byte)";
