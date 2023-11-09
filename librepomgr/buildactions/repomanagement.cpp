@@ -44,7 +44,6 @@ bool PackageMovementAction::prepareRepoAction(RequiredDatabases requiredDatabase
     if (requiredDatabases & RequiredDatabases::OneSource) {
         m_repoAddPath = findExecutable(m_setup.building.repoAddPath);
     }
-    setupLock.unlock();
 
     // check executables
     if (!checkExecutable(m_repoRemovePath)) {
@@ -55,6 +54,7 @@ bool PackageMovementAction::prepareRepoAction(RequiredDatabases requiredDatabase
         reportError("Unable to find repo-add executable \"" % m_setup.building.repoAddPath + "\" in PATH.");
         return false;
     }
+    setupLock.unlock();
 
     // locate databases and packages
     const auto *const destinationDb = *m_destinationDbs.begin();

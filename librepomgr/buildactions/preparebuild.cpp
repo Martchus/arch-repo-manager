@@ -101,13 +101,13 @@ void PrepareBuild::run()
     copySecondVectorIntoFirstVector(m_pkgbuildsDirs, m_setup.building.pkgbuildsDirs);
     m_ignoreLocalPkgbuildsRegex = m_setup.building.ignoreLocalPkgbuildsRegex;
     m_workingDirectory = determineWorkingDirectory(buildDataWorkingDirectory);
-    setupReadLock.unlock();
 
     // check executables
     if (!checkExecutable(m_makePkgPath)) {
         reportError("Unable to find makepkg executable \"" % m_setup.building.makePkgPath + "\" in PATH.");
         return;
     }
+    setupReadLock.unlock();
 
     // init build action
     auto configReadLock

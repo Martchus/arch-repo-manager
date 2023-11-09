@@ -264,7 +264,6 @@ void ConductBuild::run()
     m_updatePkgSumsPath = findExecutable(m_setup.building.updatePkgSumsPath);
     m_repoAddPath = findExecutable(m_setup.building.repoAddPath);
     m_gpgPath = findExecutable(m_setup.building.gpgPath);
-    setupReadLock.unlock();
 
     // check executables
     if (m_useContainer) {
@@ -290,6 +289,7 @@ void ConductBuild::run()
             return;
         }
     }
+    setupReadLock.unlock();
 
     // assign paths
     m_makepkgConfigPath = m_workingDirectory + "/makepkg.conf";
