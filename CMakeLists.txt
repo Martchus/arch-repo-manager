@@ -42,4 +42,4 @@ link_directories(${LIBREPOMGR_BINARY_DIR})
 add_subdirectory(srv)
 add_subdirectory(cli)
 add_subdirectory(pacfind)
-
+add_subdirectory(pacparse)
