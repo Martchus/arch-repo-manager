@@ -35,7 +35,14 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .category = "Repo management",
             .name = "Remove packages",
             .type = "remove-packages",
-            .flags = {},
+            .flags = {
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PackageMovementFlags::UseContainer),
+                    .name = "Use container",
+                    .desc = "Uses `makecontainerpkg` to invoke `repo-remove`; eliminates the need to having pacman on the host by using docker/podman instead",
+                    .param = "use-container",
+                },
+            },
             .settings = {},
             .directory = true,
             .sourceDb = false,
@@ -48,6 +55,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
             .name = "Move packages",
             .type = "move-packages",
             .flags = {
+            BuildActionFlagMetaInfo{
+                .id = static_cast<BuildActionFlagType>(PackageMovementFlags::UseContainer),
+                .name = "Use container",
+                .desc = "Uses `makecontainerpkg` to invoke `repo-add`/`repo-remove`; eliminates the need to having pacman on the host by using docker/podman instead",
+                .param = "use-container",
+            },
                 BuildActionFlagMetaInfo{
                     .id = static_cast<BuildActionFlagType>(MovePackagesFlags::IgnoreExistingFiles),
                     .name = "Ignore existing files",

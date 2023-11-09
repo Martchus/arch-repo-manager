@@ -12,6 +12,7 @@
 #include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/io/path.h>
 
+#include <boost/process/env.hpp>
 #include <boost/process/search_path.hpp>
 #include <boost/process/start_dir.hpp>
 
@@ -33,26 +34,37 @@ PackageMovementAction::PackageMovementAction(ServiceSetup &setup, const std::sha
 
 bool PackageMovementAction::prepareRepoAction(RequiredDatabases requiredDatabases)
 {
-    // initialize build action
+    // validate and read parameter/settings
     auto configReadLock = init(BuildActionAccess::ReadConfig, requiredDatabases | RequiredDatabases::OneDestination, RequiredParameters::Packages);
     if (std::holds_alternative<std::monostate>(configReadLock)) {
         return false;
     }
-
+    const auto flags = static_cast<PackageMovementFlags>(m_buildAction->flags);
+    m_useContainer = flags & PackageMovementFlags::UseContainer;
     auto setupLock = m_setup.lockToRead();
     m_repoRemovePath = findExecutable(m_setup.building.repoRemovePath);
     if (requiredDatabases & RequiredDatabases::OneSource) {
         m_repoAddPath = findExecutable(m_setup.building.repoAddPath);
     }
+    if (m_useContainer) {
+        m_makeContainerPkgPath = findExecutable(m_setup.building.makeContainerPkgPath);
+    }
 
     // check executables
-    if (!checkExecutable(m_repoRemovePath)) {
-        reportError("Unable to find repo-remove executable \"" % m_setup.building.repoRemovePath + "\" in PATH.");
-        return false;
-    }
-    if (requiredDatabases & RequiredDatabases::OneSource && !checkExecutable(m_repoAddPath)) {
-        reportError("Unable to find repo-add executable \"" % m_setup.building.repoAddPath + "\" in PATH.");
-        return false;
+    if (m_useContainer) {
+        if (!checkExecutable(m_makeContainerPkgPath)) {
+            reportError("Unable to find makecontainerpkg executable \"" % m_setup.building.makeContainerPkgPath + "\" in PATH.");
+            return false;
+        }
+    } else {
+        if (!checkExecutable(m_repoRemovePath)) {
+            reportError("Unable to find repo-remove executable \"" % m_setup.building.repoRemovePath + "\" in PATH.");
+            return false;
+        }
+        if (requiredDatabases & RequiredDatabases::OneSource && !checkExecutable(m_repoAddPath)) {
+            reportError("Unable to find repo-add executable \"" % m_setup.building.repoAddPath + "\" in PATH.");
+            return false;
+        }
     }
     setupLock.unlock();
 
@@ -158,8 +170,14 @@ void RemovePackages::run()
             repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
                 std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2))](UniqueLoggingLock &&lock) {
             repoRemoveProcess->locks().emplace_back(std::move(lock));
-            repoRemoveProcess->launch(
-                boost::process::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
+            if (m_useContainer) {
+                repoRemoveProcess->launch(boost::process::start_dir(m_destinationRepoDirectory),
+                    boost::process::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::env["TOOL"] = "repo-remove",
+                    m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_result.processedPackages);
+            } else {
+                repoRemoveProcess->launch(
+                    boost::process::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
+            }
             buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", m_destinationRepoDirectory, "\" for \"",
                 m_destinationDatabaseFile, "\", see logfile for details\n");
         });
@@ -307,7 +325,13 @@ void MovePackages::run()
                 std::bind(&MovePackages::handleRepoAddResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
             UniqueLoggingLock &&lock) {
             repoAddProcess->locks().emplace_back(std::move(lock));
-            repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
+            if (m_useContainer) {
+                repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory),
+                    boost::process::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::env["TOOL"] = "repo-add",
+                    m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_fileNames);
+            } else {
+                repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
+            }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", m_destinationRepoDirectory, "\" for \"",
                 m_destinationDatabaseFile, "\", see logfile for details\n");
         });
@@ -319,8 +343,14 @@ void MovePackages::run()
                 std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
             UniqueLoggingLock &&lock) {
             repoRemoveProcess->locks().emplace_back(std::move(lock));
-            repoRemoveProcess->launch(
-                boost::process::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
+            if (m_useContainer) {
+                repoRemoveProcess->launch(boost::process::start_dir(m_sourceRepoDirectory),
+                    boost::process::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::env["TOOL"] = "repo-remove",
+                    m_makeContainerPkgPath, "--", m_sourceDatabaseFile, m_result.processedPackages);
+            } else {
+                repoRemoveProcess->launch(
+                    boost::process::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
+            }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", m_sourceRepoDirectory, "\" for \"", m_sourceDatabaseFile,
                 "\", see logfile for details\n");
         });

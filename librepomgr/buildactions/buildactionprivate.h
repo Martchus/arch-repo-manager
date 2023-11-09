@@ -341,6 +341,8 @@ protected:
     std::vector<std::tuple<std::string_view, LibPkg::PackageLocation, bool>> m_packageLocations;
     boost::filesystem::path m_repoRemovePath;
     boost::filesystem::path m_repoAddPath;
+    boost::filesystem::path m_makeContainerPkgPath;
+    bool m_useContainer;
 };
 
 struct LIBREPOMGR_EXPORT RemovePackages : public PackageMovementAction {
