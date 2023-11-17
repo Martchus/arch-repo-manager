@@ -24,14 +24,35 @@ set(CONFIGURATION_PACKAGE_SUFFIX
 find_package(c++utilities${CONFIGURATION_PACKAGE_SUFFIX} 5.0.0 REQUIRED)
 use_cpp_utilities()
 
+# find reflective-rapidjson
+find_package(reflective_rapidjson${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
+use_reflective_rapidjson(VISIBILITY PUBLIC)
+
 # find backend libraries
 find_package(libpkg ${META_APP_VERSION} REQUIRED)
 use_libpkg()
 
 list(APPEND PRIVATE_LIBRARIES pthread)
 
-# include modules to apply configuration
+# apply basic configuration
 include(BasicConfig)
+
+# add reflection generator invocation
+include(ReflectionGenerator)
+add_reflection_generator_invocation(
+    INPUT_FILES
+    main.cpp
+    CLANG_OPTIONS_FROM_TARGETS
+    "${META_TARGET_NAME}"
+    CLANG_OPTIONS_FROM_DEPENDENCIES
+    "${PUBLIC_LIBRARIES};${PRIVATE_LIBRARIES}"
+    GENERATORS
+    json
+    OUTPUT_LISTS
+    SRC_FILES
+    ERROR_RESILIENT)
+
+# apply further configuration
 include(WindowsResources)
 include(AppTarget)
 include(TestTarget)

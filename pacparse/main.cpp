@@ -11,6 +11,8 @@
 
 #include <reflective_rapidjson/json/reflector.h>
 
+#include <atomic>
+#include <cstdlib>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -18,56 +20,106 @@
 
 using namespace CppUtilities;
 
+struct BinaryInfo : public ReflectiveRapidJSON::JsonSerializable<BinaryInfo> {
+    std::string name;
+    std::string architecture;
+    std::set<std::string> symbols;
+    std::set<std::string> requiredLibs;
+    std::string rpath;
+    std::string prefix;
+    bool isBigEndian = false;
+};
+
+struct PacparseResults : public ReflectiveRapidJSON::JsonSerializable<PacparseResults> {
+    std::vector<std::shared_ptr<LibPkg::Package>> packages;
+    std::vector<BinaryInfo> binaries;
+};
+
 int main(int argc, const char *argv[])
 {
     SET_APPLICATION_INFO;
 
     // read cli args
     auto parser = ArgumentParser();
-    auto packagesArg = Argument("packages", 'p', "specifies the paths of the package files to parse");
+    auto packagesArg = ConfigValueArgument("packages", 'p', "specifies the paths of the package files to parse", { "path" });
     packagesArg.setRequiredValueCount(Argument::varValueCount);
-    packagesArg.setValueNames({ "path" });
     packagesArg.setImplicit(true);
-    parser.setMainArguments({ &packagesArg, &parser.helpArg() });
+    auto binariesArg = ConfigValueArgument("binaries", 'b', "specifies the paths of the binaries", { "path" });
+    binariesArg.setRequiredValueCount(Argument::varValueCount);
+    parser.setMainArguments({ &packagesArg, &binariesArg, &parser.helpArg() });
     parser.setDefaultArgument(&parser.helpArg());
     parser.parseArgs(argc, argv);
+    if (parser.helpArg().isPresent()) {
+        return EXIT_SUCCESS;
+    }
 
-    auto packages = std::vector<std::shared_ptr<LibPkg::Package>>();
+    auto res = PacparseResults();
     auto packageMutex = std::mutex();
+    auto binaryMutex = std::mutex();
+    auto returnCode = std::atomic<int>(EXIT_SUCCESS);
 
     auto pi = std::vector<const char *>::const_iterator();
     auto pend = std::vector<const char *>::const_iterator();
-    auto piMutex = std::mutex();
+    auto bi = std::vector<const char *>::const_iterator();
+    auto bend = std::vector<const char *>::const_iterator();
+    auto imutex = std::mutex();
     if (packagesArg.isPresent()) {
         const auto &packagePaths = packagesArg.values();
         pi = packagePaths.begin();
         pend = packagePaths.end();
-        packages.reserve(packagePaths.size());
+        res.packages.reserve(packagePaths.size());
+    }
+    if (binariesArg.isPresent()) {
+        const auto &binaryPaths = binariesArg.values();
+        bi = binaryPaths.begin();
+        bend = binaryPaths.end();
+        res.binaries.reserve(binaryPaths.size());
     }
 
     const auto processPackage = [&] {
         for (;;) {
             // get next package path
-            auto piLock = std::unique_lock<std::mutex>(piMutex);
-            if (pi == pend) {
+            const char *path = nullptr;
+            auto isBinary = false;
+            auto ilock = std::unique_lock<std::mutex>(imutex);
+            if (pi != pend) {
+                path = *pi++;
+            } else if (bi != bend) {
+                isBinary = true;
+                path = *bi++;
+            } else {
                 return;
             }
-            auto packagePath = *(pi++);
-            piLock.unlock();
+            ilock.unlock();
 
             // parse package
             try {
-                auto package = LibPkg::Package::fromPkgFile(packagePath);
-                auto packageLock = std::unique_lock<std::mutex>(packageMutex);
-                packages.emplace_back(std::move(package));
+                if (isBinary) {
+                    auto binary = LibPkg::Binary();
+                    binary.load(path);
+                    auto binaryLock = std::unique_lock<std::mutex>(binaryMutex);
+                    auto &binaryInfo = res.binaries.emplace_back();
+                    binaryInfo.prefix = binary.addPrefix(std::string_view());
+                    binaryInfo.name = std::move(binary.name);
+                    binaryInfo.architecture = std::move(binary.architecture);
+                    binaryInfo.isBigEndian = binary.isBigEndian;
+                    binaryInfo.rpath = std::move(binary.rpath);
+                    binaryInfo.symbols = std::move(binary.symbols);
+                    binaryInfo.requiredLibs = std::move(binary.requiredLibs);
+                } else {
+                    auto package = LibPkg::Package::fromPkgFile(path);
+                    auto binaryLock = std::unique_lock<std::mutex>(packageMutex);
+                    res.packages.emplace_back(std::move(package));
+                }
             } catch (const std::runtime_error &e) {
-                std::cerr << "Unable to parse \"" << packagePath << "\": " << e.what() << '\n';
+                std::cerr << "Unable to parse \"" << path << "\": " << e.what() << '\n';
+                returnCode = EXIT_FAILURE;
             }
         }
     };
 
-    auto threads
-        = std::vector<std::thread>(std::max<std::size_t>(std::min<std::size_t>(std::thread::hardware_concurrency(), packages.capacity()), 1u) - 1);
+    auto threads = std::vector<std::thread>(
+        std::max<std::size_t>(std::min<std::size_t>(std::thread::hardware_concurrency(), res.packages.capacity() + res.binaries.capacity()), 1u) - 1);
     for (auto &t : threads) {
         t = std::thread(processPackage);
     }
@@ -76,7 +128,9 @@ int main(int argc, const char *argv[])
         t.join();
     }
 
-    const auto json = ReflectiveRapidJSON::JsonReflector::toJson(packages);
+    const auto json = ReflectiveRapidJSON::JsonReflector::toJson(res);
     std::cout << std::string_view(json.GetString(), json.GetSize());
-    return 0;
+    return returnCode;
 }
+
+#include "reflection/main.h"
