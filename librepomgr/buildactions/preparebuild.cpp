@@ -921,9 +921,10 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     }
 
     auto resultData = makeResultData(std::move(error));
+    auto wasSuccess = resultData.error.empty() && resultData.cyclicLeftovers.empty();
     auto buildActionWriteLock = m_setup.building.lockToWrite();
     m_buildAction->resultData = std::move(resultData);
-    if (resultData.error.empty() && resultData.cyclicLeftovers.empty()) {
+    if (wasSuccess) {
         reportSuccess();
     } else {
         reportError();
