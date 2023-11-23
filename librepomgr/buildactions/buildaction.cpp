@@ -478,6 +478,7 @@ void BuildServiceCleanup::run()
 
     // get variables from setup
     auto setupLock = m_setup.lockToRead();
+    m_buildActionRetention = m_setup.building.buildActionRetention;
     m_paccachePath = findExecutable(m_setup.building.paccachePath);
     const auto packageCachePath = m_setup.building.packageCacheDir;
     setupLock.unlock();
@@ -506,7 +507,7 @@ void BuildServiceCleanup::run()
     auto deleted = std::size_t();
     constexpr auto stopAt = 150;
     m_setup.building.forEachBuildAction(
-        [this, &count, &deleted, twoWeeksAgo = DateTime::gmtNow() - TimeSpan::fromDays(14)](
+        [this, &count, &deleted, expirationDate = DateTime::gmtNow() - m_buildActionRetention](
             LibPkg::StorageID id, BuildAction &action, ServiceSetup::BuildSetup::VisitorBehavior &visitorBehavior) {
             if (count <= stopAt) {
                 return true; // abort deletion if under 150 build actions anyways
@@ -514,8 +515,9 @@ void BuildServiceCleanup::run()
             if (m_buildAction->id == id || action.finished.isNull()) {
                 return false; // avoid deleting cleanup action itself as well as any unfinished actions
             }
-            if (action.result != BuildActionResult::Success || action.finished > twoWeeksAgo) {
-                return false; // delete only successful actions that are at least two weeks old
+            if (action.result != BuildActionResult::Success
+                || (action.finished > expirationDate && action.type != BuildActionType::BuildServiceCleanup)) {
+                return false; // delete only successful actions that have expired (unless it is just a cleanup action itself)
             }
             visitorBehavior = ServiceSetup::BuildSetup::VisitorBehavior::Delete;
             ++deleted;

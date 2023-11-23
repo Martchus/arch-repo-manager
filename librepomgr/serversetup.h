@@ -136,6 +136,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::uint64_t packageDownloadSizeLimit = 500 * 1024 * 1024;
         std::string testFilesDir;
         BuildPresets presets;
+        CppUtilities::TimeSpan buildActionRetention = CppUtilities::TimeSpan::fromDays(14);
         bool loadFilesDbs = false;
         bool forceLoadingDbs = false;
 

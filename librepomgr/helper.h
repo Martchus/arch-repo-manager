@@ -1,6 +1,8 @@
 #ifndef LIBREPOMGR_HELPER_H
 #define LIBREPOMGR_HELPER_H
 
+#include <c++utilities/chrono/timespan.h>
+#include <c++utilities/conversion/conversionexception.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/misc/traits.h>
@@ -63,7 +65,6 @@ inline void convertValue(const std::multimap<std::string, std::string> &multimap
 template <typename TargetType, Traits::EnableIfAny<std::is_integral<TargetType>, Traits::IsSpecializationOf<TargetType, std::atomic>> * = nullptr>
 inline void convertValue(const std::multimap<std::string, std::string> &multimap, const std::string &key, TargetType &result)
 {
-    using namespace std;
     using namespace CppUtilities;
     using namespace CppUtilities::EscapeCodes;
 
@@ -75,8 +76,7 @@ inline void convertValue(const std::multimap<std::string, std::string> &multimap
                 result = stringToNumber<TargetType>(value);
             }
         } catch (const ConversionException &) {
-            cerr << Phrases::ErrorMessage << "Specified number \"" << value << "\" for key \"" << key << "\" is invalid." << Phrases::End;
-            return;
+            std::cerr << Phrases::ErrorMessage << "Specified number \"" << value << "\" for key \"" << key << "\" is invalid." << Phrases::End;
         }
     }
 }
@@ -90,16 +90,14 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
 
 template <> inline void convertValue(const std::multimap<std::string, std::string> &multimap, const std::string &key, std::regex &result)
 {
-    using namespace std;
     using namespace CppUtilities::EscapeCodes;
 
     if (const char *const value = getLastValue(multimap, key)) {
         try {
             result = value;
-        } catch (const regex_error &e) {
-            cerr << Phrases::ErrorMessage << "Specified regex \"" << value << "\" for key \"" << key << "\" is invalid: " << Phrases::End;
-            cerr << e.what() << '\n';
-            return;
+        } catch (const std::regex_error &e) {
+            std::cerr << Phrases::ErrorMessage << "Specified regex \"" << value << "\" for key \"" << key << "\" is invalid: " << Phrases::End;
+            std::cerr << e.what() << '\n';
         }
     }
 }
@@ -116,6 +114,20 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
 {
     if (const char *const value = getLastValue(multimap, key)) {
         result = !strcmp(value, "on") || !strcmp(value, "yes");
+    }
+}
+
+template <> inline void convertValue(const std::multimap<std::string, std::string> &multimap, const std::string &key, CppUtilities::TimeSpan &result)
+{
+    using namespace CppUtilities::EscapeCodes;
+
+    if (const char *const value = getLastValue(multimap, key)) {
+        try {
+            result = CppUtilities::TimeSpan::fromString(value);
+        } catch (const CppUtilities::ConversionException &e) {
+            std::cerr << Phrases::ErrorMessage << "Specified duration \"" << value << "\" for key \"" << key << "\" is invalid: " << Phrases::End;
+            std::cerr << e.what() << '\n';
+        }
     }
 }
 
