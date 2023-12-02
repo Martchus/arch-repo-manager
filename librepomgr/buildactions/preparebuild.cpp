@@ -509,9 +509,13 @@ bool PrepareBuild::pullFurtherDependencies(const std::vector<LibPkg::Dependency>
     auto dependencyAdded = false;
     const auto *const destinationDb = *m_destinationDbs.begin();
     for (const auto &dependency : dependencies) {
-        auto dependencyExists = false;
+        // skip empty dependencies which might be present if split package contains `depends=()`
+        if (dependency.name.empty()) {
+            continue;
+        }
 
         // skip if the dependency is already in the list of packages to be built (check for cycles is done later when computing batches)
+        auto dependencyExists = false;
         if (m_buildDataByPackage.find(dependency.name) != m_buildDataByPackage.end()) {
             continue;
         }
