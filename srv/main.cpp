@@ -5,16 +5,8 @@
 #include "resources/config.h"
 
 #include <c++utilities/application/argumentparser.h>
-#include <c++utilities/io/ansiescapecodes.h>
 
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <stdexcept>
-
-using namespace std;
 using namespace CppUtilities;
-using namespace CppUtilities::EscapeCodes;
 using namespace LibRepoMgr;
 using namespace LibPkg;
 

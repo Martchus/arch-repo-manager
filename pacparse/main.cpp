@@ -1,5 +1,5 @@
+#include "../libpkg/data/package.h"
 #include "../libpkg/parser/binary.h"
-#include "../libpkg/parser/package.h"
 
 #include "resources/config.h"
 

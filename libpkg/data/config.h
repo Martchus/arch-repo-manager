@@ -12,8 +12,6 @@
 
 #include <cstring>
 #include <memory>
-#include <mutex>
-#include <regex>
 #include <set>
 
 namespace LibPkg {
