@@ -153,6 +153,7 @@ template <typename StorageEntriesType, typename StorageType, typename SpecType> 
     SpecType retrieve(Storage &storage, const std::string &entryName);
     StoreResult store(Storage &storage, RWTxn &txn, const std::shared_ptr<Entry> &entry, bool force);
     bool invalidate(Storage &storage, const std::string &entryName);
+    bool invalidateCacheOnly(Storage &storage, const std::string &entryName);
     void clear(Storage &storage);
     void clearCacheOnly(Storage &storage);
     void setLimit(std::size_t limit);

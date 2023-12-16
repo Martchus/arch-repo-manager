@@ -931,19 +931,21 @@ bool PackageUpdater::insertFromDatabaseFile(const std::string &databaseFilePath)
 
 void PackageUpdater::commit()
 {
-    const auto &storage = m_database.m_storage;
+    auto &storage = *m_database.m_storage;
     auto &pkgTxn = m_d->packagesTxn;
     auto txnHandle = pkgTxn.getTransactionHandle();
     if (m_d->clear) {
         const auto &toPreserve = m_d->handledIds;
-        for (auto i = pkgTxn.begin<std::unique_ptr>(); i != pkgTxn.end(); ++i) {
+        const auto end = pkgTxn.end();
+        for (auto i = pkgTxn.begin(); i != end; ++i) {
             if (!toPreserve.contains(i.getID())) {
+                storage.packageCache.invalidateCacheOnly(storage, i.value().name);
                 i.del();
             }
         }
     }
     {
-        auto txn = storage->providedDeps.getRWTransaction(txnHandle);
+        auto txn = storage.providedDeps.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }
@@ -952,7 +954,7 @@ void PackageUpdater::commit()
         }
     }
     {
-        auto txn = storage->requiredDeps.getRWTransaction(txnHandle);
+        auto txn = storage.requiredDeps.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }
@@ -961,7 +963,7 @@ void PackageUpdater::commit()
         }
     }
     {
-        auto txn = storage->providedLibs.getRWTransaction(txnHandle);
+        auto txn = storage.providedLibs.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }
@@ -970,7 +972,7 @@ void PackageUpdater::commit()
         }
     }
     {
-        auto txn = storage->requiredLibs.getRWTransaction(txnHandle);
+        auto txn = storage.requiredLibs.getRWTransaction(txnHandle);
         if (m_d->clear) {
             txn.clear();
         }

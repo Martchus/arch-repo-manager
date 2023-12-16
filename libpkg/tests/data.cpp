@@ -11,8 +11,8 @@ using CppUtilities::operator<<; // must be visible prior to the call site
 
 #include <filesystem>
 #include <initializer_list>
-#include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace std;
@@ -36,6 +36,7 @@ class DataTests : public TestFixture {
     CPPUNIT_TEST(testLocatePackage);
     CPPUNIT_TEST(testAddingDepsAndProvidesFromOtherPackage);
     CPPUNIT_TEST(testDependencyExport);
+    CPPUNIT_TEST(testPackageUpdater);
     CPPUNIT_TEST(testMisc);
     CPPUNIT_TEST_SUITE_END();
 
@@ -59,6 +60,7 @@ public:
     void testLocatePackage();
     void testAddingDepsAndProvidesFromOtherPackage();
     void testDependencyExport();
+    void testPackageUpdater();
     void testMisc();
 
 private:
@@ -522,6 +524,44 @@ void DataTests::testDependencyExport()
     CPPUNIT_ASSERT_EQUAL(2_st, libProvides.size());
     CPPUNIT_ASSERT(libProvides.contains("libfoo"));
     CPPUNIT_ASSERT(libProvides.contains("libbar"));
+}
+
+void DataTests::testPackageUpdater()
+{
+    m_pkg1 = std::make_shared<LibPkg::Package>();
+    m_pkg1->name = "foo";
+    m_pkg2 = std::make_shared<LibPkg::Package>();
+    m_pkg2->name = "autoconf";
+    m_pkg2->version = "1-1";
+    m_dbFile = workingCopyPath("test-data.db", WorkingCopyMode::Cleanup);
+    m_config.initStorage(m_dbFile.data());
+    auto *const db = m_config.findOrCreateDatabase("test"sv, "x86_64"sv);
+    db->path = testFilePath("core.db");
+    db->updatePackage(m_pkg1);
+    db->updatePackage(m_pkg2);
+    auto updater = LibPkg::PackageUpdater(*db, true);
+    updater.insertFromDatabaseFile(db->path);
+    auto thread = std::thread([db] {
+        auto autoconf = db->findPackage("autoconf");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("two packages before commit", 2_st, db->packageCount());
+        CPPUNIT_ASSERT_MESSAGE("cache not wiped before commit (so removed package still present)", db->findPackage("foo"));
+        CPPUNIT_ASSERT_MESSAGE("cache contains autoconf", autoconf);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("cache populated before commit (so new version already visible)", "2.69-4"s, autoconf->version);
+    });
+    thread.join();
+    updater.commit();
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("package count after commit", 220_st, db->packageCount());
+    CPPUNIT_ASSERT_MESSAGE("old package gone after commit", !db->findPackage("foo"));
+
+    auto newPkg = db->findPackage("autoconf");
+    CPPUNIT_ASSERT_MESSAGE("new package present after commit", newPkg);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("search returns correct package", "autoconf"s, newPkg->name);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("the package version was updated", "2.69-4"s, newPkg->version);
+    CPPUNIT_ASSERT(newPkg = db->findPackage("acl"));
+    CPPUNIT_ASSERT_EQUAL("acl"s, newPkg->name);
+    CPPUNIT_ASSERT(newPkg = db->findPackage("zlib"));
+    CPPUNIT_ASSERT_EQUAL("zlib"s, newPkg->name);
 }
 
 void DataTests::testMisc()

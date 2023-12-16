@@ -181,10 +181,7 @@ template <typename StorageEntriesType, typename StorageType, typename SpecType>
 bool StorageCache<StorageEntriesType, StorageType, SpecType>::invalidate(Storage &storage, const std::string &entryName)
 {
     // remove package from cache
-    const auto ref = typename Entries::Ref(storage, entryName);
-    auto lock = std::unique_lock(m_mutex);
-    m_entries.erase(ref);
-    lock.unlock();
+    invalidateCacheOnly(storage, entryName);
     // remove package from storage
     auto txn = storage.packages.getRWTransaction();
     if (auto i = txn.template find<0>(entryName); i != txn.end()) {
@@ -193,6 +190,15 @@ bool StorageCache<StorageEntriesType, StorageType, SpecType>::invalidate(Storage
         return true;
     }
     return false;
+}
+
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+bool StorageCache<StorageEntriesType, StorageType, SpecType>::invalidateCacheOnly(Storage &storage, const std::string &entryName)
+{
+    const auto ref = typename Entries::Ref(storage, entryName);
+    const auto lock = std::unique_lock(m_mutex);
+    m_entries.erase(ref);
+    return true;
 }
 
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
