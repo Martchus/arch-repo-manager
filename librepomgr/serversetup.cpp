@@ -488,6 +488,7 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
                 convertValue(iniEntry.second, "pacman_config_file_path", pacmanConfigFilePath);
                 convertValue(iniEntry.second, "working_directory", workingDirectory);
                 convertValue(iniEntry.second, "default_arch", defaultArch);
+                convertValue(iniEntry.second, "db_path", dbPath);
                 convertValue(iniEntry.second, "max_dbs", maxDbs);
                 convertValue(iniEntry.second, "package_cache_limit", packageCacheLimit);
             }
