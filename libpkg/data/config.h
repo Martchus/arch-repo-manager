@@ -13,6 +13,7 @@
 #include <cstring>
 #include <memory>
 #include <set>
+#include <regex>
 
 namespace LibPkg {
 
@@ -123,6 +124,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     // storage and caching
     void initStorage(const char *path = "libpkg.db", std::uint32_t maxDbs = 0);
     void rebuildDb();
+    void dumpDb(const std::optional<std::regex> &filterRegex);
     std::size_t cachedPackages() const;
     void setPackageCacheLimit(std::size_t limit);
     std::unique_ptr<StorageDistribution> &storage();

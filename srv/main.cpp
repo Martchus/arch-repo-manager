@@ -41,9 +41,18 @@ int main(int argc, const char *argv[])
         }
         exitCode = setup.fixDb();
     });
+    OperationArgument dumpDb("dump-db", '\0', "dumps package database entries");
+    ConfigValueArgument filterRegexArg("filter-regex", 'r', "dump only packages which name matches the specified regex", { "regex" });
+    dumpDb.setSubArguments({ &filterRegexArg, &configFileArg });
+    dumpDb.setCallback([&setup, &exitCode, &filterRegexArg, &configFileArg](const ArgumentOccurrence &) {
+        if (const auto configFilePath = configFileArg.firstValue()) {
+            setup.configFilePath = configFilePath;
+        }
+        exitCode = setup.dumpDb(filterRegexArg.isPresent() ? std::string_view(filterRegexArg.firstValue()) : std::string_view());
+    });
     HelpArgument helpArg(parser);
     NoColorArgument noColorArg;
-    parser.setMainArguments({ &runArg, &fixDb, &noColorArg, &helpArg });
+    parser.setMainArguments({ &runArg, &fixDb, &dumpDb, &noColorArg, &helpArg });
     parser.setDefaultArgument(&runArg);
     parser.parseArgs(argc, argv);
     return exitCode;

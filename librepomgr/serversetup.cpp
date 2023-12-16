@@ -46,6 +46,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string_view>
+#include <regex>
 #include <unordered_set>
 
 using namespace std;
@@ -880,6 +881,25 @@ int ServiceSetup::fixDb()
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Unknown error occurred." << Phrases::EndFlush;
         return EXIT_FAILURE + 4;
+    }
+#endif
+    return EXIT_SUCCESS;
+}
+
+int ServiceSetup::dumpDb(std::string_view filterRegex)
+{
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    try {
+#endif
+        loadConfigFiles(true);
+        config.dumpDb(filterRegex.empty() ? std::nullopt : std::optional(std::regex(filterRegex.begin(), filterRegex.end())));
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+    } catch (const std::exception &e) {
+        cerr << Phrases::ErrorMessage << "Exception occurred: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        return EXIT_FAILURE + 5;
+    } catch (...) {
+        cerr << Phrases::ErrorMessage << "Unknown error occurred." << Phrases::EndFlush;
+        return EXIT_FAILURE + 5;
     }
 #endif
     return EXIT_SUCCESS;

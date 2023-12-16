@@ -71,6 +71,15 @@ void LibPkg::Config::rebuildDb()
     aur.rebuildDb();
 }
 
+void Config::dumpDb(const std::optional<std::regex> &filterRegex)
+{
+    assert(m_storage != nullptr);
+    for (auto &db : databases) {
+        db.dumpDb(filterRegex);
+    }
+    aur.dumpDb(filterRegex);
+}
+
 std::size_t Config::cachedPackages() const
 {
     return m_storage ? m_storage->packageCache().size() : 0;

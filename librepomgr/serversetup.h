@@ -61,6 +61,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     void initStorage();
     int run();
     int fixDb();
+    int dumpDb(std::string_view filterRegex);
     ServiceStatus computeStatus();
 
     // variables relevant for the web server; only changed when (re)loading config

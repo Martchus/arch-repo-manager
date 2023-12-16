@@ -13,6 +13,7 @@
 #include <atomic>
 #include <filesystem>
 #include <optional>
+#include <regex>
 #include <unordered_set>
 
 namespace LibPkg {
@@ -161,6 +162,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
 
     void initStorage(StorageDistribution &storage);
     void rebuildDb();
+    void dumpDb(const std::optional<std::regex> &filterRegex);
     void deducePathsFromLocalDirs();
     void resetConfiguration(bool keepLocalPaths = false);
     void clearPackages();
