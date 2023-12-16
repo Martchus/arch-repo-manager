@@ -760,7 +760,7 @@ PackageLocation Database::locatePackage(const string &packageName) const
             break;
         }
     } catch (std::filesystem::filesystem_error &e) {
-        res.error = move(e);
+        res.error = std::move(e);
     }
     return res;
 }
