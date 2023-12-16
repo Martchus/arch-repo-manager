@@ -875,10 +875,10 @@ int ServiceSetup::fixDb()
         config.rebuildDb();
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
-        cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "Exception occurred: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
         return EXIT_FAILURE + 4;
     } catch (...) {
-        cerr << Phrases::ErrorMessage << "Unknown error occurred when terminating server." << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "Unknown error occurred." << Phrases::EndFlush;
         return EXIT_FAILURE + 4;
     }
 #endif
