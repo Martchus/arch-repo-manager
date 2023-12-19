@@ -493,6 +493,9 @@ StorageID Database::findBasePackageWithID(const std::string &packageName, Packag
 
 void Database::removePackage(const std::string &packageName)
 {
+    if (packageName.empty()) {
+        return;
+    }
     const auto lock = std::unique_lock(m_storage->updateMutex);
     auto txn = m_storage->packages.getRWTransaction();
     const auto [packageID, package] = m_storage->packageCache.retrieve(*m_storage, &txn, packageName);

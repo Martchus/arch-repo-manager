@@ -228,7 +228,10 @@ void DataTests::testPackageSearch()
 {
     setupPackages();
 
-    auto pkgs = m_config.findPackages("foo"sv);
+    auto pkgs = m_config.findPackages(std::string_view());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no results for package with empty name", 0_st, pkgs.size());
+
+    pkgs = m_config.findPackages("foo"sv);
     CPPUNIT_ASSERT_EQUAL(2_st, pkgs.size());
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package from first db returned first, cached object returned", m_pkg1, pkgs.front().pkg);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("package from first db returned second, cached object returned", m_pkg3, pkgs.back().pkg);
