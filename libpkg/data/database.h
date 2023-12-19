@@ -187,7 +187,6 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     StorageID findBasePackageWithID(const std::string &packageName, PackageBase &basePackage);
     void removePackage(const std::string &packageName);
     StorageID updatePackage(const std::shared_ptr<Package> &package);
-    StorageID forceUpdatePackage(const std::shared_ptr<Package> &package);
     std::unordered_map<PackageSpec, UnresolvedDependencies> detectUnresolvedPackages(Config &config,
         const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedPackages,
         const std::unordered_set<std::string_view> &depsToIgnore = std::unordered_set<std::string_view>(),

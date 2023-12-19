@@ -326,8 +326,8 @@ void DataTests::testComputingBuildOrder()
     tar->version = "5.6-6";
     tar->dependencies.emplace_back("foo");
     m_pkg2->dependencies.emplace_back("tar"); // let bar depend on tar
-    db.forceUpdatePackage(tar);
-    db.forceUpdatePackage(m_pkg2);
+    db.updatePackage(tar);
+    db.updatePackage(m_pkg2);
 
     // fail due to cycle
     res = m_config.computeBuildOrder({ "foo", "bar", "tar" }, BuildOrderOptions::None);
@@ -354,8 +354,8 @@ void DataTests::testComputingBuildOrder()
     tar->packageInfo = std::make_optional<PackageInfo>();
     tar->dependencies.clear();
     tar->dependencies.emplace_back("bar");
-    db.forceUpdatePackage(tar);
-    db.forceUpdatePackage(m_pkg2);
+    db.updatePackage(tar);
+    db.updatePackage(m_pkg2);
     res = m_config.computeBuildOrder({ "foo" }, BuildOrderOptions::None);
     CPPUNIT_ASSERT_EQUAL(true, res.success);
     CPPUNIT_ASSERT_EQUAL(0_st, res.cycle.size());

@@ -510,26 +510,7 @@ StorageID Database::updatePackage(const std::shared_ptr<Package> &package)
     }
     const auto lock = std::unique_lock(m_storage->updateMutex);
     auto txn = m_storage->packages.getRWTransaction();
-    const auto res = m_storage->packageCache.store(*m_storage, txn, package, false);
-    if (!res.updated) {
-        return res.id;
-    }
-    if (res.oldEntry) {
-        removePackageDependencies(*m_storage, txn.getTransactionHandle(), res.id, res.oldEntry);
-    }
-    addPackageDependencies(*m_storage, txn.getTransactionHandle(), res.id, package);
-    txn.commit();
-    return res.id;
-}
-
-StorageID Database::forceUpdatePackage(const std::shared_ptr<Package> &package)
-{
-    if (package->name.empty()) {
-        return 0;
-    }
-    const auto lock = std::unique_lock(m_storage->updateMutex);
-    auto txn = m_storage->packages.getRWTransaction();
-    const auto res = m_storage->packageCache.store(*m_storage, txn, package, true);
+    const auto res = m_storage->packageCache.store(*m_storage, txn, package);
     if (res.oldEntry) {
         removePackageDependencies(*m_storage, txn.getTransactionHandle(), res.id, res.oldEntry);
     }
@@ -913,7 +894,7 @@ PackageSpec LibPkg::PackageUpdater::findPackageWithID(const std::string &package
 StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
 {
     const auto &storage = m_database.m_storage;
-    const auto res = storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package, true);
+    const auto res = storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, package);
     m_d->update(res, package);
     return res.id;
 }

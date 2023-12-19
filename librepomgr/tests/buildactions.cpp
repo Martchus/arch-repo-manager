@@ -602,13 +602,13 @@ void BuildActionsTests::testConductingBuild()
     CPPUNIT_ASSERT_MESSAGE("boost-libs package present", boostLibsPackage);
     boostLibsPackage->libprovides = { "elf-x86_64::libboost_regex.so.1.72.0" };
     boostLibsPackage->libdepends = { "elf-x86_64::libstdc++.so.6" };
-    boostDb->forceUpdatePackage(boostLibsPackage);
+    boostDb->updatePackage(boostLibsPackage);
     auto sourceHighlightPackage = miscDb->findPackage("source-highlight");
     CPPUNIT_ASSERT_MESSAGE("source-highlight package present", sourceHighlightPackage);
     sourceHighlightPackage->libprovides = { "elf-x86_64::libsource-highlight.so.4" };
     sourceHighlightPackage->libdepends
         = { "elf-x86_64::libboost_regex.so.1.72.0", "elf-x86_64::libsource-highlight.so.4", "elf-x86_64::libstdc++.so.6" };
-    miscDb->forceUpdatePackage(sourceHighlightPackage);
+    miscDb->updatePackage(sourceHighlightPackage);
     m_setup.printDatabases();
     logTestSetup();
 
