@@ -118,7 +118,8 @@ void Database::dumpDb(const std::optional<std::regex> &filterRegex)
     }
     std::cout << "index (" << txn.size<0>() << "):\n";
     for (auto i = txn.begin<0>(); i != end; ++i) {
-        if (const auto key = i.getKey().get<std::string_view>(); !filterRegex.has_value() || std::regex_match(key.cbegin(), key.cend(), filterRegex.value())) {
+        if (const auto key = i.getKey().get<std::string_view>();
+            !filterRegex.has_value() || std::regex_match(key.cbegin(), key.cend(), filterRegex.value())) {
             const auto value = i.getID();
             std::cout << key << ':' << ' ' << value << '\n';
         }
