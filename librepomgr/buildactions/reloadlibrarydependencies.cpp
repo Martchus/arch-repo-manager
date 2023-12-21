@@ -364,7 +364,7 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Adding parsed information to databases ...\n");
     std::size_t counter = 0;
     for (DatabaseToConsider &relevantDb : m_relevantPackagesByDatabase) {
-        auto configWritelock = m_setup.config.lockToRead();
+        auto lock = m_setup.config.lockToRead();
         auto *const db = m_setup.config.findDatabase(relevantDb.name, relevantDb.arch);
         if (!db) {
             continue; // the whole database has been removed while we were loading package contents
