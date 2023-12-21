@@ -894,6 +894,34 @@ PackageSpec LibPkg::PackageUpdater::findPackageWithID(const std::string &package
     return m_database.m_storage->packageCache.retrieve(*m_database.m_storage, &m_d->packagesTxn, packageName);
 }
 
+/*!
+ * \brief Begins updating the existing \a package with the specified \a packageID.
+ * \remarks
+ * - Do not use this function when PackageUpdate has been constructed with clear=true.
+ * - Call this method before modifying \a package. Then modify the package. Then call endUpdate().
+ */
+void PackageUpdater::beginUpdate(StorageID packageID, const std::shared_ptr<Package> &package)
+{
+    m_d->update(packageID, true, package);
+}
+
+/*!
+ * \brief Ends updating the existing \a package with the specified \a packageID.
+ * \remarks
+ * - Do not use this function when PackageUpdate has been constructed with clear=true.
+ * - Call this method after callsing beginUpdate() and modifying \a package.
+ */
+void PackageUpdater::endUpdate(StorageID packageID, const std::shared_ptr<Package> &package)
+{
+    const auto &storage = m_database.m_storage;
+    storage->packageCache.store(*m_database.m_storage, m_d->packagesTxn, packageID, package);
+    m_d->update(packageID, false, package);
+}
+
+/*!
+ * \brief Updates the specified \a package. The \a package may or may not exist.
+ * \remarks If the package exists then provides/deps from the existing package are taken over if appropriate.
+ */
 StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
 {
     const auto &storage = m_database.m_storage;

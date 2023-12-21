@@ -367,17 +367,26 @@ void PackageBase::clear()
     description.clear();
 }
 
+/*!
+ * \brief Returns whether addDepsAndProvidesFromOtherPackage() would take over the information (without force).
+ */
+bool Package::canDepsAndProvidesFromOtherPackage(const Package &otherPackage) const
+{
+    return !((otherPackage.origin != PackageOrigin::PackageContents && otherPackage.origin != PackageOrigin::CustomSource)
+        || version != otherPackage.version
+        || !(!packageInfo || buildDate.isNull() || (otherPackage.packageInfo && buildDate == otherPackage.buildDate)));
+}
+
+/*!
+ * \brief Takes over deps/provides from \a otherPackage if appropriate.
+ * \remarks
+ * The information is not taken over if \a otherPackage does not match the current instance (only
+ * version and build date are considered) or if otherPackage has no info from package contents. Use
+ * the \a force parameter to avoid these checks.
+ */
 bool Package::addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force)
 {
-    if (&otherPackage == this) {
-        return false;
-    }
-
-    // skip if otherPackage does not match the current instance (only version and build date are considered) or if otherPackage has no info from package contents
-    if (!force
-        && ((otherPackage.origin != PackageOrigin::PackageContents && otherPackage.origin != PackageOrigin::CustomSource)
-            || version != otherPackage.version
-            || !(!packageInfo || buildDate.isNull() || (otherPackage.packageInfo && buildDate == otherPackage.buildDate)))) {
+    if (&otherPackage == this || (!force && !canDepsAndProvidesFromOtherPackage(otherPackage))) {
         return false;
     }
 

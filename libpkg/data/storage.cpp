@@ -129,6 +129,11 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::retrieve(Storage &
     return retrieve(storage, nullptr, entryName);
 }
 
+/*!
+ * \brief Stores the specified \a entry.
+ * \remarks The entry may exist or may not exist. A lookup for an existing entry is done to take over
+ *          deps/provides from the existing entry if it makes sense.
+ */
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
 auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &storage, RWTxn &txn, const std::shared_ptr<Entry> &entry) -> StoreResult
 {
@@ -149,6 +154,7 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &sto
         entry->addDepsAndProvidesFromOtherPackage(*res.oldEntry);
     }
     lock.unlock();
+
     // check for package in storage
     if (!res.oldEntry) {
         res.oldEntry = std::make_shared<Entry>();
@@ -158,8 +164,10 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &sto
             res.oldEntry.reset();
         }
     }
+
     // update package in storage
     res.id = txn.put(*entry, res.id);
+
     // update cache entry
     lock = std::unique_lock(m_mutex);
     if (cacheEntry) {
@@ -169,8 +177,29 @@ auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(Storage &sto
     }
     cacheEntry->entry = entry;
     lock.unlock();
+
     res.updated = true;
     return res;
+}
+
+/*!
+ * \brief Stores the specified \a entry with the specified \a storageID.
+ * \remarks This is used to update an existing entry with a known ID.
+ */
+template <typename StorageEntriesType, typename StorageType, typename SpecType>
+auto StorageCache<StorageEntriesType, StorageType, SpecType>::store(
+    Storage &storage, RWTxn &txn, StorageID storageID, const std::shared_ptr<Entry> &entry) -> void
+{
+    // update package in storage
+    const auto id = txn.put(*entry, storageID);
+
+    // update cache entry
+    using CacheEntry = typename Entries::StorageEntry;
+    using CacheRef = typename Entries::Ref;
+    const auto ref = CacheRef(storage, entry);
+    const auto lock = std::unique_lock(m_mutex);
+    const auto cacheEntry = &m_entries.insert(CacheEntry(ref, id));
+    cacheEntry->entry = entry;
 }
 
 template <typename StorageEntriesType, typename StorageType, typename SpecType>

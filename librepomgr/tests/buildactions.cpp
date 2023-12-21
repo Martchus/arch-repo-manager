@@ -314,6 +314,7 @@ void BuildActionsTests::testParsingInfoFromPkgFiles()
     auto &fooDb = config.databases[0];
     auto &barDb = config.databases[1];
     const auto harfbuzz = LibPkg::Package::fromPkgFileName("mingw-w64-harfbuzz-1.4.2-1-any.pkg.tar.xz");
+    harfbuzz->libprovides = { "harfbuzzlibrary.so" };
     const auto harfbuzzID = fooDb.updatePackage(harfbuzz);
     const auto syncthingtray = LibPkg::Package::fromPkgFileName("syncthingtray-0.6.2-1-x86_64.pkg.tar.xz");
     const auto syncthingtrayID = fooDb.updatePackage(syncthingtray);
@@ -322,6 +323,14 @@ void BuildActionsTests::testParsingInfoFromPkgFiles()
     barDb.updatePackage(cmake);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("origin", LibPkg::PackageOrigin::PackageFileName, cmake->origin);
     barDb.localPkgDir = directory(testFilePath("repo/bar/cmake-3.8.2-1-x86_64.pkg.tar.xz"));
+    auto harfbuzzLibraryPresent = false;
+    fooDb.providingPackages("harfbuzzlibrary.so", false, [&](LibPkg::StorageID id, const std::shared_ptr<LibPkg::Package> &package) {
+        CPPUNIT_ASSERT_EQUAL(harfbuzzID, id);
+        CPPUNIT_ASSERT_EQUAL(harfbuzz->name, package->name);
+        harfbuzzLibraryPresent = true;
+        return true;
+    });
+    CPPUNIT_ASSERT_MESSAGE("harfbuzz found via \"harfbuzzlibrary.so\" before reload", harfbuzzLibraryPresent);
 
     auto buildAction = std::make_shared<BuildAction>(0, &m_setup);
     auto reloadLibDependencies = ReloadLibraryDependencies(m_setup, buildAction);
@@ -345,6 +354,11 @@ void BuildActionsTests::testParsingInfoFromPkgFiles()
     CPPUNIT_ASSERT_EQUAL(1_st, pkgsProvidingLibSyncthingConnector.size());
     CPPUNIT_ASSERT_EQUAL(syncthingtray->name, pkgsProvidingLibSyncthingConnector.front().pkg->name);
     CPPUNIT_ASSERT_EQUAL(syncthingtrayID, pkgsProvidingLibSyncthingConnector.front().id);
+
+    fooDb.providingPackages("harfbuzzlibrary.so", false, [&](LibPkg::StorageID, const std::shared_ptr<LibPkg::Package> &) {
+        CPPUNIT_FAIL("harfbuzz still found via \"harfbuzzlibrary.so\" after reload");
+        return true;
+    });
 }
 
 /*!

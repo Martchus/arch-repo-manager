@@ -415,6 +415,7 @@ struct LIBPKG_EXPORT Package : public PackageBase,
         std::string_view directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
     void addDepsAndProvidesFromContents(const FileMap &contents);
     std::vector<std::string> processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
+    bool canDepsAndProvidesFromOtherPackage(const Package &otherPackage) const;
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);
     bool isArchAny() const;
     std::vector<std::string> validate() const;

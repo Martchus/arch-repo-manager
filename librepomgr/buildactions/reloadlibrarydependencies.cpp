@@ -377,19 +377,19 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
             }
             // find the package in the database again
             const auto [packageID, existingPackage] = updater.findPackageWithID(package.info.name);
-            if (!existingPackage) {
-                continue; // the package has been removed while we were loading package contents
+            // skip if the package has been removed meanwhile if it it does no longer match what's in the database
+            if (!existingPackage || !existingPackage->canDepsAndProvidesFromOtherPackage(package.info)) {
+                continue;
             }
             // add the dependencies/provides to the existing package
-            if (!existingPackage->addDepsAndProvidesFromOtherPackage(package.info)) {
-                continue; // the package does no longer match what's in the database
-            }
+            updater.beginUpdate(packageID, existingPackage);
+            existingPackage->addDepsAndProvidesFromOtherPackage(package.info, true);
             // update timestamp so we can skip this package on the next run
             if (existingPackage->timestamp < package.lastModified) {
                 existingPackage->timestamp = package.lastModified;
             }
             // add the new dependencies on database-level
-            updater.update(existingPackage);
+            updater.endUpdate(packageID, existingPackage);
             ++counter;
         }
         updater.commit();
