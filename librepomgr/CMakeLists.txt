@@ -168,12 +168,14 @@ add_reflection_generator_invocation(
     ERROR_RESILIENT)
 
 # disable Boost's support for concepts to avoid compile errors
+# ~~~
 # /usr/include/boost/asio/async_result.hpp:70:20: error: concept cannot have associated constraints
 # BOOST_ASIO_CONCEPT completion_handler_for =
 #                    ^
 # /usr/include/boost/asio/async_result.hpp:492:20: error: concept cannot have associated constraints
 # BOOST_ASIO_CONCEPT completion_token_for = requires(T&& t)
 #                    ^
+# ~~~
 list(APPEND META_PUBLIC_COMPILE_DEFINITIONS BOOST_ASIO_DISABLE_CONCEPTS)
 
 # include modules to apply configuration
