@@ -108,7 +108,7 @@ local_mirror = file://$local_db_path
 ```
 
 The server obviously needs write permissions to add packages to repositories. In my
-setup I've just add it as group and set permissions accordingly:
+setup I just added it as group and set permissions accordingly:
 
 ```
 sudo chown -R martchus:buildservice-git $local_db_path
@@ -222,14 +222,14 @@ keyserver hkp://keys.gnupg.net
 #### Notes
 * Adding the pacman keyring is actually not very useful because we need to check signatures
   of any upstream project and not just arch devs.
-* If "auto-key-retrieve" does not work, use `gpg --recv-key <KEYID>` as a workaround
+* If "auto-key-retrieve" does not work, use `gpg --recv-key <KEYID>` as a workaround.
 * Also see http://allanmcrae.com/2015/01/two-pgp-keyrings-for-package-management-in-arch-linux/
 
 ### ccache configuration
 To use ccache one can set the ccache directory in the config (`ccache_dir`) and install the
 package `ccache` (and `mingw-w64-ccache` for MinGW packages) into the chroot. Make sure the user
 you start the server with has permissions to read and write there. Otherwise the resulting
-configure errors can be confusing. Internally the server is mounting that directory like
+configuration errors can be confusing. Internally the server is mounting that directory as
 described in [the wiki](https://wiki.archlinux.org/index.php/Ccache#makechrootpkg).
 
 If you want to use the existing `ccache` directory owned by your current user, you could do
