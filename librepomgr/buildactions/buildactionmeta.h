@@ -88,6 +88,7 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     PullingInFurtherDependenciesUnexpected = (1 << 5),
     FetchOfficialPackageSources = (1 << 6),
     UseContainer = (1 << 7),
+    AurOnly = (1 << 8),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,

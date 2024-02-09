@@ -78,6 +78,7 @@ void PrepareBuild::run()
     m_pullingInFurtherDependenciesUnexpected = flags & PrepareBuildFlags::PullingInFurtherDependenciesUnexpected;
     m_fetchOfficialSources = flags & PrepareBuildFlags::FetchOfficialPackageSources;
     m_useContainer = flags & PrepareBuildFlags::UseContainer;
+    m_aurOnly = flags & PrepareBuildFlags::AurOnly;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -890,14 +891,22 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     }
 
     // check for errors
-    set<string> failedPackages;
+    auto failedPackages = std::set<std::string>();
+    auto localPackages = std::set<std::string>();
+    auto errorMessage = std::string();
     for (const auto &buildData : m_buildDataByPackage) {
         if (!buildData.second.error.empty()) {
             failedPackages.emplace(buildData.first);
+        } else if (m_aurOnly && !buildData.second.originalSourceDirectory.empty()) {
+            localPackages.emplace(buildData.first);
         }
     }
     if (!failedPackages.empty()) {
-        auto errorMessage = "Unable to retrieve the following packages (see result data for details): " + joinStrings(failedPackages, " ");
+        errorMessage = "Unable to retrieve the following packages (see result data for details): " + joinStrings(failedPackages, " ");
+    } else if (!localPackages.empty()) {
+        errorMessage = "The following packages have a local override but the AUR-only flag was set: " + joinStrings(localPackages, " ");
+    }
+    if (!errorMessage.empty()) {
         m_buildAction->appendOutput(Phrases::ErrorMessage, errorMessage, '\n');
         auto resultData = makeResultData(std::move(errorMessage));
         auto buildActionWriteLock = m_setup.building.lockToWrite();

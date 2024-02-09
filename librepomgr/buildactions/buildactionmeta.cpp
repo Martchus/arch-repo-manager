@@ -197,6 +197,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Uses `makecontainerpkg` instead of using `makepkg` when printing source info; eliminates the need to having pacman on the host by using docker/podman instead",
                     .param = "use-container",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::AurOnly),
+                    .name = "AUR-only",
+                    .desc = "Consider it an error when a PKGBUILD was found locally and thus was not downloaded from the AUR",
+                    .param = "aur-only",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

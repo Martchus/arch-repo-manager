@@ -520,6 +520,7 @@ private:
     bool m_pulledInFurtherDependencies = false;
     bool m_fetchOfficialSources = false;
     bool m_useContainer = false;
+    bool m_aurOnly = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {
