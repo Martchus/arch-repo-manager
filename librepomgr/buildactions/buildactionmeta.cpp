@@ -192,7 +192,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .param = "fetch-official-pkgbuilds",
                 },
                 BuildActionFlagMetaInfo{
-                    .id = static_cast<BuildActionFlagType>(ConductBuildFlags::UseContainer),
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::UseContainer),
                     .name = "Use container",
                     .desc = "Uses `makecontainerpkg` instead of using `makepkg` when printing source info; eliminates the need to having pacman on the host by using docker/podman instead",
                     .param = "use-container",

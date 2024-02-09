@@ -519,7 +519,7 @@ private:
     bool m_pullingInFurtherDependenciesUnexpected = false;
     bool m_pulledInFurtherDependencies = false;
     bool m_fetchOfficialSources = false;
-    bool m_useContainer;
+    bool m_useContainer = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {
