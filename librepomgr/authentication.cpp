@@ -7,6 +7,7 @@
 #include <c++utilities/io/ansiescapecodes.h>
 
 #include <openssl/sha.h>
+#include <openssl/crypto.h>
 
 namespace LibRepoMgr {
 
@@ -39,16 +40,19 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
     }
 }
 
+static constexpr char toUpper(const char c)
+{
+    return (c >= 'a' && c <= 'z') ? (c - ('a' - 'A')) : c;
+}
+
 void ServiceSetup::Authentication::applyConfig(const std::string &userName, const std::multimap<std::string, std::string> &multimap)
 {
     auto &user = users[userName];
     convertValue(multimap, "password_sha512", user.passwordSha512);
     convertValue(multimap, "permissions", user.permissions);
-}
-
-static constexpr char toLower(const char c)
-{
-    return (c >= 'A' && c <= 'Z') ? (c + ('a' - 'A')) : c;
+    for (auto &c : user.passwordSha512) {
+        c = toUpper(c);
+    }
 }
 
 UserAuth ServiceSetup::Authentication::authenticate(std::string_view authorizationHeader) const
@@ -83,22 +87,26 @@ UserAuth ServiceSetup::Authentication::authenticate(std::string_view authorizati
     if (user == users.cend()) {
         return auth;
     }
-    constexpr auto sha512HexSize = 128;
+    constexpr auto sha512HexSize = SHA512_DIGEST_LENGTH * 2;
     if (user->second.passwordSha512.size() != sha512HexSize) {
         return auth;
     }
 
     // hash password
-    unsigned char hash[SHA512_DIGEST_LENGTH];
-    SHA512(reinterpret_cast<const unsigned char *>(password.data()), password.size(), hash);
+    auto hash = std::array<unsigned char, SHA512_DIGEST_LENGTH>();
+    SHA512(reinterpret_cast<const unsigned char *>(password.data()), password.size(), hash.data());
+
+    // convert hash to string (hexadecimal)
+    auto hashHex = std::array<char, sha512HexSize>();
+    auto hashHexIter = hashHex.begin();
+    for (const auto hashNumber : hash) {
+        *(hashHexIter++) = static_cast<char>(CppUtilities::digitToChar((hashNumber / 16) % 16));
+        *(hashHexIter++) = static_cast<char>(CppUtilities::digitToChar(hashNumber % 16));
+    }
 
     // check whether password hash matches
-    auto i = user->second.passwordSha512.cbegin();
-    for (unsigned char hashNumber : hash) {
-        const auto digits = CppUtilities::numberToString(hashNumber, 16);
-        if ((toLower(*(i++)) != toLower(digits.size() < 2 ? '0' : digits.front())) || (toLower(*(i++)) != toLower(digits.back()))) {
-            return auth;
-        }
+    if (CRYPTO_memcmp(user->second.passwordSha512.data(), hashHex.data(), sha512HexSize) != 0) {
+        return auth;
     }
 
     // return the user's permissions
