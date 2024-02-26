@@ -4,6 +4,7 @@
 #ifndef LIBREPOMGR_GLOBAL
 #define LIBREPOMGR_GLOBAL
 
+#include "librepomgr-definitions.h"
 #include <c++utilities/application/global.h>
 
 #ifdef LIBREPOMGR_STATIC

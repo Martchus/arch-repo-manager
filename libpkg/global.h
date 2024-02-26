@@ -4,6 +4,7 @@
 #ifndef LIBPKG_GLOBAL
 #define LIBPKG_GLOBAL
 
+#include "libpkg-definitions.h"
 #include <c++utilities/application/global.h>
 
 #ifdef LIBPKG_STATIC
