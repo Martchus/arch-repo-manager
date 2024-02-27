@@ -321,7 +321,7 @@ void Database::allPackages(const PackageVisitorMove &visitor)
     }
 }
 
-void Database::allPackages(const PackageVisitorBase &visitor)
+void Database::allPackagesBase(const PackageVisitorBase &visitor)
 {
     auto txn = m_storage->packages.getROTransaction();
     for (auto i = txn.begin<std::shared_ptr, PackageBase>(); i != txn.end(); ++i) {

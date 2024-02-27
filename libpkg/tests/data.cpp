@@ -1,5 +1,8 @@
 #include "../data/config.h"
 
+#include "resources/config.h"
+
+#include <c++utilities/application/commandlineutils.h>
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/misc.h>
@@ -37,6 +40,7 @@ class DataTests : public TestFixture {
     CPPUNIT_TEST(testAddingDepsAndProvidesFromOtherPackage);
     CPPUNIT_TEST(testDependencyExport);
     CPPUNIT_TEST(testPackageUpdater);
+    CPPUNIT_TEST(stresstestPackageUpdater);
     CPPUNIT_TEST(testMisc);
     CPPUNIT_TEST_SUITE_END();
 
@@ -61,6 +65,7 @@ public:
     void testAddingDepsAndProvidesFromOtherPackage();
     void testDependencyExport();
     void testPackageUpdater();
+    void stresstestPackageUpdater();
     void testMisc();
 
 private:
@@ -565,6 +570,47 @@ void DataTests::testPackageUpdater()
     CPPUNIT_ASSERT_EQUAL("acl"s, newPkg->name);
     CPPUNIT_ASSERT(newPkg = db->findPackage("zlib"));
     CPPUNIT_ASSERT_EQUAL("zlib"s, newPkg->name);
+}
+
+void DataTests::stresstestPackageUpdater()
+{
+    if (!CppUtilities::isEnvVariableSet(PROJECT_VARNAME_UPPER "_ENABLE_STRESS_TESTS").value_or(false)) {
+        return;
+    }
+    m_dbFile = workingCopyPath("stresstest-data.db", WorkingCopyMode::Cleanup);
+    m_config.initStorage(m_dbFile.data());
+
+    auto dbFile = testFilePath("stresstest/ownstuff-protected.files.tar.xz");
+    auto dbFileOld = testFilePath("stresstest/ownstuff-protected.files.tar.xz.old");
+    auto *const db = m_config.findOrCreateDatabase("ownstuff-protected"sv, "x86_64"sv);
+    auto basePackageFromIndex = PackageBase();
+
+    constexpr auto iterations = 1000;
+    for (auto i = 0; i != iterations; ++i) {
+        if (i % (iterations / 100) == 0) {
+            std::cerr << "\rRunning stress test: " << (i * 100 / iterations) << " %";
+        }
+
+        auto updater = LibPkg::PackageUpdater(*db, true);
+        updater.insertFromDatabaseFile(i % 2 == 0 ? dbFileOld : dbFile);
+        updater.commit();
+        CPPUNIT_ASSERT_MESSAGE("packages present", db->packageCount() > 0);
+
+        db->allPackagesBase([db, &basePackageFromIndex](StorageID packageID, std::shared_ptr<PackageBase> &&basePackage) {
+            CPPUNIT_ASSERT_MESSAGE("package ID valid", packageID);
+            CPPUNIT_ASSERT_MESSAGE("base package returned", basePackage);
+            CPPUNIT_ASSERT_MESSAGE("name assigned", !basePackage->name.empty());
+            CPPUNIT_ASSERT_MESSAGE("version assigned", !basePackage->version.empty());
+            basePackageFromIndex.clear();
+
+            const auto packageIDViaIndex = db->findBasePackageWithID(basePackage->name, basePackageFromIndex);
+            CPPUNIT_ASSERT_MESSAGE("package ID via index valid", packageIDViaIndex);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("index valid, ID matches", packageID, packageIDViaIndex);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("index valid, name matches", basePackage->name, basePackageFromIndex.name);
+            return false;
+        });
+    }
+    std::cerr << "Running stress test: done\n";
 }
 
 void DataTests::testMisc()

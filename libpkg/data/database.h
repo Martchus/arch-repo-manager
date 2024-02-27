@@ -173,7 +173,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     static bool isFileRelevant(const char *filePath, const char *fileName, mode_t);
     std::vector<std::shared_ptr<Package>> findPackages(const std::function<bool(const Database &, const Package &)> &pred);
     void allPackages(const PackageVisitorMove &visitor);
-    void allPackages(const PackageVisitorBase &visitor);
+    void allPackagesBase(const PackageVisitorBase &visitor);
     void allPackagesByName(const PackageVisitorByName &visitor);
     void allPackagesByName(const PackageVisitorByNameBase &visitor);
     std::size_t packageCount() const;
