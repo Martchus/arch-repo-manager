@@ -395,4 +395,6 @@ Copyright © 2017-2024 Marius Kittler
 
 All code is licensed under [GPL-2-or-later](LICENSE). This does *not* apply to
 code contained in Git repositories included as Git submodule (which contain
-their own README and licensing information).
+their own README and licensing information). This does also *not* apply to
+code in the directories under `srv/static/node_modules` (which contain 3rdparty
+code that has its own licensing information).
