@@ -386,8 +386,7 @@ and CSS files are bundled. For development the full checkout might be useful
 
 ```
 cd srv/static/node_modules
-npm install xterm
-npm install --save xterm-addon-search
+npm install @xterm/xterm @xterm/addon-search
 ```
 
 ## Copyright notice and license
