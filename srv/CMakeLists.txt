@@ -20,10 +20,10 @@ set(JAVA_SCRIPT_FILES
     static/js/terminal.js
     static/js/utils.js
     static/js/main.js
-    static/node_modules/xterm/lib/xterm.js
-    static/node_modules/xterm-addon-search/lib/xterm-addon-search.js)
+    static/node_modules/@xterm/xterm/lib/xterm.js
+    static/node_modules/@xterm/addon-search/lib/addon-search.js)
 set(CSS_FILES static/css/basics.css static/css/genericrendering.css static/css/layout.css static/css/log.css
-              static/css/specifics.css static/node_modules/xterm/css/xterm.css)
+              static/css/specifics.css static/node_modules/@xterm/xterm/css/xterm.css)
 set(IMG_FILES
     static/img/favicon.svg
     static/img/logo.svg
