@@ -337,7 +337,7 @@ void MovePackages::run()
         });
 
     // remove package from database file of source repo
-    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName),
+    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_sourceDatabaseLockName),
         [this, buildAction = m_buildAction,
             repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
                 std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
