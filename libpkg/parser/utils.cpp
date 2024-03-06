@@ -74,7 +74,7 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
             }
 
             if (directoryHandler(std::string_view(filePath, dirEnd))) {
-                return;
+                goto free;
             }
             continue;
         }
@@ -101,7 +101,7 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
         if (entryType == AE_IFLNK) {
             if (fileHandler(std::string_view(filePath, static_cast<string::size_type>(dirEnd - filePath)),
                     ArchiveFile(fileName, std::string(archive_entry_symlink_utf8(entry)), ArchiveFileType::Link, creationTime, modificationTime))) {
-                return;
+                goto free;
             }
             continue;
         }
@@ -128,11 +128,12 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
         // move it to results
         if (fileHandler(std::string_view(filePath, static_cast<string::size_type>(dirEnd - filePath)),
                 ArchiveFile(fileName, std::move(fileContent), ArchiveFileType::Regular, creationTime, modificationTime))) {
-            return;
+            goto free;
         }
     }
 
     // free resources used by libarchive
+free:
     archive_entry_free(entry);
     int returnCode = archive_read_free(ar);
     if (returnCode != ARCHIVE_OK) {
