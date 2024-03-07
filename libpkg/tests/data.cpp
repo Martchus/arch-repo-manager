@@ -585,7 +585,10 @@ void DataTests::stresstestPackageUpdater()
     auto *const db = m_config.findOrCreateDatabase("ownstuff-protected"sv, "x86_64"sv);
     auto basePackageFromIndex = PackageBase();
 
-    constexpr auto iterations = 1000;
+    static constexpr auto iterations = 1000;
+    static const auto packageToModify = "android-sdk"s;
+    static const auto newLibdepends = std::set<std::string>{"foo", "bar", "baz"};
+    static const auto newLibprovides = std::set<std::string>{"a", "b", "c"};
     for (auto i = 0; i != iterations; ++i) {
         if (i % (iterations / 100) == 0) {
             std::cerr << "\rRunning stress test: " << (i * 100 / iterations) << " %";
@@ -595,6 +598,18 @@ void DataTests::stresstestPackageUpdater()
         updater.insertFromDatabaseFile(i % 2 == 0 ? dbFileOld : dbFile);
         updater.commit();
         CPPUNIT_ASSERT_MESSAGE("packages present", db->packageCount() > 0);
+
+        auto updater2 = LibPkg::PackageUpdater(*db);
+        auto [existingPackageID, existingPackage] = updater2.findPackageWithID(packageToModify);
+        CPPUNIT_ASSERT(existingPackage != nullptr);
+        CPPUNIT_ASSERT_EQUAL(packageToModify, existingPackage->name);
+        CPPUNIT_ASSERT(existingPackage->libdepends.empty());
+        CPPUNIT_ASSERT(existingPackage->libprovides.empty());
+        updater2.beginUpdate(existingPackageID, existingPackage);
+        existingPackage->libdepends = newLibdepends;
+        existingPackage->libprovides = newLibprovides;
+        updater2.endUpdate(existingPackageID, existingPackage);
+        updater2.commit();
 
         db->allPackagesBase([db, &basePackageFromIndex](StorageID packageID, std::shared_ptr<PackageBase> &&basePackage) {
             CPPUNIT_ASSERT_MESSAGE("package ID valid", packageID);
@@ -609,6 +624,12 @@ void DataTests::stresstestPackageUpdater()
             CPPUNIT_ASSERT_EQUAL_MESSAGE("index valid, name matches", basePackage->name, basePackageFromIndex.name);
             return false;
         });
+
+        auto updatedPackage = db->findPackage(packageToModify);
+        CPPUNIT_ASSERT(updatedPackage != nullptr);
+        CPPUNIT_ASSERT_EQUAL(packageToModify, updatedPackage->name);
+        CPPUNIT_ASSERT_EQUAL(newLibdepends, updatedPackage->libdepends);
+        CPPUNIT_ASSERT_EQUAL(newLibprovides, updatedPackage->libprovides);
     }
     std::cerr << "Running stress test: done\n";
 }
