@@ -202,7 +202,7 @@ location /buildservice/api/ {
     proxy_set_header        X-Forwarded-Proto $scheme;
 }
 location ~ ^(?!/buildservice/api/)/buildservice/(.*)$ {
-    alias /run/media/devel/projects/c++/cmake/auto-makepkg/buildservice/static/$1;
+    alias /usr/share/buildservice-git/web/static/$1;
 }
 
 ```
