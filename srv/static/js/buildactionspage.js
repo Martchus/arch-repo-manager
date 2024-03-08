@@ -250,19 +250,20 @@ function renderBuildActionActions(actionValue, buildAction, detailsTable)
 
 function showBuildActions(ajaxRequest)
 {
-    if (!window.globalInfo) {
+    if (!window.globalInfo && ajaxRequest.status === 200) {
         window.functionsPostponedUntilGlobalInfo.push(showBuildActions.bind(this, ...arguments));
         return;
     }
     const buildActionsList = Utils.getAndEmptyElement('build-actions-list');
     if (ajaxRequest.status !== 200) {
-        buildActionsList.appendChild(document.createTextNode('Unable to load build actions: ' + ajaxRequest.responseText));
+        buildActionsList.appendChild(document.createTextNode('Unable to load build actions: ' + ajaxRequest.responseTextDisplay));
+        buildActionsList.appendChild(document.createTextNode(' '));
         buildActionsList.appendChild(CustomRendering.renderReloadButton(queryBuildActions));
         return;
     }
     const responseJson = JSON.parse(ajaxRequest.responseText);
     if (!Array.isArray(responseJson)) {
-        buildActionsList.appendChild(document.createTextNode('Unable to load build actions: response is no array'));
+        buildActionsList.appendChild(document.createTextNode('Unable to load build actions: response is no array '));
         buildActionsList.appendChild(CustomRendering.renderReloadButton(queryBuildActions));
         return;
     }

@@ -108,7 +108,7 @@ function showPackageSearchResults(ajaxRequest)
 {
     const packageSearchResults = Utils.getAndEmptyElement('package-search-results');
     if (ajaxRequest.status !== 200) {
-        packageSearchResults.appendChild(document.createTextNode('unable search for packages: ' + ajaxRequest.responseText));
+        packageSearchResults.appendChild(document.createTextNode('unable search for packages: ' + ajaxRequest.responseTextDisplay));
         return;
     }
     const responseJson = JSON.parse(ajaxRequest.responseText);

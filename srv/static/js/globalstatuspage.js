@@ -18,11 +18,10 @@ function handleGlobalStatusUpdate(ajaxRequest)
 {
     const globalStatus = Utils.getAndEmptyElement('global-status');
     let responseText = ajaxRequest.responseText;
-    if (ajaxRequest.status === 500) {
-        responseText = 'internal server error';
-    }
     if (ajaxRequest.status !== 200) {
-        globalStatus.appendChild(document.createTextNode('unable to load global status: ' + responseText));
+        globalStatus.appendChild(document.createTextNode('unable to load global status: ' + ajaxRequest.responseTextDisplay));
+        globalStatus.appendChild(document.createTextNode(' '));
+        globalStatus.appendChild(CustomRendering.renderReloadButton(queryGlobalStatus));
         return;
     }
     const responseJson = JSON.parse(responseText);

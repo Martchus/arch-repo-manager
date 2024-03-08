@@ -156,7 +156,7 @@ export function showPackageDetails(ajaxRequest, row)
     const packageID = makePackageID(row);
     const packageDetailsContainer = Utils.getAndEmptyElement('package-details-container');
     if (ajaxRequest.status !== 200) {
-        packageDetailsContainer.appendChild(document.createTextNode('unable query package details: ' + ajaxRequest.responseText));
+        packageDetailsContainer.appendChild(document.createTextNode('unable query package details: ' + ajaxRequest.responseTextDisplay));
         return;
     }
     const responseJson = JSON.parse(ajaxRequest.responseText);
