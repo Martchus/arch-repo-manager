@@ -1,6 +1,3 @@
-// ignore warning about "return result_type{ storageEntry.id, storageEntry.ref.relatedStorage };"
-#pragma GCC diagnostic ignored "-Wnull-dereference"
-
 #include "./storageprivate.h"
 
 #include <c++utilities/conversion/stringbuilder.h>
