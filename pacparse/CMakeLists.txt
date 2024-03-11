@@ -13,9 +13,6 @@ set(META_PROJECT_VARNAME REPO_CLEAN)
 set(META_APP_NAME "Package parser")
 set(META_APP_AUTHOR "Martchus")
 set(META_APP_DESCRIPTION "Tool to parse an Arch Linux package printing the results as JSON")
-set(META_VERSION_MAJOR 0)
-set(META_VERSION_MINOR 0)
-set(META_VERSION_PATCH 1)
 
 # find c++utilities
 set(CONFIGURATION_PACKAGE_SUFFIX

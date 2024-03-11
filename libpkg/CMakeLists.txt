@@ -42,9 +42,6 @@ set(META_PROJECT_TYPE library)
 set(META_PROJECT_VARNAME LIBPKG)
 set(META_APP_NAME "Unofficial Arch Linux package library")
 set(META_APP_DESCRIPTION "C++ library to parse Arch Linux packages and databases")
-set(META_VERSION_MAJOR 0)
-set(META_VERSION_MINOR 0)
-set(META_VERSION_PATCH 1)
 
 # find c++utilities
 set(CONFIGURATION_PACKAGE_SUFFIX

@@ -13,9 +13,6 @@ set(META_PROJECT_VARNAME REPO_CLEAN)
 set(META_APP_NAME "Package finder")
 set(META_APP_AUTHOR "Martchus")
 set(META_APP_DESCRIPTION "Tool to find the package containing a certain file")
-set(META_VERSION_MAJOR 0)
-set(META_VERSION_MINOR 0)
-set(META_VERSION_PATCH 1)
 
 # find c++utilities
 set(CONFIGURATION_PACKAGE_SUFFIX

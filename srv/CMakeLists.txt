@@ -61,9 +61,6 @@ set(META_APP_NAME "Repo manager and package builder for Arch Linux")
 set(META_APP_AUTHOR "Martchus")
 set(META_APP_DESCRIPTION
     "Daemon and web application for building Arch Linux packages and managing custom Arch Linux repositories")
-set(META_VERSION_MAJOR 0)
-set(META_VERSION_MINOR 0)
-set(META_VERSION_PATCH 1)
 
 # include CMake modules from own project directory
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules" "${CMAKE_MODULE_PATH}")
