@@ -34,6 +34,17 @@ export function initBuildActionsForm()
         handleBuildActionPresetChange();
     };
 
+    // allow selecting to start after the latest build action
+    const buildActionsFormElements = buildActionsForm.elements;
+    buildActionsFormElements['start-after-latest'].onclick = function() {
+        const condElement = buildActionsFormElements['start-condition'];
+        const idElement = buildActionsFormElements['start-after-id'];
+        const id = document.getElementById('build-actions-list')?.getElementsByTagName('table')[0]?.tBodies[0]?.getElementsByTagName('tr')[0]?.dataset.id;
+        condElement.value = 'after';
+        idElement.disabled = false;
+        idElement.value = id || '';
+    };
+
     queryBuildActions();
     handleBuildActionTypeChange();
     buildActionsForm.dataset.initialized = true;
