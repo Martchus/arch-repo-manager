@@ -90,7 +90,7 @@ function makeFormQueryParameter(form)
             continue; // if we disable a form element or hide it via CSS we also don't want to submit its data
         }
         const type = formElement.type;
-        if ((type === 'checkbox' || type === 'radio') && !formElement.checked) {
+        if ((type === 'button') || ((type === 'checkbox' || type === 'radio') && !formElement.checked)) {
             continue;
         }
         const name = formElement.name;
