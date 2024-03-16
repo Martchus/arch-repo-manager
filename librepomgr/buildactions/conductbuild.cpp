@@ -1142,7 +1142,7 @@ void ConductBuild::invokeMakechrootpkgStep3(std::shared_ptr<BuildProcessSession>
     locks.emplace_back(std::move(chrootLock));
     auto lock = lockToRead();
     auto &packageProgress = m_buildProgress.progressByPackage[packageName];
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, sudoArgs, makechrootpkgFlags, "-C",
+    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, sudoArgs, makechrootpkgFlags, "-Y",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
         packageProgress.makepkgFlags, boost::process::std_in < boost::asio::buffer(m_sudoPassword));
     lock.unlock();

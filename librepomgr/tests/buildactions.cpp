@@ -585,7 +585,7 @@ void BuildActionsTests::testConductingBuild()
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "no staging needed: updpkgsums log", "fake updatepkgsums: \n"s, readFile("building/build-data/conduct-build-test/boost/pkg/updpkgsums.log"));
     TESTUTILS_ASSERT_LIKE("no staging needed: build log",
-        "fake makechrootpkg: -c -u -C .*building/test-cache-dir/x86_64 -r .*chroot-dir/arch-x86_64 -l buildservice --\n"s,
+        "fake makechrootpkg: -c -u -Y .*building/test-cache-dir/x86_64 -r .*chroot-dir/arch-x86_64 -l buildservice --\n"s,
         readFile("building/build-data/conduct-build-test/boost/pkg/build.log"));
     TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
         "fake repo-add: boost.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
