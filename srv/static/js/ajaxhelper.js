@@ -39,7 +39,7 @@ export function queryRoute(method, path, callback, type)
             default:
                 try {
                     // avoid showing HTML code from gateway
-                    ajaxRequest.responseTextDisplay = ajaxRequest.status >= 500 || ajaxRequest.status < 600 ? 'internal server error' : ajaxRequest.responseText;
+                    ajaxRequest.responseTextDisplay = ajaxRequest.status >= 500 && ajaxRequest.status < 600 ? 'internal server error' : ajaxRequest.responseText;
                     return callback(this, status === 200);
                 } catch (e) {
                     window.alert('Unable to process server response: ' + e);
