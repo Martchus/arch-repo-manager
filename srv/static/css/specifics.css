@@ -30,7 +30,7 @@
 #package-search-db {
     height: 100px !important;
 }
-#package-search-form table input[type="text"], #package-search-form table select {
+#package-search-form table input[type="text"], input[type="search"], #package-search-form table select {
     width: 100%;
 }
 #package-search-form table td, #package-search-form table th {
