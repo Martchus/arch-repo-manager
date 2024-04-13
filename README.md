@@ -43,6 +43,16 @@ Further ideas (not implemented yet):
     * bundle an application with its dependencies similar to `linuxdeployqt`
       and `windeployqt`
 
+## Important caveats
+* So far releases are not regularly tagged. It is probably best to build the latest version
+  from Git as needed.
+* So far also no security review of the code has been done and at the same time the code
+  base contains lots of rather low-level code (instead of relying on frameworks), many
+  self-written parsers and exposes a web service. So use it at your own risk (like most
+  other open source projects, but here I'd like to highlight it specifically).
+* 32-bit architectures are  not supported (as the database needs a huge address space). Of
+  course you can build packages *for* 32-bit architectures.
+
 ## Setup server
 An example config files can be found in this repository, see the `srv/doc`
 directory. The example config is also installed so one can easily get started.
