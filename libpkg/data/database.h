@@ -123,6 +123,8 @@ struct LIBPKG_EXPORT PackageUpdater {
     void beginUpdate(StorageID packageID, const std::shared_ptr<Package> &package);
     void endUpdate(StorageID packageID, const std::shared_ptr<Package> &package);
     StorageID update(const std::shared_ptr<Package> &package);
+    const std::unordered_set<StorageID> &handledIDs() const;
+    std::size_t packageCount() const;
     bool insertFromDatabaseFile(const std::string &databaseFilePath);
     void commit();
 

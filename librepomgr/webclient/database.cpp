@@ -168,6 +168,10 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
                 updater.insertFromDatabaseFile(session2.destinationFilePath);
                 updater.commit();
                 db->lastUpdate = lastModified;
+                const auto newPackageCount = db->packageCount();
+                lock.unlock();
+                log(Phrases::InfoMessage, "Inserted ", updater.packageCount(), " packages (handling ", updater.handledIDs().size(),
+                    " IDs) into database \"", dbName, '@', dbArch, "\" which now contains ", newPackageCount, " packages\n");
             } catch (const std::runtime_error &e) {
                 log(Phrases::ErrorMessage, "Unable to parse retrieved database file for \"", dbName, '@', dbArch, "\": ", e.what(), '\n');
                 dbQuerySession->addResponse(std::move(dbName));

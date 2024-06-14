@@ -393,6 +393,11 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
             ++counter;
         }
         updater.commit();
+        const auto newPackageCount = db->packageCount();
+        lock.unlock();
+        m_buildAction->appendOutput(Phrases::InfoMessage, "Added dependency information for ", updater.handledIDs().size(), " packages (of ",
+            updater.packageCount(), ") within database \"", relevantDb.name, '@', relevantDb.arch, "\" which contains ", newPackageCount,
+            " packages in total\n");
     }
 
     m_buildAction->appendOutput(Phrases::SuccessMessage, "Added dependency information for ", counter, " packages\n");

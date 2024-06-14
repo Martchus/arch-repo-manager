@@ -112,6 +112,12 @@ void ReloadDatabase::run()
                     dbFileLock.lock().unlock();
                     updater.commit();
                     destinationDb->lastUpdate = lastModified;
+
+                    const auto newPackageCount = destinationDb->packageCount();
+                    configLock.unlock();
+                    m_buildAction->appendOutput(Phrases::InfoMessage, "Inserted ", updater.packageCount(), " packages (handling ",
+                        updater.handledIDs().size(), " IDs) into database \"", dbName, '@', dbArch, "\" which now contains ", newPackageCount,
+                        " packages\n");
                 } catch (const std::runtime_error &e) {
                     m_buildAction->appendOutput(Phrases::ErrorMessage, "An error occurred when reloading database \"", dbName, '@', dbArch,
                         "\" from local file \"", dbPath, "\": ", e.what(), '\n');

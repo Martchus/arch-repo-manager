@@ -41,6 +41,7 @@ struct PackageUpdaterPrivate {
     AffectedDeps affectedRequiredDeps;
     AffectedLibs affectedProvidedLibs;
     AffectedLibs affectedRequiredLibs;
+    std::size_t packageCountBeforeCommit = 0;
 
 private:
     static AffectedDeps::iterator findDependency(const Dependency &dependency, AffectedDeps &affected);
@@ -930,6 +931,23 @@ StorageID PackageUpdater::update(const std::shared_ptr<Package> &package)
     return res.id;
 }
 
+/*!
+ * \brief Returns the package IDs handled so far.
+ * \remarks Those IDs might not have been committed.
+ */
+const std::unordered_set<StorageID> &PackageUpdater::handledIDs() const
+{
+    return m_d->handledIds;
+}
+
+/*!
+ * \brief Returns the number of packages that was present just before committing changes.
+ */
+std::size_t PackageUpdater::packageCount() const
+{
+    return m_d->packageCountBeforeCommit;
+}
+
 bool PackageUpdater::insertFromDatabaseFile(const std::string &databaseFilePath)
 {
     LibPkg::Package::fromDatabaseFile(databaseFilePath, [this](const std::shared_ptr<LibPkg::Package> &package) {
@@ -993,6 +1011,7 @@ void PackageUpdater::commit()
             m_d->submit(libraryName, affected, txn);
         }
     }
+    m_d->packageCountBeforeCommit = pkgTxn.size();
     pkgTxn.commit();
     m_d->lock.unlock();
 }
