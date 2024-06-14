@@ -610,8 +610,10 @@ private:
         const std::string &packageNameToCheck, const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const;
     InvocationResult invokeUpdatePkgSums(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, const std::string &buildDirectory);
+    InvocationResult invokeGpgForKeyImport(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
+        PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeMakepkgToMakeSourcePackage(const BatchProcessingSession::SharedPointerType &downloadsSession,
-        const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
+        const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory, bool skipKey = false);
     void invokeMakechrootpkg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
         bool hasFailuresInPreviousBatches, std::move_only_function<void(InvocationResult)> &&cb);
     void invokeMakechrootpkgStep2(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,

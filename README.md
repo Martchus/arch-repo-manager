@@ -230,10 +230,17 @@ keyserver hkp://keys.gnupg.net
 ```
 
 #### Notes
-* Adding the pacman keyring is actually not very useful because we need to check signatures
-  of any upstream project and not just arch devs.
-* If "auto-key-retrieve" does not work, use `gpg --recv-key <KEYID>` as a workaround.
-* Also see http://allanmcrae.com/2015/01/two-pgp-keyrings-for-package-management-in-arch-linux/
+* The build service will invoke `gpg --import …` automatically for any `keys/pgp/*.asc`
+  files found next to the `PKGBUILD` file (as it is present on many official packages
+  like [freetype2](https://gitlab.archlinux.org/archlinux/packaging/packages/freetype2/-/blob/main/keys/pgp/E30674707856409FF1948010BE6C3AAC63AD8E3F.asc)).
+  When only building packages where a key is expected to be supplied this way, the
+  `auto-key-retrieve` keyserver option mentioned in the example above is not required.
+* If `auto-key-retrieve` does not work, invoke `gpg --recv-key <KEYID>` or
+  `gpg --import <KEYFILE>` manually as a workaround.
+* Adding keys from the pacman keyring is actually not very useful because we need to
+  check signatures of any upstream project and not just Arch Linux devs. Checkout
+  http://allanmcrae.com/2015/01/two-pgp-keyrings-for-package-management-in-arch-linux/
+  for a more detailed explanation.
 
 ### ccache configuration
 To use ccache one can set the ccache directory in the config (`ccache_dir`) and install the

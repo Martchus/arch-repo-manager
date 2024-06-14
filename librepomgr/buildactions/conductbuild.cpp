@@ -911,9 +911,88 @@ InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession:
     return InvocationResult::Ok;
 }
 
-InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProcessingSession::SharedPointerType &downloadsSession,
+InvocationResult ConductBuild::invokeGpgForKeyImport(const BatchProcessingSession::SharedPointerType &downloadsSession,
     const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory)
 {
+    // skip if gpg is not installed/located
+    if (m_gpgPath.empty()) {
+        return InvocationResult::Skipped;
+    }
+
+    // check the build directory for keys to import; skip if no keys are found
+    auto keyFiles = std::vector<std::string>();
+    auto keyDir = buildDirectory + "/keys/pgp";
+    try {
+        const auto possibleKeyFiles = std::filesystem::directory_iterator(keyDir);
+        for (const auto &keyFile : possibleKeyFiles) {
+            if (const auto status = keyFile.status(); !std::filesystem::is_regular_file(status)) {
+                continue;
+            }
+            if (keyFile.path().extension() != ".asc") {
+                continue;
+            }
+            keyFiles.emplace_back(keyFile.path());
+        }
+    } catch (const std::filesystem::filesystem_error &e) {
+        if (e.code() == std::errc::no_such_file_or_directory) {
+            return InvocationResult::Skipped;
+        }
+        auto writeLock = lockToWrite();
+        packageProgress.error = "Unable to check key directory \"" % keyDir % "\" for keys to import: " + e.what();
+        writeLock.unlock();
+        return InvocationResult::Error;
+    }
+    if (keyFiles.empty()) {
+        return InvocationResult::Skipped;
+    }
+
+    // invoke "gpg --import …"
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " key import", packageProgress.buildDirectory + "/key-import.log",
+        [this, downloadsSession, &packageProgress, &packageName, buildDirectory = buildDirectory](
+            boost::process::child &&child, ProcessResult &&result) {
+            if (result.errorCode) {
+                auto lock = lockToWrite();
+                auto errorMessage = result.errorCode.message();
+                packageProgress.error = "unable to import GPG key: " + errorMessage;
+                lock.unlock();
+                m_buildAction->log()(Phrases::ErrorMessage, "Unable to import GPG key for ", packageName, ": ", errorMessage, '\n');
+                downloadsSession->addResponse(string(packageName));
+            } else if (result.exitCode != 0) {
+                auto lock = lockToWrite();
+                packageProgress.error = argsToString("unable to import GPG key: gpg returned with exit code ", result.exitCode);
+                lock.unlock();
+                m_buildAction->log()(Phrases::ErrorMessage, "gpg invocation to import GPG key for package \"", packageName,
+                    "\" exited with non-zero exit code: ", child.exit_code(), '\n');
+                downloadsSession->addResponse(string(packageName));
+            } else {
+                invokeMakepkgToMakeSourcePackage(downloadsSession, packageName, packageProgress, buildDirectory, true);
+                return;
+            }
+            enqueueDownloads(downloadsSession, 1);
+        });
+    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, "--yes", "--import", keyFiles);
+    m_buildAction->log()(Phrases::InfoMessage, "Importing ", keyFiles.size(), " keys for package \"", packageName, '\"', '\n');
+    return InvocationResult::Ok;
+}
+
+InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProcessingSession::SharedPointerType &downloadsSession,
+    const std::string &packageName, PackageBuildProgress &packageProgress, const std::string &buildDirectory, bool skipKey)
+{
+    // check whether a GPG key is present that should be imported first
+    if (!skipKey) {
+        switch (invokeGpgForKeyImport(downloadsSession, packageName, packageProgress, buildDirectory)) {
+        case InvocationResult::Ok:
+            // the handler of the GPG invocation will invoke this function again to continue
+            return InvocationResult::Ok;
+        case InvocationResult::Error:
+            // consider the package failed
+            return InvocationResult::Error;
+        case InvocationResult::Skipped:
+            // continue without importing keys
+            break;
+        }
+    }
+
     auto processSession = m_buildAction->makeBuildProcess(packageName + " download", packageProgress.buildDirectory + "/download.log",
         [this, downloadsSession, &packageProgress, &packageName](boost::process::child &&child, ProcessResult &&result) {
             auto lock = lockToWrite();
