@@ -587,8 +587,8 @@ void DataTests::stresstestPackageUpdater()
 
     static constexpr auto iterations = 1000;
     static const auto packageToModify = "android-sdk"s;
-    static const auto newLibdepends = std::set<std::string>{"foo", "bar", "baz"};
-    static const auto newLibprovides = std::set<std::string>{"a", "b", "c"};
+    static const auto newLibdepends = std::set<std::string>{ "foo", "bar", "baz" };
+    static const auto newLibprovides = std::set<std::string>{ "a", "b", "c" };
     for (auto i = 0; i != iterations; ++i) {
         if (i % (iterations / 100) == 0) {
             std::cerr << "\rRunning stress test: " << (i * 100 / iterations) << " %";

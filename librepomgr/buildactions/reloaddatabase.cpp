@@ -77,8 +77,8 @@ void ReloadDatabase::run()
                 Phrases::ErrorMessage, "Unable to reload database database ", db->name, '@', db->arch, ": no path configured\n");
             continue;
         }
-        boost::asio::post(
-            m_setup.building.ioContext.get_executor(), [this, force, session, dbName = db->name, dbArch = db->arch, dbPath = std::move(dbPath)]() mutable {
+        boost::asio::post(m_setup.building.ioContext.get_executor(),
+            [this, force, session, dbName = db->name, dbArch = db->arch, dbPath = std::move(dbPath)]() mutable {
                 try {
                     auto configLock = m_setup.config.lockToRead();
                     auto dbFileLock = m_setup.locks.acquireToRead(m_buildAction->log(), ServiceSetup::Locks::forDatabase(dbName, dbArch));

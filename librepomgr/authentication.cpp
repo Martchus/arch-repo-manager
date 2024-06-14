@@ -6,8 +6,8 @@
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
 
-#include <openssl/sha.h>
 #include <openssl/crypto.h>
+#include <openssl/sha.h>
 
 namespace LibRepoMgr {
 
