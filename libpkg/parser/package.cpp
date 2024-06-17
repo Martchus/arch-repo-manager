@@ -1045,7 +1045,7 @@ PackageNameData PackageNameData::decompose(std::string_view packageName)
     static const auto packageNameRegex
         = std::regex("((lib32|mingw-w64(-(ucrt|clang-x86_64|clang-aarch64))?|android-aarch64|android-x86-64|android-x86|android-armv7a-eabi|arm-none-"
                      "eabi|aarch64-linux-"
-                     "gnu|static-compat|riscv64-linux|avr|psp)-)?(.*?)((-(cvs|svn|hg|darcs|bzr|git|custom|compat|static|qt\\d+|doc|cli|gui))*)");
+                     "gnu|static-compat|riscv64-linux|avr|psp|wasm)-)?(.*?)((-(cvs|svn|hg|darcs|bzr|git|custom|compat|static|qt\\d+|doc|cli|gui))*)");
     auto data = PackageNameData{};
     auto match = std::cmatch{};
     if (!regex_match(packageName.cbegin(), packageName.cend(), match, packageNameRegex)) {
