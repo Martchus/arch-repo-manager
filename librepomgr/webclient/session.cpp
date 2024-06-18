@@ -55,6 +55,27 @@ bool LibRepoMgr::WebClient::Session::openDestinationFile()
     return true;
 }
 
+bool Session::closeDestinationFile(bool skipHandler)
+{
+    if (!std::holds_alternative<FileResponse>(response)) {
+        return true;
+    }
+    auto &file = std::get<FileResponse>(response).get().body().file();
+    if (!file.is_open()) {
+        return true;
+    }
+    auto ec = boost::system::error_code();
+    file.close(ec);
+    if (ec == boost::beast::errc::success) {
+        return true;
+    }
+    if (!skipHandler) {
+        m_handler(*this, HttpClientError("closing output file", ec));
+        m_handler = decltype(m_handler)();
+    }
+    return false;
+}
+
 void Session::run(
     const char *host, const char *port, http::verb verb, const char *target, std::optional<std::uint64_t> bodyLimit, unsigned int version)
 {
@@ -63,9 +84,8 @@ void Session::run(
     if (sslStream
         && !SSL_ctrl(sslStream->native_handle(), SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name,
             reinterpret_cast<void *>(const_cast<char *>(host)))) {
-        m_handler(*this,
-            HttpClientError(
-                "setting SNI hostname", boost::beast::error_code{ static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() }));
+        invokeHandler(HttpClientError(
+            "setting SNI hostname", boost::beast::error_code{ static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() }));
         return;
     }
 
@@ -106,7 +126,7 @@ inline Session::RawSocket &Session::socket()
 void Session::resolved(boost::beast::error_code ec, ip::tcp::resolver::results_type results)
 {
     if (ec) {
-        m_handler(*this, HttpClientError("resolving", ec));
+        invokeHandler(HttpClientError("resolving", ec));
         return;
     }
 
@@ -117,7 +137,7 @@ void Session::resolved(boost::beast::error_code ec, ip::tcp::resolver::results_t
 void Session::connected(boost::beast::error_code ec)
 {
     if (ec) {
-        m_handler(*this, HttpClientError("connecting", ec));
+        invokeHandler(HttpClientError("connecting", ec));
         return;
     }
 
@@ -132,7 +152,7 @@ void Session::connected(boost::beast::error_code ec)
 void Session::handshakeDone(boost::beast::error_code ec)
 {
     if (ec) {
-        m_handler(*this, HttpClientError("SSL handshake", ec));
+        invokeHandler(HttpClientError("SSL handshake", ec));
         return;
     }
     sendRequest();
@@ -164,7 +184,7 @@ void Session::headRequested(boost::beast::error_code ec, std::size_t bytesTransf
 {
     boost::ignore_unused(bytesTransferred);
     if (ec) {
-        m_handler(*this, HttpClientError("sending HEAD request", ec));
+        invokeHandler(HttpClientError("sending HEAD request", ec));
         return;
     }
 
@@ -182,7 +202,7 @@ void Session::requested(boost::beast::error_code ec, std::size_t bytesTransferre
 {
     boost::ignore_unused(bytesTransferred);
     if (ec) {
-        m_handler(*this, HttpClientError("sending request", ec));
+        invokeHandler(HttpClientError("sending request", ec));
         return;
     }
 
@@ -238,7 +258,7 @@ void Session::chunkReceived(boost::beast::error_code ec, std::size_t bytesTransf
     if (ec == boost::beast::http::error::end_of_chunk) {
         m_chunkProcessing->handler(m_chunkProcessing->chunkExtensions, m_chunkProcessing->currentChunk);
     } else if (ec) {
-        m_handler(*this, HttpClientError("receiving chunk response", ec));
+        invokeHandler(HttpClientError("receiving chunk response", ec));
         return;
     }
     if (!continueReadingChunks()) {
@@ -265,7 +285,7 @@ void Session::headReceived(boost::beast::error_code ec, std::size_t bytesTransfe
 {
     boost::ignore_unused(bytesTransferred);
     if (ec) {
-        m_handler(*this, HttpClientError("receiving HEAD response", ec));
+        invokeHandler(HttpClientError("receiving HEAD response", ec));
         return;
     }
     m_headHandler(*this);
@@ -281,7 +301,7 @@ void Session::received(boost::beast::error_code ec, std::size_t bytesTransferred
 {
     boost::ignore_unused(bytesTransferred);
     if (ec) {
-        m_handler(*this, HttpClientError("receiving response", ec));
+        invokeHandler(HttpClientError("receiving response", ec));
         return;
     }
     closeGracefully();
@@ -295,17 +315,22 @@ void Session::closeGracefully()
         sslStream->async_shutdown(std::bind(&Session::closed, shared_from_this(), std::placeholders::_1));
     } else if (auto *const socket = std::get_if<RawSocket>(&m_stream)) {
         socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-        if (m_handler) {
-            m_handler(*this, ec && ec != boost::beast::errc::not_connected ? HttpClientError("closing connection", ec) : HttpClientError());
-        }
+        invokeHandler(ec && ec != boost::beast::errc::not_connected ? HttpClientError("closing connection", ec) : HttpClientError());
     }
 }
 
 void Session::closed(boost::beast::error_code ec)
 {
     // rationale regarding boost::asio::error::eof: http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
+    invokeHandler(ec && ec != boost::asio::error::eof ? HttpClientError("closing connection", ec) : HttpClientError());
+}
+
+void Session::invokeHandler(const HttpClientError &error)
+{
+    closeDestinationFile(error);
     if (m_handler) {
-        m_handler(*this, ec && ec != boost::asio::error::eof ? HttpClientError("closing connection", ec) : HttpClientError());
+        m_handler(*this, error);
+        m_handler = decltype(m_handler)();
     }
 }
 

@@ -84,6 +84,7 @@ private:
     RawSocket &socket();
 
     bool openDestinationFile();
+    bool closeDestinationFile(bool skipHandler);
     void resolved(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results);
     void connected(boost::beast::error_code ec);
     void handshakeDone(boost::beast::error_code ec);
@@ -98,6 +99,7 @@ private:
     void received(boost::beast::error_code ec, std::size_t bytesTransferred);
     void closeGracefully();
     void closed(boost::beast::error_code ec);
+    void invokeHandler(const HttpClientError &error = HttpClientError());
 
 public:
     Request request;
