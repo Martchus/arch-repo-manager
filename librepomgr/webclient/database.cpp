@@ -185,8 +185,8 @@ void queryDatabases(LogContext &log, ServiceSetup &setup, std::vector<DatabaseQu
 std::shared_ptr<DatabaseQuerySession> queryDatabases(
     LogContext &log, ServiceSetup &setup, std::vector<DatabaseQueryParams> &&urls, bool force, DatabaseQuerySession::HandlerType &&handler)
 {
-    auto dbQuerySession = DatabaseQuerySession::create(setup.building.ioContext, move(handler));
-    queryDatabases(log, setup, move(urls), dbQuerySession, force);
+    auto dbQuerySession = DatabaseQuerySession::create(setup.building.ioContext, std::move(handler));
+    queryDatabases(log, setup, std::move(urls), dbQuerySession, force);
     return dbQuerySession;
 }
 
@@ -195,7 +195,7 @@ std::shared_ptr<DatabaseQuerySession> queryDatabases(LogContext &log, ServiceSet
 {
     auto query = prepareDatabaseQuery(log, dbs, setup.building.loadFilesDbs);
     configReadLock->unlock();
-    return queryDatabases(log, setup, std::move(query.queryParamsForDbs), force, move(handler));
+    return queryDatabases(log, setup, std::move(query.queryParamsForDbs), force, std::move(handler));
 }
 
 PackageCachingSession::PackageCachingSession(PackageCachingDataForSession &data, boost::asio::io_context &ioContext,
