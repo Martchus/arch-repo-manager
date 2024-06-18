@@ -44,15 +44,15 @@ void Session::setChunkHandler(ChunkHandler &&handler)
 bool LibRepoMgr::WebClient::Session::openDestinationFile()
 {
     auto &fileResponse = response.emplace<FileResponse>();
-    boost::beast::error_code errorCode;
+    auto ec = boost::beast::error_code();
     fileResponse.body_limit(m_bodyLimit);
-    fileResponse.get().body().open(destinationFilePath.data(), file_mode::write, errorCode);
-    if (errorCode != boost::beast::errc::success) {
-        m_handler(*this, HttpClientError("opening output file", errorCode));
-        m_handler = decltype(m_handler)();
-        return false;
+    fileResponse.get().body().open(destinationFilePath.data(), file_mode::write, ec);
+    if (ec == boost::beast::errc::success) {
+        return true;
     }
-    return true;
+    m_handler(*this, HttpClientError("opening output file", ec));
+    m_handler = decltype(m_handler)();
+    return false;
 }
 
 bool Session::closeDestinationFile(bool skipHandler)
@@ -151,11 +151,7 @@ void Session::connected(boost::beast::error_code ec)
 
 void Session::handshakeDone(boost::beast::error_code ec)
 {
-    if (ec) {
-        invokeHandler(HttpClientError("SSL handshake", ec));
-        return;
-    }
-    sendRequest();
+    ec ? invokeHandler(HttpClientError("SSL handshake", ec)) : sendRequest();
 }
 
 void Session::sendRequest()
@@ -300,11 +296,7 @@ void Session::headReceived(boost::beast::error_code ec, std::size_t bytesTransfe
 void Session::received(boost::beast::error_code ec, std::size_t bytesTransferred)
 {
     boost::ignore_unused(bytesTransferred);
-    if (ec) {
-        invokeHandler(HttpClientError("receiving response", ec));
-        return;
-    }
-    closeGracefully();
+    ec ? invokeHandler(HttpClientError("receiving response", ec)) : closeGracefully();
 }
 
 void Session::closeGracefully()
