@@ -24,6 +24,7 @@ using CppUtilities::operator<<; // must be visible prior to the call site
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <ostream>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -45,6 +46,7 @@ class ParserTests : public TestFixture {
     CPPUNIT_TEST(testParsingSplitPackageSrcInfoWithDifferentArchs);
     CPPUNIT_TEST(testParsingPkgInfo);
     CPPUNIT_TEST(testParsingPkgName);
+    CPPUNIT_TEST(testParsingDatabase);
     CPPUNIT_TEST(testExtractingPkgFile);
     CPPUNIT_TEST(testParsingDescriptions);
     CPPUNIT_TEST(testParsingDatabaseAndOverallStorageBehavior);
@@ -65,6 +67,7 @@ public:
     void testParsingSplitPackageSrcInfoWithDifferentArchs();
     void testParsingPkgInfo();
     void testParsingPkgName();
+    void testParsingDatabase();
     void testExtractingPkgFile();
     void testParsingDescriptions();
     void testParsingDatabaseAndOverallStorageBehavior();
@@ -285,6 +288,25 @@ void ParserTests::testParsingPkgName()
     CPPUNIT_ASSERT_EQUAL("texlive-localmanager-git"s, pkg->name);
     CPPUNIT_ASSERT_EQUAL("0.4.6.r0.gd71966e-1"s, pkg->version);
     CPPUNIT_ASSERT_EQUAL("any"s, pkg->arch);
+}
+
+void ParserTests::testParsingDatabase()
+{
+    const auto dbPath = testFilePath("extra.files.truncated.tar.gz");
+    const auto expectedPackages = std::unordered_set<std::string>{ "389-ds-base", "0ad-data", "0ad" };
+    auto parsedPackages = std::unordered_set<std::string>();
+    auto error = std::string();
+    try {
+        LibPkg::Package::fromDatabaseFile(dbPath, [&](const std::shared_ptr<LibPkg::Package> &package) {
+            parsedPackages.insert(package->name);
+            return false;
+        });
+    } catch (const std::runtime_error &e) {
+        error = e.what();
+    }
+    TESTUTILS_ASSERT_LIKE_FLAGS("truncation not silently ignored", ".*(unable|error).*extra.files.truncated.tar.gz.*truncated.*",
+        std::regex::ECMAScript | std::regex::icase, error);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("was able to parse the first few packages despite truncation", expectedPackages, parsedPackages);
 }
 
 void ParserTests::testExtractingPkgFile()

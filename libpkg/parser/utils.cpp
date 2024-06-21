@@ -132,12 +132,19 @@ void walkThroughArchiveInternal(struct archive *ar, const string &archiveName, c
         }
     }
 
-    // free resources used by libarchive
 free:
+    // check for errors
+    const auto *const archiveError = archive_error_string(ar);
+    const auto errorMessage = archiveError ? std::string(archiveError) : std::string();
+
+    // free resources used by libarchive
     archive_entry_free(entry);
-    int returnCode = archive_read_free(ar);
-    if (returnCode != ARCHIVE_OK) {
-        throw runtime_error("Unable to free archive: " + archiveName);
+    if (const auto returnCode = archive_read_free(ar); returnCode != ARCHIVE_OK) {
+        throw std::runtime_error(errorMessage.empty() ? argsToString("Unable to free archive \"", archiveName, '\"')
+                                                      : argsToString("Unable to free archive \"", archiveName, "\" after error: ", errorMessage));
+    }
+    if (archiveError) {
+        throw std::runtime_error(argsToString("An error occurred when reading archive \"", archiveName, "\": ", errorMessage));
     }
 }
 
