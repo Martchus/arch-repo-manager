@@ -771,8 +771,7 @@ bool LibPkg::Package::isLicense(const char *filePath, const char *fileName, mode
 
 void Package::addInfoFromPkgInfoFile(const string &info)
 {
-    parsePkgInfo(
-        info, [this](Package &) { return this; }, true);
+    parsePkgInfo(info, [this](Package &) { return this; }, true);
 }
 
 static const regex pythonVersionRegex("usr/lib/python(2|3)\\.([0-9]*)(\\..*)?/site-packages");

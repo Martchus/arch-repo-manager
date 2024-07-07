@@ -419,7 +419,7 @@ void ServiceSetup::BuildSetup::forEachBuildAction(
     const auto reverse = start == std::numeric_limits<std::size_t>::max();
     for (auto i = reverse ? txn.rbegin<decltype(txn)::DirectStorage, BuildActionBase>()
                           : txn.lower_bound<decltype(txn)::DirectStorage, BuildActionBase>(static_cast<LibPkg::StorageID>(
-                              start > std::numeric_limits<LibPkg::StorageID>::max() ? std::numeric_limits<LibPkg::StorageID>::max() : start));
+                                start > std::numeric_limits<LibPkg::StorageID>::max() ? std::numeric_limits<LibPkg::StorageID>::max() : start));
          i != txn.end() && limit; reverse ? --i : ++i, --limit) {
         if (func(i.getID(), std::move(i.value()))) {
             return;
