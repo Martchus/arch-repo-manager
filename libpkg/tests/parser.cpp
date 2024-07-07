@@ -135,6 +135,14 @@ void ParserTests::testParsingPackageName()
     CPPUNIT_ASSERT_EQUAL("cppwinrt"sv, mingwUcrtCppWinrt.actualName);
     CPPUNIT_ASSERT_EQUAL("mingw-w64-ucrt"sv, mingwUcrtCppWinrt.targetPrefix);
     CPPUNIT_ASSERT_EQUAL(""sv, mingwUcrtCppWinrt.vcsSuffix);
+    const auto mingwClangEnv = PackageNameData::decompose("mingw-w64-clang-environment");
+    CPPUNIT_ASSERT_EQUAL("environment"sv, mingwClangEnv.actualName);
+    CPPUNIT_ASSERT_EQUAL("mingw-w64-clang"sv, mingwClangEnv.targetPrefix);
+    CPPUNIT_ASSERT_EQUAL(""sv, mingwClangEnv.vcsSuffix);
+    const auto mingwClangCrt = PackageNameData::decompose("mingw-w64-clang-aarch64-crt");
+    CPPUNIT_ASSERT_EQUAL("crt"sv, mingwClangCrt.actualName);
+    CPPUNIT_ASSERT_EQUAL("mingw-w64-clang-aarch64"sv, mingwClangCrt.targetPrefix);
+    CPPUNIT_ASSERT_EQUAL(""sv, mingwClangCrt.vcsSuffix);
     const auto staticCompatQt6 = PackageNameData::decompose("static-compat-qt6-base");
     CPPUNIT_ASSERT_EQUAL("qt6-base"sv, staticCompatQt6.actualName);
     CPPUNIT_ASSERT_EQUAL("static-compat"sv, staticCompatQt6.targetPrefix);
