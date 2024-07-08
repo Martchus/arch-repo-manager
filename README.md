@@ -118,13 +118,8 @@ local_mirror = file://$local_db_path
 ```
 
 The server obviously needs write permissions to add packages to repositories. In my
-setup I just added it as group and set permissions accordingly:
-
-```
-sudo chown -R martchus:buildservice-git $local_db_path
-find $local_db_path -type d -exec chmod 775 {} \+
-find $local_db_path -type f -exec chmod 664 {} \+
-```
+setup I added the group `buildservice-git` and set ownership/permissions accordingly
+(see `srv/scripts/set-permissions.sh`).
 
 ### Setting up the chroot for the build with `makechrootpkg`
 The overall reasoning and procedure is already outlined
