@@ -228,20 +228,17 @@ void StorageCache<StorageEntriesType, StorageType, SpecType>::clear(Storage &sto
 {
     clearCacheOnly(storage);
     auto packagesTxn = storage.packages.getRWTransaction();
+    auto txnHandle = packagesTxn.getTransactionHandle();
     packagesTxn.clear();
-    packagesTxn.commit();
-    auto providedDepsTxn = storage.providedDeps.getRWTransaction();
+    auto providedDepsTxn = storage.providedDeps.getRWTransaction(txnHandle);
     providedDepsTxn.clear();
-    providedDepsTxn.commit();
-    auto requiredDepsTxn = storage.requiredDeps.getRWTransaction();
+    auto requiredDepsTxn = storage.requiredDeps.getRWTransaction(txnHandle);
     requiredDepsTxn.clear();
-    requiredDepsTxn.commit();
-    auto providedLibsTxn = storage.providedLibs.getRWTransaction();
+    auto providedLibsTxn = storage.providedLibs.getRWTransaction(txnHandle);
     providedLibsTxn.clear();
-    providedLibsTxn.commit();
-    auto requiredLibsTxn = storage.requiredLibs.getRWTransaction();
+    auto requiredLibsTxn = storage.requiredLibs.getRWTransaction(txnHandle);
     requiredLibsTxn.clear();
-    requiredLibsTxn.commit();
+    packagesTxn.commit();
 }
 
 template <typename StorageEntriesType, typename StorageType, typename SpecType>
