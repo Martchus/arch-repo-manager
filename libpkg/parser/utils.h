@@ -5,49 +5,9 @@
 
 #include <c++utilities/chrono/datetime.h>
 
-#include <functional>
-#include <map>
 #include <string>
-#include <vector>
 
 namespace LibPkg {
-
-/*
- * Helper to extract archives with libarchive
- */
-
-enum class ArchiveFileType { Regular, Link };
-
-struct LIBPKG_EXPORT ArchiveFile {
-    ArchiveFile(
-        std::string &&name, std::string &&content, ArchiveFileType type, CppUtilities::DateTime creationTime, CppUtilities::DateTime modificationTime)
-        : name(name)
-        , content(content)
-        , creationTime(creationTime)
-        , modificationTime(modificationTime)
-        , type(type)
-    {
-    }
-    std::string name;
-    std::string content;
-    CppUtilities::DateTime creationTime;
-    CppUtilities::DateTime modificationTime;
-    ArchiveFileType type;
-};
-
-using FileMap = std::map<std::string, std::vector<ArchiveFile>>;
-using FilePredicate = std::function<bool(const char *, const char *, mode_t)>;
-using DirectoryHandler = std::function<bool(std::string_view path)>;
-using FileHandler = std::function<bool(std::string_view path, ArchiveFile &&file)>;
-
-LIBPKG_EXPORT FileMap extractFiles(const std::string &archivePath, const FilePredicate &isFileRelevant = FilePredicate());
-LIBPKG_EXPORT void walkThroughArchive(const std::string &archivePath, const FilePredicate &isFileRelevant = FilePredicate(),
-    FileHandler &&fileHandler = FileHandler(), DirectoryHandler &&directoryHandler = DirectoryHandler());
-LIBPKG_EXPORT FileMap extractFilesFromBuffer(
-    const std::string &archiveData, const std::string &archiveName, const FilePredicate &isFileRelevant = FilePredicate());
-LIBPKG_EXPORT void walkThroughArchiveFromBuffer(const std::string &archiveData, const std::string &archiveName,
-    const FilePredicate &isFileRelevant = FilePredicate(), FileHandler &&fileHandler = FileHandler(),
-    DirectoryHandler &&directoryHandler = DirectoryHandler());
 
 /*
  * PKGBUILD amendment

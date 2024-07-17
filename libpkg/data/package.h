@@ -13,6 +13,7 @@
 #include <reflective_rapidjson/json/serializable.h>
 
 #include <c++utilities/chrono/datetime.h>
+#include <c++utilities/io/archive.h>
 
 #include <cstring>
 #include <limits>
@@ -412,8 +413,8 @@ struct LIBPKG_EXPORT Package : public PackageBase,
     void addInfoFromPkgInfoFile(const std::string &info);
     void addDepsAndProvidesFromContainedDirectory(std::string_view directoryPath);
     void addDepsAndProvidesFromContainedFile(
-        std::string_view directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
-    void addDepsAndProvidesFromContents(const FileMap &contents);
+        std::string_view directoryPath, const CppUtilities::ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs);
+    void addDepsAndProvidesFromContents(const CppUtilities::FileMap &contents);
     std::vector<std::string> processDllsReferencedByImportLibs(std::set<std::string> &&dllsReferencedByImportLibs);
     bool canDepsAndProvidesFromOtherPackage(const Package &otherPackage) const;
     bool addDepsAndProvidesFromOtherPackage(const Package &otherPackage, bool force = false);

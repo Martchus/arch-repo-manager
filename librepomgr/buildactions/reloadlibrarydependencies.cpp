@@ -321,9 +321,9 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
             // extract the binary package's files
             try {
                 auto dllsReferencedByImportLibs = std::set<std::string>();
-                LibPkg::walkThroughArchive(
+                CppUtilities::walkThroughArchive(
                     currentPkg.path, &LibPkg::Package::isPkgInfoFileOrBinary,
-                    [&currentPkg, &dllsReferencedByImportLibs](std::string_view directoryPath, LibPkg::ArchiveFile &&file) {
+                    [&currentPkg, &dllsReferencedByImportLibs](std::string_view directoryPath, CppUtilities::ArchiveFile &&file) {
                         if (directoryPath.empty() && file.name == ".PKGINFO") {
                             currentPkg.info.addInfoFromPkgInfoFile(file.content);
                             return false;

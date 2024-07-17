@@ -865,9 +865,9 @@ std::shared_ptr<Package> Package::fromPkgFile(const string &path)
     std::set<std::string> dllsReferencedByImportLibs;
     Package tmpPackageForLibraryDeps;
     shared_ptr<Package> package;
-    LibPkg::walkThroughArchive(
+    CppUtilities::walkThroughArchive(
         path, &LibPkg::Package::isPkgInfoFileOrBinary,
-        [&package, &tmpPackageForLibraryDeps, &dllsReferencedByImportLibs](std::string_view directoryPath, LibPkg::ArchiveFile &&file) {
+        [&package, &tmpPackageForLibraryDeps, &dllsReferencedByImportLibs](std::string_view directoryPath, CppUtilities::ArchiveFile &&file) {
             if (directoryPath.empty() && file.name == ".PKGINFO") {
                 if (package) {
                     return false; // only consider one .PKGINFO file (multiple ones are likely not possible in any supported archive formats anyways)
