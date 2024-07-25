@@ -785,7 +785,7 @@ function renderBuildActionArtefacts(array, obj)
     });
 }
 
-function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionInfo, sourceDbs, newVersion)
+function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionInfo, sourceDbs, newVersion, oldVersion)
 {
     const inputElement = document.createElement('input');
     inputElement.type = 'checkbox';
@@ -814,6 +814,11 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
             labelElement.appendChild(document.createTextNode(' from ' + from));
         }
         labelElement.appendChild(document.createTextNode(': ' + versionInfo));
+        const tooltipLines = [
+            (newVersion.db === 'aur' ? 'AUR upload date: ' + GenericRendering.formatTimeAgoStringWithDate(newVersion.timestamp): 'Build date of new version: ' + GenericRendering.formatTimeAgoStringWithDate(newVersion.buildDate)),
+            ('Build date of old version: ') + GenericRendering.formatTimeAgoStringWithDate(oldVersion.buildDate),
+        ];
+        labelElement.title = tooltipLines.join('\n');
     } else if (newPackageName && packageName !== newPackageName) {
         labelElement.appendChild(document.createTextNode(packageName + ' (' + newPackageName + '): ' + versionInfo));
     } else {
@@ -891,6 +896,8 @@ function renderOrphanPackage(value, obj, level, row)
             undefined,
             packageObj.version,
             row.sourceDbs,
+            undefined,
+            packageObj
         );
     }, function(package1, package2) {
         return package1.name.localeCompare(package2.name);
@@ -909,7 +916,8 @@ function renderUpdateOrDowngrade(value, obj, level, row)
             newVersion.name,
             oldVersion.version + ' → ' + newVersion.version,
             row.sourceDbs,
-            newVersion
+            newVersion,
+            oldVersion
         );
     }, function(updateInfo1, updateInfo2) {
         return updateInfo1.oldVersion.name.localeCompare(updateInfo2.oldVersion.name);

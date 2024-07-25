@@ -954,6 +954,7 @@ std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size
         auto *package = &*(spec.pkg = std::make_shared<Package>());
         auto &sourceInfo = package->sourceInfo = std::make_optional<SourceInfo>();
         package->origin = origin;
+        package->timestamp = DateTime::fromTimeStampGmt(result.LastModified);
         package->name = std::move(result.Name);
         package->version = std::move(result.Version);
         package->description = std::move(result.Description);
@@ -992,7 +993,7 @@ std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size
             sourceInfo->outOfDate = DateTime::fromTimeStampGmt(*result.OutOfDate);
         }
         sourceInfo->firstSubmitted = DateTime::fromTimeStampGmt(result.FirstSubmitted);
-        sourceInfo->lastModified = DateTime::fromTimeStampGmt(result.LastModified);
+        sourceInfo->lastModified = package->timestamp;
         sourceInfo->url = std::move(result.URLPath);
     }
     return packages;

@@ -104,6 +104,16 @@ export function formatTimeAgoString(date)
     return Math.floor(seconds) + ' s ago';
 }
 
+/// \brief Returns a 'time ago' string and the original date in brackets.
+export function formatTimeAgoStringWithDate(timeStamp)
+{
+    const date = dateFromTimeStamp(timeStamp);
+    if (date.getFullYear() === 1) {
+        return 'unknown';
+    }
+    return formatTimeAgoString(date) + ' (' + timeStamp + ')';
+}
+
 /// \brief Returns a Date object from the specified time stamp.
 export function dateFromTimeStamp(timeStamp)
 {
