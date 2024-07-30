@@ -262,7 +262,7 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                 BuildActionSettingMetaInfo{
                     .name = "Chroot default user",
                     .desc = "The default chroot user to use (instead of the globally configured one)",
-                    .param = "chroot-dir",
+                    .param = "chroot-user",
                 },
                 BuildActionSettingMetaInfo{
                     .name = "CCache directory",
