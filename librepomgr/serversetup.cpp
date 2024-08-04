@@ -91,9 +91,26 @@ ThreadPool::ThreadPool(const char *name, boost::asio::io_context &ioContext, uns
 #endif
             threads
                 .emplace_back([&ioContext, name] {
-                    ioContext.run();
-                    std::cout << argsToString(
-                        formattedPhraseString(Phrases::SubMessage), name, " thread terminates", formattedPhraseString(Phrases::End));
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+                    for (;;) {
+                        try {
+#endif
+                            ioContext.run();
+                            std::cout << argsToString(
+                                formattedPhraseString(Phrases::SubMessage), name, " thread terminates", formattedPhraseString(Phrases::End));
+#ifndef CPP_UTILITIES_DEBUG_BUILD
+                            return;
+                        } catch (const boost::exception &e) {
+                            std::cerr << Phrases::ErrorMessage << "Exception occurred in \"" << name << "\" thread: " << Phrases::End << "    "
+                                      << boost::diagnostic_information(e) << Phrases::EndFlush;
+                        } catch (const std::exception &e) {
+                            std::cerr << Phrases::ErrorMessage << "Exception occurred in \"" << name << "\" thread: " << Phrases::End << "    "
+                                      << e.what() << Phrases::EndFlush;
+                        } catch (...) {
+                            std::cerr << Phrases::ErrorMessage << "Unknown error occurred in \"" << name << "\" thread." << Phrases::EndFlush;
+                        }
+                    }
+#endif
                 })
 #ifdef PLATFORM_LINUX
                 .native_handle(),
@@ -826,11 +843,11 @@ int ServiceSetup::run()
         cout << Phrases::SuccessMessage << "Web server stopped." << Phrases::EndFlush;
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const boost::exception &e) {
-        cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << boost::diagnostic_information(e)
+        cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "    " << boost::diagnostic_information(e)
              << Phrases::EndFlush;
         return EXIT_FAILURE + 2;
     } catch (const std::exception &e) {
-        cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "Server terminated due to exception: " << Phrases::End << "    " << e.what() << Phrases::EndFlush;
         return EXIT_FAILURE + 2;
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Server terminated due to an unknown error." << Phrases::EndFlush;
@@ -854,7 +871,7 @@ int ServiceSetup::run()
         });
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
-        cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "Exception occurred when terminating server: " << Phrases::End << "    " << e.what() << Phrases::EndFlush;
         return EXIT_FAILURE + 3;
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Unknown error occurred when terminating server." << Phrases::EndFlush;
@@ -876,7 +893,7 @@ int ServiceSetup::fixDb()
         config.rebuildDb();
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
-        cerr << Phrases::ErrorMessage << "Exception occurred: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "Exception occurred: " << Phrases::End << "    " << e.what() << Phrases::EndFlush;
         return EXIT_FAILURE + 4;
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Unknown error occurred." << Phrases::EndFlush;
@@ -895,7 +912,7 @@ int ServiceSetup::dumpDb(std::string_view filterRegex)
         config.dumpDb(filterRegex.empty() ? std::nullopt : std::optional(std::regex(filterRegex.begin(), filterRegex.end())));
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
-        cerr << Phrases::ErrorMessage << "Exception occurred: " << Phrases::End << "  " << e.what() << Phrases::EndFlush;
+        cerr << Phrases::ErrorMessage << "Exception occurred: " << Phrases::End << "    " << e.what() << Phrases::EndFlush;
         return EXIT_FAILURE + 5;
     } catch (...) {
         cerr << Phrases::ErrorMessage << "Unknown error occurred." << Phrases::EndFlush;
