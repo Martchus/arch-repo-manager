@@ -342,7 +342,11 @@ void BuildAction::assignStartAfter(const std::vector<std::shared_ptr<BuildAction
     }
 }
 
-void BuildAction::abort()
+/*!
+ * \brief Aborts the build action.
+ * \remarks May acquire a write-lock on building. Set \a hasBuildLock to true if the caller has already acquired that lock.
+ */
+void BuildAction::abort(bool hasBuildLock)
 {
     m_aborted.store(true);
     if (!m_setup) {
@@ -352,7 +356,7 @@ void BuildAction::abort()
         boost::asio::post(m_setup->building.ioContext.get_executor(), m_stopHandler);
     }
     if (m_waitingOnAsyncLock) {
-        const auto buildActionLock = m_setup->building.lockToWrite();
+        const auto buildActionLock = hasBuildLock ? std::unique_lock<std::shared_mutex>() : m_setup->building.lockToWrite();
         if (isExecuting()) {
             conclude(BuildActionResult::Aborted);
         }

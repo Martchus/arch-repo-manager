@@ -214,7 +214,7 @@ public:
     const std::atomic_bool &aborted() const;
     LibPkg::StorageID start(ServiceSetup &setup, std::unique_ptr<Io::PasswordFile> &&secrets);
     void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
-    void abort();
+    void abort(bool hasBuildLock = false);
     void acquireToWrite(std::string &&lockName, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback);
     void appendOutput(std::string_view output);
     void appendOutput(std::string &&output);

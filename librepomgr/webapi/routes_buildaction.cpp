@@ -595,7 +595,7 @@ void postStopBuildActions(const Params &params, ResponseHandler &&handler)
         return;
     }
     for (auto &action : buildActionsSearchResult.actions) {
-        action->abort();
+        action->abort(true);
         if (action->status == BuildActionStatus::Running) {
             // can not immediately stop a running action; the action needs to terminate itself acknowledging the aborted flag
             continue;
