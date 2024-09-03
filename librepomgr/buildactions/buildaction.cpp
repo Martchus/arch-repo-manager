@@ -18,6 +18,8 @@
 #include <c++utilities/tests/testutils.h>
 #endif
 
+#include <filesystem>
+
 using namespace std;
 using namespace CppUtilities;
 using namespace CppUtilities::EscapeCodes;
@@ -490,14 +492,15 @@ void BuildServiceCleanup::run()
     // find concrete cache dirs (packageCachePath does not contain arch subdir) and start invoking paccache
     m_concreteCacheDirs.reserve(8);
     try {
-        for (auto i = boost::filesystem::directory_iterator(packageCachePath, boost::filesystem::directory_options::follow_directory_symlink);
-             auto entry : i) {
-            if (entry.path().filename_is_dot() || entry.path().filename_is_dot_dot()) {
+        for (auto i = std::filesystem::directory_iterator(packageCachePath, std::filesystem::directory_options::follow_directory_symlink);
+             auto &entry : i) {
+            const auto filename = entry.path().filename();
+            if (filename == "." || filename == "..") {
                 continue;
             }
-            auto canonical = boost::filesystem::canonical(entry.path());
-            if (boost::filesystem::is_directory(canonical)) {
-                m_concreteCacheDirs.emplace_back(entry.path().filename().string(), std::move(canonical));
+            const auto canonical = std::filesystem::canonical(entry.path());
+            if (std::filesystem::is_directory(canonical)) {
+                m_concreteCacheDirs.emplace_back(filename.string(), std::move(canonical));
             }
         }
     } catch (const std::exception &e) {
