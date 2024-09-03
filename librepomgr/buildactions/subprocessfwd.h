@@ -5,8 +5,10 @@
 
 namespace boost {
 namespace process {
+inline namespace v1 {
 class child;
 }
+} // namespace process
 } // namespace boost
 
 namespace LibRepoMgr {

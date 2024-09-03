@@ -32,8 +32,10 @@
 #endif
 
 namespace boost::process {
+inline namespace v1 {
 class child;
 }
+} // namespace boost::process
 
 namespace CppUtilities {
 class BufferSearch;
