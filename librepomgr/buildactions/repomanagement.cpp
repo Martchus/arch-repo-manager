@@ -12,9 +12,9 @@
 #include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/io/path.h>
 
-#include <boost/process/env.hpp>
-#include <boost/process/search_path.hpp>
-#include <boost/process/start_dir.hpp>
+#include <boost/process/v1/env.hpp>
+#include <boost/process/v1/search_path.hpp>
+#include <boost/process/v1/start_dir.hpp>
 
 #include <filesystem>
 #include <iostream>

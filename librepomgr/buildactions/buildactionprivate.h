@@ -25,7 +25,7 @@
 #endif
 #include <boost/beast/core/file.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/process/extend.hpp>
+#include <boost/process/v1/extend.hpp>
 
 #ifdef CPP_UTILITIES_DEBUG_BUILD
 #include <boost/asio/deadline_timer.hpp>

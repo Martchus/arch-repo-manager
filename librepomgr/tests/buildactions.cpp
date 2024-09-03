@@ -23,7 +23,7 @@ using CppUtilities::operator<<; // must be visible prior to the call site
 #include <c++utilities/tests/outputcheck.h>
 
 #include <boost/asio/executor_work_guard.hpp>
-#include <boost/process/search_path.hpp>
+#include <boost/process/v1/search_path.hpp>
 
 #include <chrono>
 

@@ -20,8 +20,8 @@
 
 #include <boost/asio/read.hpp>
 
-#include <boost/process/env.hpp>
-#include <boost/process/start_dir.hpp>
+#include <boost/process/v1/env.hpp>
+#include <boost/process/v1/start_dir.hpp>
 
 #include <rapidjson/error/en.h>
 #include <rapidjson/filewritestream.h>
