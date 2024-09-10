@@ -791,7 +791,7 @@ void ConductBuild::enqueueMakechrootpkg(
     if (reportAbortedIfAborted()) {
         return;
     }
-    assert(maxParallelInvocations == 1); // FIXME: parallel builds not implemented yet (required unique working copies and locking repo-add)
+    assert(maxParallelInvocations == 1); // FIXME: parallel builds not implemented yet (required unique working copies)
 
     // invoke makechrootpkg for the next package, handle result and continue or return early if there's no next package
     const auto hasFailuresInPreviousBatches = makepkgchrootSession->hasFailuresInPreviousBatches();
