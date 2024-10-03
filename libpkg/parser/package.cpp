@@ -830,7 +830,7 @@ std::vector<std::string> Package::processDllsReferencedByImportLibs(std::set<str
     auto issues = std::vector<std::string>();
     if (dllsReferencedByImportLibs.empty()) {
         return issues;
-    } else if (name == "mingw-w64-crt") {
+    } else if (name == "mingw-w64-crt" || (name.starts_with("mingw-w64-clang-") && name.ends_with("-crt"))) {
         // assume the CRT references DLLs provided by Windows itself
         libprovides = std::move(dllsReferencedByImportLibs);
         return issues;

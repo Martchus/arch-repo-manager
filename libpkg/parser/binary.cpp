@@ -563,6 +563,9 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
     case 0x1c4:
         architecture = "arm";
         break;
+    case 0xaa64:
+        architecture = "aarch64";
+        break;
     case 0x32:
         architecture = "ia64";
         break;
@@ -623,7 +626,8 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
     std::int64_t importLibraryDllNameOffset = -1, importLibraryDllNameSize = -1;
     for (auto sectionsLeft = numberOfSections; sectionsLeft; --sectionsLeft) {
         importDataSection.read(reader);
-        if (!strncmp(importDataSection.name, ".idata$7", 8)) {
+        // read the import library DLL name; ld from binutils writes it to ".idata$7" and lld to ".idata$6"
+        if (importLibraryDllNameOffset < 0 && (!strncmp(importDataSection.name, ".idata$7", 8) || !strncmp(importDataSection.name, ".idata$6", 8))) {
             importLibraryDllNameOffset = importDataSection.fileOffset;
             importLibraryDllNameSize = importDataSection.fileSize;
         }
@@ -666,6 +670,9 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
     }
 }
 
+/*!
+ * \sa https://en.wikipedia.org/wiki/Ar_(Unix)
+ */
 void Binary::parseAr(BinaryReader &reader)
 {
     for (auto remainingSize = reader.readStreamsize(); remainingSize >= 60;) {
@@ -697,7 +704,8 @@ void Binary::parseAr(BinaryReader &reader)
         static_assert(std::is_scalar_v<std::decay_t<decltype(fileSizeStr)>>);
         const auto fileSize = stringToNumber<iostream::off_type>(fileSizeStr);
         const auto nextFileOffset = fileOffset + fileSize;
-        if (endsWith(string_view(fileName), ".o")) {
+        const auto fileNameView = std::string_view(fileName);
+        if (fileNameView.ends_with(".o") || fileNameView.ends_with(".dll")) {
             const auto magic = reader.readUInt32BE();
             if (magic == 0x7f454c46u) {
                 return; // we're not interested in static libraries containing ELF files
@@ -705,6 +713,9 @@ void Binary::parseAr(BinaryReader &reader)
 
             reader.stream()->seekg(-4, ios_base::cur);
             parsePe(reader, fileOffset);
+            if (name.empty() && fileNameView.ends_with(".dll")) {
+                name = fileNameView;
+            }
             if (!name.empty()) {
                 subType = BinarySubType::WindowsImportLibrary;
                 return; // stop if the DLL name has been determined

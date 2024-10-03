@@ -27,7 +27,9 @@ class BinaryParserTests : public TestFixture {
     CPPUNIT_TEST_SUITE(BinaryParserTests);
     CPPUNIT_TEST(testParsingElf);
     CPPUNIT_TEST(testParsingPe);
+    CPPUNIT_TEST(testParsingPeAarch64);
     CPPUNIT_TEST(testParsingAr);
+    CPPUNIT_TEST(testParsingArAarch64);
     CPPUNIT_TEST(testParsingElfFromPkgFile);
     CPPUNIT_TEST(testParsingPeFromPkgFile);
     CPPUNIT_TEST(testParsingArFromPkgFile);
@@ -39,7 +41,9 @@ public:
 
     void testParsingElf();
     void testParsingPe();
+    void testParsingPeAarch64();
     void testParsingAr();
+    void testParsingArAarch64();
     void testParsingElfFromPkgFile();
     void testParsingPeFromPkgFile();
     void testParsingArFromPkgFile();
@@ -81,14 +85,40 @@ void BinaryParserTests::testParsingPe()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("rpath", string(), bin.rpath);
 }
 
+void BinaryParserTests::testParsingPeAarch64()
+{
+    Binary bin;
+    bin.load(testFilePath("aarch64-hello-world.exe"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Pe, bin.type);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "aarch64"s, bin.architecture);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "aarch64-hello-world.exe"s, bin.name);
+    const auto requiredLibs = std::set<std::string>({ "api-ms-win-crt-heap-l1-1-0.dll"s, "api-ms-win-crt-private-l1-1-0.dll"s,
+        "api-ms-win-crt-runtime-l1-1-0.dll"s, "api-ms-win-crt-stdio-l1-1-0.dll"s, "api-ms-win-crt-string-l1-1-0.dll"s,
+        "api-ms-win-crt-math-l1-1-0.dll"s, "api-ms-win-crt-environment-l1-1-0.dll"s, "api-ms-win-crt-time-l1-1-0.dll"s, "KERNEL32.dll"s });
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("requires", requiredLibs, bin.requiredLibs);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("rpath", std::string(), bin.rpath);
+}
+
 void BinaryParserTests::testParsingAr()
 {
     Binary bin;
     bin.load(testFilePath("mingw-w64-crt/libkernel32.a"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Ar, bin.type);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("subtype", BinarySubType::WindowsImportLibrary, bin.subType);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "x86_64"s, bin.architecture);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "KERNEL32.dll"s, bin.name);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("rpath", string(), bin.rpath);
+}
+
+void BinaryParserTests::testParsingArAarch64()
+{
+    Binary bin;
+    bin.load(testFilePath("aarch64-libmsyuv.a"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Ar, bin.type);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("subtype", BinarySubType::WindowsImportLibrary, bin.subType);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "aarch64"s, bin.architecture);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "MSYUV.dll"s, bin.name);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("rpath", std::string(), bin.rpath);
 }
 
 void BinaryParserTests::testParsingElfFromPkgFile()
