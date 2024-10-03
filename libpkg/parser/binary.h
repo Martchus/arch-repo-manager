@@ -104,7 +104,6 @@ private:
     void parseElf(CppUtilities::BinaryReader &reader, const std::string_view *fileContent = nullptr);
     void parsePe(CppUtilities::BinaryReader &reader, typename std::iostream::off_type baseFileOffset = 0);
     void parseAr(CppUtilities::BinaryReader &reader);
-    void parseCoff(CppUtilities::BinaryReader &reader);
 
     std::uint64_t readElfAddress(CppUtilities::BinaryReader &reader);
     std::uint32_t readElfInt32(CppUtilities::BinaryReader &reader);
