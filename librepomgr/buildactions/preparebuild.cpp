@@ -447,25 +447,26 @@ void PrepareBuild::fetchMissingBuildData()
         buildData.originalSourceDirectory.clear();
 
         // skip next block if package name matches configured pattern
-        LibPkg::PackageNameData packageNameData;
-        if (regex_match(packageName, m_ignoreLocalPkgbuildsRegex)) {
+        auto &lookupPackageName = buildData.convertFrom.empty() ? packageName : buildData.convertFrom;
+        auto packageNameData = LibPkg::PackageNameData();
+        if (regex_match(lookupPackageName, m_ignoreLocalPkgbuildsRegex)) {
             goto addAurQuery;
         }
 
         // copy PKGBUILD from local PKGBUILDs directory and generate .SRCINFO from it via makepkg
         if (!m_pkgbuildsDirs.empty()) {
-            packageNameData = LibPkg::PackageNameData::decompose(packageName);
+            packageNameData = LibPkg::PackageNameData::decompose(lookupPackageName);
         }
         for (const auto &pkgbuildsDir : m_pkgbuildsDirs) {
             const auto variant = packageNameData.variant();
             try {
-                if (const auto directPkgbuildPath = pkgbuildsDir % '/' % packageName;
-                    std::filesystem::exists(pkgbuildsDir % '/' % packageName + "/PKGBUILD")) {
+                if (const auto directPkgbuildPath = pkgbuildsDir % '/' % lookupPackageName;
+                    std::filesystem::exists(pkgbuildsDir % '/' % lookupPackageName + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(directPkgbuildPath);
                 } else if (const auto variantPkgbuildPath = pkgbuildsDir % '/' % packageNameData.actualName % '/' % variant;
                            filesystem::exists(variantPkgbuildPath + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(variantPkgbuildPath);
-                } else if (const auto svnPkgbuildPath = pkgbuildsDir % '/' % packageName % "/trunk";
+                } else if (const auto svnPkgbuildPath = pkgbuildsDir % '/' % lookupPackageName % "/trunk";
                            filesystem::exists(svnPkgbuildPath + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(svnPkgbuildPath);
                 } else {
@@ -475,16 +476,16 @@ void PrepareBuild::fetchMissingBuildData()
                 filesystem::copy(buildData.originalSourceDirectory, buildData.sourceDirectory, std::filesystem::copy_options::recursive);
 
             } catch (const filesystem::filesystem_error &e) {
-                multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+                multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = lookupPackageName,
                     .errorOutput = std::string(),
                     .packages = {},
                     .error
                     = "Unable to copy files from PKGBUILDs directory " % pkgbuildsDir % " to " % buildData.sourceDirectory % ": " + e.what() });
                 continue;
             }
-            makeSrcInfo(multiSession, buildData.sourceDirectory, packageName);
+            makeSrcInfo(multiSession, buildData.sourceDirectory, lookupPackageName);
             needToGeneratedSrcInfo = true;
-            addPackageToLogLine(logLines[0], packageName);
+            addPackageToLogLine(logLines[0], lookupPackageName);
             buildData.hasSource = true;
             break;
         }
@@ -493,11 +494,11 @@ void PrepareBuild::fetchMissingBuildData()
         // download latest snapshot containing PKGBUILD and .SRCINFO from AUR
         if (!buildData.hasSource) {
             snapshotQueries.emplace_back(WebClient::AurSnapshotQueryParams{
-                .packageName = &packageName,
+                .packageName = &lookupPackageName,
                 .targetDirectory = &buildData.sourceDirectory,
                 .tryOfficial = m_fetchOfficialSources,
             });
-            addPackageToLogLine(logLines[1], packageName);
+            addPackageToLogLine(logLines[1], lookupPackageName);
         }
     }
 
@@ -870,6 +871,22 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         if (response.isOfficial && buildData.error.empty()) {
             needToFetchAgain = true;
             continue;
+        }
+        if (response.is404 && buildData.convertFrom.empty()) {
+            const auto packageNameParts = LibPkg::PackageNameData::decompose(response.packageName);
+            if (packageNameParts.targetPrefix == "mingw-w64-clang-aarch64") {
+                buildData.convertFrom.reserve(11 + packageNameParts.actualName.size() + packageNameParts.vcsSuffix.size());
+                buildData.convertFrom += "mingw-w64-";
+                buildData.convertFrom += packageNameParts.actualName;
+                if (!packageNameParts.vcsSuffix.empty()) {
+                    buildData.convertFrom += '-';
+                    buildData.convertFrom += packageNameParts.vcsSuffix;
+                }
+                buildData.warnings.emplace_back(argsToString("Retrieving package \"", buildData.convertFrom, "\" instead of \"", response.packageName,
+                    "\" because lookup of that package ran into error: ", buildData.error));
+                buildData.error.clear();
+                needToFetchAgain = true;
+            }
         }
         if (buildData.error.empty()) {
             buildData.error = "no build data available";
