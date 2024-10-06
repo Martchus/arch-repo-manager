@@ -89,6 +89,7 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     FetchOfficialPackageSources = (1 << 6),
     UseContainer = (1 << 7),
     AurOnly = (1 << 8),
+    NoCheck = (1 << 9),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,

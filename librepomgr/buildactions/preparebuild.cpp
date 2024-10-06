@@ -79,6 +79,7 @@ void PrepareBuild::run()
     m_fetchOfficialSources = flags & PrepareBuildFlags::FetchOfficialPackageSources;
     m_useContainer = flags & PrepareBuildFlags::UseContainer;
     m_aurOnly = flags & PrepareBuildFlags::AurOnly;
+    m_noCheck = flags & PrepareBuildFlags::NoCheck;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -884,7 +885,9 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
             continue;
         }
         furtherDependenciesNeeded = pullFurtherDependencies(buildData.sourceInfo->makeDependencies) || furtherDependenciesNeeded;
-        furtherDependenciesNeeded = pullFurtherDependencies(buildData.sourceInfo->checkDependencies) || furtherDependenciesNeeded;
+        if (!m_noCheck) {
+            furtherDependenciesNeeded = pullFurtherDependencies(buildData.sourceInfo->checkDependencies) || furtherDependenciesNeeded;
+        }
         for (const auto &[packageID, package] : buildData.packages) {
             furtherDependenciesNeeded = pullFurtherDependencies(package->dependencies) || furtherDependenciesNeeded;
         }
@@ -1143,6 +1146,9 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                         } catch (const std::filesystem::filesystem_error &e) {
                             m_buildAction->appendOutput(
                                 Phrases::ErrorMessage, "Unable to determine whether PKGBUILD has been updated: ", e.what(), '\n');
+                        }
+                        if (m_noCheck) {
+                            buildProgress.makepkgFlags.emplace_back("--nocheck");
                         }
                     }
                     return progress.toJsonDocument();

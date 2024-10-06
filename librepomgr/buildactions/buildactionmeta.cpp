@@ -203,6 +203,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Consider it an error when a PKGBUILD was found locally and thus was not downloaded from the AUR",
                     .param = "aur-only",
                 },
+                BuildActionFlagMetaInfo{
+                      .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::NoCheck),
+                      .name = "No checks",
+                      .desc = "Skips the check() function of PKGBUILDs",
+                      .param = "no-check",
+                  },
             },
             .settings = {
                 BuildActionSettingMetaInfo{
