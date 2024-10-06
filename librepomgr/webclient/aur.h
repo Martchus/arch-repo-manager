@@ -22,6 +22,7 @@ struct AurSnapshotResult {
     std::vector<LibPkg::PackageSpec> packages;
     std::string error;
     bool isOfficial = false;
+    bool is404 = false;
 };
 struct AurSnapshotQueryParams {
     const std::string *packageName = nullptr;

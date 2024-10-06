@@ -208,6 +208,8 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     }
 
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                        .errorOutput = std::string(),
+                        .packages = {},
                         .error = "Unable to retrieve AUR snapshot tarball for package " % *params.packageName % ": " + error.what() });
                     return;
                 }
@@ -222,9 +224,12 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                         return;
                     }
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                        .errorOutput = std::string(),
+                        .packages = {},
                         .error
                         = "Unable to retrieve AUR snapshot tarball for package " % *params.packageName % ": AUR returned " % response.result_int()
-                            + " response" });
+                            + " response",
+                        .is404 = response.result() == boost::beast::http::status::not_found });
                     return;
                 }
                 const auto &body = response.body();
@@ -233,10 +238,13 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     snapshotFiles = extractFilesFromBuffer(body, *params.packageName, [](const char *, const char *, mode_t) { return true; });
                 } catch (const std::runtime_error &extractionError) {
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                        .errorOutput = std::string(),
+                        .packages = {},
                         .error = "Unable to extract AUR snapshot tarball for package " % *params.packageName % ": " + extractionError.what() });
                     return;
                 }
-                auto result = AurSnapshotResult{ .packageName = *params.packageName };
+                auto result
+                    = AurSnapshotResult{ .packageName = *params.packageName, .errorOutput = std::string(), .packages = {}, .error = std::string() };
                 auto haveSrcFileInfo = false, havePkgbuild = false;
                 for (const auto &directory : snapshotFiles) {
                     // parse .SRCINFO and check for presence of PKGBUILD
@@ -266,8 +274,10 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     try {
                         filesystem::create_directories(targetDir);
                     } catch (const filesystem::filesystem_error &fileSystemError) {
-                        multiSession->addResponse(WebClient::AurSnapshotResult{
-                            .packageName = *params.packageName, .error = "Unable to make directory " % targetDir % ": " + fileSystemError.what() });
+                        multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                            .errorOutput = std::string(),
+                            .packages = {},
+                            .error = "Unable to make directory " % targetDir % ": " + fileSystemError.what() });
                         return;
                     }
                     for (const auto &file : directory.second) {
@@ -278,6 +288,8 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                                 filesystem::create_symlink(file.content, targetPath);
                             } catch (const filesystem::filesystem_error &fileSystemError) {
                                 multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                                    .errorOutput = std::string(),
+                                    .packages = {},
                                     .error = "Unable to make symlink " % targetPath % ": " + fileSystemError.what() });
                                 return;
                             }
@@ -287,8 +299,10 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                             writeFile(targetPath, file.content);
                             setLastModified(targetPath, file.modificationTime);
                         } catch (const std::ios_base::failure &failure) {
-                            multiSession->addResponse(WebClient::AurSnapshotResult{
-                                .packageName = *params.packageName, .error = "Unable to write " % targetPath % ": " + failure.what() });
+                            multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                                .errorOutput = std::string(),
+                                .packages = {},
+                                .error = "Unable to write " % targetPath % ": " + failure.what() });
                             return;
                         }
                     }
