@@ -332,12 +332,14 @@ void PrepareBuild::processSrcInfo(WebClient::AurSnapshotQuerySession &multiSessi
     if (result.errorCode) {
         multiSession.addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
             .errorOutput = std::move(result.error),
+            .packages = {},
             .error = argsToString("Unable to invoke makepkg --printsourceinfo: ", result.errorCode.message()) });
         return;
     }
     if (child.exit_code() != 0) {
         multiSession.addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
             .errorOutput = std::move(result.error),
+            .packages = {},
             .error = argsToString("makepkg --printsourceinfo exited with non-zero exit code: ", child.exit_code()) });
         return;
     }
@@ -346,8 +348,10 @@ void PrepareBuild::processSrcInfo(WebClient::AurSnapshotQuerySession &multiSessi
     try {
         writeFile(srcInfoPath, result.output);
     } catch (const std::ios_base::failure &failure) {
-        multiSession.addResponse(
-            WebClient::AurSnapshotResult{ .packageName = packageName, .error = "Unable to write " % srcInfoPath % ": " + failure.what() });
+        multiSession.addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+            .errorOutput = std::string(),
+            .packages = {},
+            .error = "Unable to write " % srcInfoPath % ": " + failure.what() });
         return;
     }
 
@@ -356,7 +360,9 @@ void PrepareBuild::processSrcInfo(WebClient::AurSnapshotQuerySession &multiSessi
 
 void PrepareBuild::addResultFromSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &packageName, const std::string &srcInfo)
 {
-    auto snapshotResult = WebClient::AurSnapshotResult{ .packageName = packageName, .packages = LibPkg::Package::fromInfo(srcInfo, false) };
+    auto snapshotResult = WebClient::AurSnapshotResult{
+        .packageName = packageName, .errorOutput = std::string(), .packages = LibPkg::Package::fromInfo(srcInfo, false), .error = std::string()
+    };
     if (snapshotResult.packages.empty() || snapshotResult.packages.front().pkg->name.empty()) {
         snapshotResult.error = "Unable to parse .SRCINFO: no package name present";
     } else if (!snapshotResult.packages.front().pkg->sourceInfo.has_value()) {
@@ -399,6 +405,8 @@ void PrepareBuild::fetchMissingBuildData()
                 const auto pkgbuildPath = buildData.sourceDirectory + "/PKGBUILD";
                 if (!filesystem::exists(pkgbuildPath)) {
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+                        .errorOutput = std::string(),
+                        .packages = {},
                         .error = "Existing source directory \"" % buildData.sourceDirectory + "\" does not contain a PKGBUILD file." });
                     continue;
                 }
@@ -413,6 +421,8 @@ void PrepareBuild::fetchMissingBuildData()
                         srcInfo = readFile(srcInfoPath, 0x10000);
                     } catch (const std::ios_base::failure &e) {
                         multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+                            .errorOutput = std::string(),
+                            .packages = {},
                             .error = "Unable to read .SRCINFO \"" % srcInfoPath % "\" from existing source directory: " + e.what() });
                         continue;
                     }
@@ -426,6 +436,8 @@ void PrepareBuild::fetchMissingBuildData()
             }
         } catch (const filesystem::filesystem_error &e) {
             multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+                .errorOutput = std::string(),
+                .packages = {},
                 .error = "Unable to check existing source directory \"" % buildData.sourceDirectory % "\": " + e.what() });
             continue;
         }
@@ -463,6 +475,8 @@ void PrepareBuild::fetchMissingBuildData()
 
             } catch (const filesystem::filesystem_error &e) {
                 multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+                    .errorOutput = std::string(),
+                    .packages = {},
                     .error
                     = "Unable to copy files from PKGBUILDs directory " % pkgbuildsDir % " to " % buildData.sourceDirectory % ": " + e.what() });
                 continue;
