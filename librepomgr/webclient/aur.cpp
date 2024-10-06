@@ -246,12 +246,13 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 auto result
                     = AurSnapshotResult{ .packageName = *params.packageName, .errorOutput = std::string(), .packages = {}, .error = std::string() };
                 auto haveSrcFileInfo = false, havePkgbuild = false;
+                const auto &lookupName = params.lookupPackageName ? *params.lookupPackageName : *params.packageName;
                 for (const auto &directory : snapshotFiles) {
                     // parse .SRCINFO and check for presence of PKGBUILD
-                    if (!startsWith(directory.first, *params.packageName)) {
+                    if (!startsWith(directory.first, lookupName)) {
                         continue;
                     }
-                    auto directoryPath = string_view{ directory.first }.substr(params.packageName->size());
+                    auto directoryPath = string_view{ directory.first }.substr(lookupName.size());
                     if (directoryPath.starts_with("-main")) {
                         directoryPath = directoryPath.substr(5);
                     }
@@ -328,7 +329,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
             });
 
         // run query, e.g. https: //aur.archlinux.org/cgit/aur.git/snapshot/mingw-w64-configure.tar.gz
-        const auto encodedPackageName = WebAPI::Url::encodeValue(*params.packageName);
+        const auto encodedPackageName = WebAPI::Url::encodeValue(params.lookupPackageName ? *params.lookupPackageName : *params.packageName);
         if (params.tryOfficial) {
             const auto url = "/archlinux/packaging/packages/" % encodedPackageName % "/-/archive/main/" % encodedPackageName + "-main.tar.gz";
             session->run("gitlab.archlinux.org", "443", boost::beast::http::verb::get, url.data(), 11);

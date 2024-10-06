@@ -262,6 +262,7 @@ void ConductBuild::run()
         m_makeChrootPkgPath = findExecutable(m_setup.building.makeChrootPkgPath);
     }
     m_updatePkgSumsPath = findExecutable(m_setup.building.updatePkgSumsPath);
+    m_conversionScriptPath = findExecutable(m_setup.building.conversionScriptPath);
     m_repoAddPath = findExecutable(m_setup.building.repoAddPath);
     m_gpgPath = findExecutable(m_setup.building.gpgPath);
 
@@ -756,6 +757,20 @@ void ConductBuild::enqueueDownloads(const BatchProcessingSession::SharedPointerT
             continue;
         }
 
+        // convert PKGBUILD to destination variant if required
+        switch (invokeConversion(downloadsSession, *packageName, buildData, packageProgress, buildDirectory.native())) {
+        case InvocationResult::Ok:
+            // consider the download being started; invokeMakepkgToMakeSourcePackage() will be invoked later by the handler
+            startedDownloads += 1;
+            continue;
+        case InvocationResult::Error:
+            // move on to the next package; invokeUpdatePkgSums() has already "recorded" the error
+            continue;
+        case InvocationResult::Skipped:
+            // updating checksums not needed; continue with invokeMakepkgToMakeSourcePackage() directly
+            break;
+        }
+
         // update checksums if configured
         switch (invokeUpdatePkgSums(downloadsSession, *packageName, packageProgress, buildDirectory.native())) {
         case InvocationResult::Ok:
@@ -852,6 +867,71 @@ bool ConductBuild::checkForFailedDependency(
         }
     }
     return false;
+}
+
+InvocationResult ConductBuild::invokeConversion(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
+    const PackageBuildData &packageBuildData, PackageBuildProgress &packageProgress, const std::string &buildDirectory)
+{
+    if (!packageBuildData.convertFrom.has_value()) {
+        return InvocationResult::Skipped;
+    }
+    auto ec = std::error_code();
+    auto sourceDirectory = std::filesystem::absolute(packageBuildData.sourceDirectory, ec).string();
+    if (ec) {
+        auto lock = lockToWrite();
+        packageProgress.error = "unable to convert: " + ec.message();
+        return InvocationResult::Error;
+    }
+    auto &convertFrom = *packageBuildData.convertFrom;
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " conversion", packageProgress.buildDirectory + "/conversion.log",
+        [this, downloadsSession, &packageProgress, &packageName, buildDirectory](boost::process::child &&child, ProcessResult &&result) {
+            const auto hasError = result.errorCode || result.exitCode != 0;
+            if (result.errorCode) {
+                auto lock = lockToWrite();
+                const auto errorMessage = result.errorCode.message();
+                packageProgress.error = "unable to convert: " + errorMessage;
+                lock.unlock();
+                m_buildAction->log()(Phrases::ErrorMessage, "Unable to invoke conversion for ", packageName, ": ", errorMessage, '\n');
+                downloadsSession->addResponse(string(packageName));
+            } else if (result.exitCode != 0) {
+                auto lock = lockToWrite();
+                packageProgress.error = argsToString("unable to convert: conversion script returned with exit code ", result.exitCode);
+                lock.unlock();
+                m_buildAction->log()(
+                    Phrases::ErrorMessage, "conversion of ", packageName, " exited with non-zero exit code: ", child.exit_code(), '\n');
+                downloadsSession->addResponse(string(packageName));
+            }
+            // move on to the next download if an error occurred; otherwise continue making the source package
+            if (hasError) {
+                enqueueDownloads(downloadsSession, 1);
+                return;
+            }
+            // continue updating checksums if configured
+            switch (invokeUpdatePkgSums(downloadsSession, packageName, packageProgress, buildDirectory)) {
+            case InvocationResult::Ok:
+            case InvocationResult::Error:
+                return;
+            case InvocationResult::Skipped:
+                break;
+            }
+            // continue with the actual build
+            switch (invokeMakepkgToMakeSourcePackage(downloadsSession, packageName, packageProgress, buildDirectory)) {
+            case InvocationResult::Ok:
+                break;
+            case InvocationResult::Error:
+            case InvocationResult::Skipped:
+                // move on to the next package; invokeMakepkgToMakeSourcePackage() has already "recorded" any errors
+                enqueueDownloads(downloadsSession, 1);
+                break;
+            }
+        });
+    m_buildAction->log()(Phrases::InfoMessage, "Converting PKGBUILD of ", packageName, " via ", m_conversionScriptPath.string(), '\n',
+        ps(Phrases::SubMessage), "conversion: ", convertFrom.sourceVariant, " => ", convertFrom.destinationVariant, '\n',
+        ps(Phrases::SubMessage), "source: ", sourceDirectory, '\n',
+        ps(Phrases::SubMessage), "destination: ", buildDirectory, '\n');
+    processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["FORCE_VARIANT_CONVERSION"] = "1", m_conversionScriptPath,
+        convertFrom.sourceVariant, convertFrom.destinationVariant, sourceDirectory, buildDirectory);
+    return InvocationResult::Ok;
 }
 
 InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,

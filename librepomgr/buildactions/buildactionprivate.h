@@ -611,6 +611,8 @@ private:
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, std::size_t maxParallelInvocations, std::size_t invocation = 0);
     bool checkForFailedDependency(
         const std::string &packageNameToCheck, const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const;
+    InvocationResult invokeConversion(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
+        const PackageBuildData &packageBuildData, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeUpdatePkgSums(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeGpgForKeyImport(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
@@ -672,6 +674,7 @@ private:
     boost::filesystem::path m_makeChrootPkgPath;
     boost::filesystem::path m_makeContainerPkgPath;
     boost::filesystem::path m_updatePkgSumsPath;
+    boost::filesystem::path m_conversionScriptPath;
     boost::filesystem::path m_repoAddPath;
     boost::filesystem::path m_gpgPath;
     std::filesystem::path m_makepkgConfigPath;

@@ -232,6 +232,7 @@ void PrepareBuild::run()
             // FIXME: It is a little bit inconsistent that in other places existing PackageBuildData is overridden and here it is re-used.
             if (m_cleanSourceDirectory) {
                 buildData.hasSource = false;
+                buildData.convertFrom.reset();
             }
             foundSourcePackage = true;
             if (std::get<LibPkg::Database *>(existingPackage.db) == destinationDb) {
@@ -447,25 +448,26 @@ void PrepareBuild::fetchMissingBuildData()
         buildData.originalSourceDirectory.clear();
 
         // skip next block if package name matches configured pattern
-        LibPkg::PackageNameData packageNameData;
-        if (regex_match(packageName, m_ignoreLocalPkgbuildsRegex)) {
+        auto &lookupPackageName = buildData.convertFrom.has_value() ? buildData.convertFrom->sourcePackage : packageName;
+        auto packageNameData = LibPkg::PackageNameData();
+        if (regex_match(lookupPackageName, m_ignoreLocalPkgbuildsRegex)) {
             goto addAurQuery;
         }
 
         // copy PKGBUILD from local PKGBUILDs directory and generate .SRCINFO from it via makepkg
         if (!m_pkgbuildsDirs.empty()) {
-            packageNameData = LibPkg::PackageNameData::decompose(packageName);
+            packageNameData = LibPkg::PackageNameData::decompose(lookupPackageName);
         }
         for (const auto &pkgbuildsDir : m_pkgbuildsDirs) {
             const auto variant = packageNameData.variant();
             try {
-                if (const auto directPkgbuildPath = pkgbuildsDir % '/' % packageName;
-                    std::filesystem::exists(pkgbuildsDir % '/' % packageName + "/PKGBUILD")) {
+                if (const auto directPkgbuildPath = pkgbuildsDir % '/' % lookupPackageName;
+                    std::filesystem::exists(pkgbuildsDir % '/' % lookupPackageName + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(directPkgbuildPath);
                 } else if (const auto variantPkgbuildPath = pkgbuildsDir % '/' % packageNameData.actualName % '/' % variant;
                            filesystem::exists(variantPkgbuildPath + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(variantPkgbuildPath);
-                } else if (const auto svnPkgbuildPath = pkgbuildsDir % '/' % packageName % "/trunk";
+                } else if (const auto svnPkgbuildPath = pkgbuildsDir % '/' % lookupPackageName % "/trunk";
                            filesystem::exists(svnPkgbuildPath + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(svnPkgbuildPath);
                 } else {
@@ -494,6 +496,7 @@ void PrepareBuild::fetchMissingBuildData()
         if (!buildData.hasSource) {
             snapshotQueries.emplace_back(WebClient::AurSnapshotQueryParams{
                 .packageName = &packageName,
+                .lookupPackageName = &lookupPackageName,
                 .targetDirectory = &buildData.sourceDirectory,
                 .tryOfficial = m_fetchOfficialSources,
             });
@@ -874,7 +877,28 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         if (buildData.error.empty()) {
             buildData.error = "no build data available";
         }
-        sourcesMissing = true;
+        if (response.is404 && !buildData.convertFrom.has_value()) {
+            const auto packageNameParts = LibPkg::PackageNameData::decompose(response.packageName);
+            if (packageNameParts.targetPrefix == "mingw-w64-clang-aarch64") {
+                auto &convertFrom = buildData.convertFrom.emplace();
+                convertFrom.sourcePackage.reserve(11 + packageNameParts.actualName.size() + packageNameParts.vcsSuffix.size());
+                convertFrom.sourcePackage += "mingw-w64-";
+                convertFrom.sourcePackage += packageNameParts.actualName;
+                if (!packageNameParts.vcsSuffix.empty()) {
+                    convertFrom.sourcePackage += '-';
+                    convertFrom.sourcePackage += packageNameParts.vcsSuffix;
+                }
+                convertFrom.sourceVariant = "mingw-w64";
+                convertFrom.destinationVariant = packageNameParts.targetPrefix;
+                buildData.warnings.emplace_back(argsToString("Retrieving package \"", convertFrom.sourcePackage, "\" instead of \"",
+                    response.packageName, "\" because lookup of that package ran into error: ", buildData.error));
+                buildData.error.clear();
+                needToFetchAgain = true;
+            }
+        }
+        if (!buildData.error.empty()) {
+            sourcesMissing = true;
+        }
     }
     for (auto &response : responses) {
         if (response.packageName.empty()) {

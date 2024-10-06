@@ -181,6 +181,7 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     convertValue(multimap, "makechrootpkg_path", makeChrootPkgPath);
     convertValue(multimap, "makecontainerpkg_path", makeContainerPkgPath);
     convertValue(multimap, "updpkgsums_path", updatePkgSumsPath);
+    convertValue(multimap, "conversion_script_path", conversionScriptPath);
     convertValue(multimap, "repo_add_path", repoAddPath);
     convertValue(multimap, "repo_remove_path", repoRemovePath);
     convertValue(multimap, "pacman_path", pacmanPath);
@@ -202,6 +203,9 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     convertValue(multimap, "build_action_retention", buildActionRetention);
     convertValue(multimap, "load_files_dbs", loadFilesDbs);
     convertValue(multimap, "db_path", dbPath);
+    if (conversionScriptPath.empty() && !pkgbuildsDirs.empty()) {
+        conversionScriptPath = pkgbuildsDirs.front() + "/devel/conv-variant.pl";
+    }
 }
 
 void ServiceSetup::BuildSetup::readPresets(const std::string &configFilePath, const std::string &presetsFileRelativePath)

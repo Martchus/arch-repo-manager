@@ -26,6 +26,7 @@ struct AurSnapshotResult {
 };
 struct AurSnapshotQueryParams {
     const std::string *packageName = nullptr;
+    const std::string *lookupPackageName = nullptr;
     const std::string *targetDirectory = nullptr;
     bool tryOfficial = false;
 };

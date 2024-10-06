@@ -28,6 +28,7 @@
 #include <functional>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <type_traits>
@@ -53,8 +54,17 @@ struct InternalBuildAction;
 
 using AssociatedLocks = std::vector<std::variant<SharedLoggingLock, UniqueLoggingLock>>;
 
+struct LIBREPOMGR_EXPORT PackageConversion : public ReflectiveRapidJSON::JsonSerializable<PackageConversion>,
+                                             public ReflectiveRapidJSON::BinarySerializable<PackageConversion, 1> {
+    std::string sourcePackage;
+    std::string sourceVariant;
+    std::string destinationVariant;
+};
+
+// clang-format off
+
 struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSerializable<PackageBuildData>,
-                                            public ReflectiveRapidJSON::BinarySerializable<PackageBuildData, 1> {
+                                            public ReflectiveRapidJSON::BinarySerializable<PackageBuildData, 2> {
     std::string existingVersion;
     std::vector<std::shared_ptr<LibPkg::Package>> existingPackages;
     std::string sourceDirectory;
@@ -65,7 +75,11 @@ struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSeri
     std::string error;
     std::size_t specifiedIndex = std::numeric_limits<std::size_t>::max();
     bool hasSource = false;
+REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
+    std::optional<PackageConversion> convertFrom;
 };
+
+// clang-format on
 
 struct LIBREPOMGR_EXPORT BuildPreparation : public ReflectiveRapidJSON::JsonSerializable<BuildPreparation>,
                                             public ReflectiveRapidJSON::BinarySerializable<BuildPreparation, 1> {
