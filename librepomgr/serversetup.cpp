@@ -455,23 +455,28 @@ void ServiceSetup::BuildSetup::forEachBuildAction(ServiceSetup::BuildSetup::Buil
         *count = txn.size();
     }
     for (auto i = txn.begin(); i != txn.end(); ++i) {
-        const auto running = m_runningActions.find(i.getID());
-        auto &action = running != m_runningActions.end() ? *running->second : i.value();
-        auto visitorBehavior = VisitorBehavior::DiscardChanges;
-        const auto stop = func(i.getID(), action, visitorBehavior);
-        if (visitorBehavior == VisitorBehavior::SaveChanges) {
-            if (running != m_runningActions.end() && !action.isExecuting()) {
-                m_runningActions.erase(running);
+        try {
+            const auto running = m_runningActions.find(i.getID());
+            auto &action = running != m_runningActions.end() ? *running->second : i.value();
+            auto visitorBehavior = VisitorBehavior::DiscardChanges;
+            const auto stop = func(i.getID(), action, visitorBehavior);
+            if (visitorBehavior == VisitorBehavior::SaveChanges) {
+                if (running != m_runningActions.end() && !action.isExecuting()) {
+                    m_runningActions.erase(running);
+                }
+                txn.put(action, i.getID());
+            } else if (visitorBehavior == VisitorBehavior::Delete && !action.isExecuting()) {
+                if (running != m_runningActions.end()) {
+                    m_runningActions.erase(running);
+                }
+                txn.del(i.getID());
             }
-            txn.put(action, i.getID());
-        } else if (visitorBehavior == VisitorBehavior::Delete && !action.isExecuting()) {
-            if (running != m_runningActions.end()) {
-                m_runningActions.erase(running);
+            if (stop) {
+                break;
             }
-            txn.del(i.getID());
-        }
-        if (stop) {
-            break;
+        } catch (const ReflectiveRapidJSON::BinaryVersionNotSupported &e) {
+            cerr << Phrases::ErrorMessage << "Unable to load build action record " << e.record << " from database: version not supported (got "
+                 << e.presentVersion << ", max supported is " << e.maxVersion << ')' << Phrases::EndFlush;
         }
     }
     txn.commit();
@@ -745,28 +750,32 @@ void ServiceSetup::restoreState()
         std::cerr << Phrases::WarningMessage << "An IO error occurred when restoring cache file \"" << cacheFilePath << "\"." << Phrases::EndFlush;
     }
 
-    // open LMDB storage
-    cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::End;
-    config.initStorage(dbPath.data(), maxDbs);
-    cout << Phrases::SubMessage << "Package cache limit: " << packageCacheLimit << Phrases::End;
-    config.setPackageCacheLimit(packageCacheLimit);
-    cout << Phrases::InfoMessage << "Opening actions LMDB file: " << building.dbPath << Phrases::EndFlush;
-    building.initStorage(building.dbPath.data());
+    try {
+        // open LMDB storage
+        cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::End;
+        config.initStorage(dbPath.data(), maxDbs);
+        cout << Phrases::SubMessage << "Package cache limit: " << packageCacheLimit << Phrases::End;
+        config.setPackageCacheLimit(packageCacheLimit);
+        cout << Phrases::InfoMessage << "Opening actions LMDB file: " << building.dbPath << Phrases::EndFlush;
+        building.initStorage(building.dbPath.data());
 
-    // ensure no build actions are considered running anymore and populate follow up actions
-    building.forEachBuildAction([this](LibPkg::StorageID, BuildAction &buildAction, BuildSetup::VisitorBehavior &visitorBehavior) {
-        if (buildAction.isExecuting()) {
-            buildAction.status = BuildActionStatus::Finished;
-            buildAction.result = BuildActionResult::Failure;
-            buildAction.resultData = "service crashed while exectuing";
-            visitorBehavior = BuildSetup::VisitorBehavior::SaveChanges;
-        } else if (buildAction.isScheduled()) {
-            for (const auto previousBuildActionId : buildAction.startAfter) {
-                building.m_followUpActions[previousBuildActionId].emplace(buildAction.id);
+        // ensure no build actions are considered running anymore and populate follow up actions
+        building.forEachBuildAction([this](LibPkg::StorageID, BuildAction &buildAction, BuildSetup::VisitorBehavior &visitorBehavior) {
+            if (buildAction.isExecuting()) {
+                buildAction.status = BuildActionStatus::Finished;
+                buildAction.result = BuildActionResult::Failure;
+                buildAction.resultData = "service crashed while exectuing";
+                visitorBehavior = BuildSetup::VisitorBehavior::SaveChanges;
+            } else if (buildAction.isScheduled()) {
+                for (const auto previousBuildActionId : buildAction.startAfter) {
+                    building.m_followUpActions[previousBuildActionId].emplace(buildAction.id);
+                }
             }
-        }
-        return false;
-    });
+            return false;
+        });
+    } catch (const std::exception &e) {
+        cerr << Phrases::ErrorMessage << "Unable to load build actions from database: " << e.what() << Phrases::EndFlush;
+    }
 }
 
 std::size_t ServiceSetup::saveState()
