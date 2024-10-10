@@ -376,6 +376,9 @@ std::shared_ptr<BuildProcessSession> BuildAction::makeBuildProcess(
     std::string &&displayName, std::string &&logFilePath, ProcessHandler &&handler, AssociatedLocks &&locks)
 {
     const auto processesLock = std::lock_guard<std::mutex>(m_processesMutex);
+    if (m_aborted) {
+        return nullptr;
+    }
     auto &process = m_ongoingProcesses[logFilePath];
     if (process) {
         // prevent multiple ongoing processes for the same log file
@@ -393,7 +396,15 @@ std::shared_ptr<BuildProcessSession> BuildAction::makeBuildProcess(
 
 void BuildAction::terminateOngoingBuildProcesses()
 {
-    const auto processesLock = std::lock_guard<std::mutex>(m_processesMutex);
+    auto processesLock = std::unique_lock<std::mutex>(m_processesMutex);
+    if (m_ongoingProcesses.empty()) {
+        processesLock.unlock();
+        auto buildLock = m_setup->building.lockToWrite();
+        if (isExecuting()) {
+            conclude(BuildActionResult::Aborted);
+        }
+        return;
+    }
     for (auto &[logFilePath, process] : m_ongoingProcesses) {
         if (process->hasExited()) {
             continue;

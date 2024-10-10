@@ -169,6 +169,9 @@ void RemovePackages::run()
         [this, buildAction = m_buildAction,
             repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
                 std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2))](UniqueLoggingLock &&lock) {
+            if (!repoRemoveProcess) {
+                return;
+            }
             repoRemoveProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
                 repoRemoveProcess->launch(boost::process::start_dir(m_destinationRepoDirectory),
@@ -324,6 +327,9 @@ void MovePackages::run()
             repoAddProcess = m_buildAction->makeBuildProcess("repo-add", m_workingDirectory + "/repo-add.log",
                 std::bind(&MovePackages::handleRepoAddResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
             UniqueLoggingLock &&lock) {
+            if (!repoAddProcess) {
+                return;
+            }
             repoAddProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
                 repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory),
@@ -342,6 +348,9 @@ void MovePackages::run()
             repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
                 std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
             UniqueLoggingLock &&lock) {
+            if (!repoRemoveProcess) {
+                return;
+            }
             repoRemoveProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
                 repoRemoveProcess->launch(boost::process::start_dir(m_sourceRepoDirectory),

@@ -74,6 +74,9 @@ void CustomCommand::run()
         const auto buildLock = m_setup.building.lockToWrite();
         reportSuccess();
     });
+    if (!m_process) {
+        return;
+    }
 
     // acquire locks
     // note: Using an std::set here (instead of a std::vector) to ensure we don't attempt to acquire the same lock twice and to ensure

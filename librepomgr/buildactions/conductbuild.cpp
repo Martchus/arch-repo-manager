@@ -925,10 +925,12 @@ InvocationResult ConductBuild::invokeConversion(const BatchProcessingSession::Sh
                 break;
             }
         });
+    if (!processSession) {
+        return InvocationResult::Skipped;
+    }
     m_buildAction->log()(Phrases::InfoMessage, "Converting PKGBUILD of ", packageName, " via ", m_conversionScriptPath.string(), '\n',
-        ps(Phrases::SubMessage), "conversion: ", convertFrom.sourceVariant, " => ", convertFrom.destinationVariant, '\n',
-        ps(Phrases::SubMessage), "source: ", sourceDirectory, '\n',
-        ps(Phrases::SubMessage), "destination: ", buildDirectory, '\n');
+        ps(Phrases::SubMessage), "conversion: ", convertFrom.sourceVariant, " => ", convertFrom.destinationVariant, '\n', ps(Phrases::SubMessage),
+        "source: ", sourceDirectory, '\n', ps(Phrases::SubMessage), "destination: ", buildDirectory, '\n');
     processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["FORCE_VARIANT_CONVERSION"] = "1", m_conversionScriptPath,
         convertFrom.sourceVariant, convertFrom.destinationVariant, sourceDirectory, buildDirectory);
     return InvocationResult::Ok;
@@ -978,6 +980,9 @@ InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession:
                 break;
             }
         });
+    if (!processSession) {
+        return InvocationResult::Skipped;
+    }
     if (m_useContainer && !checkExecutable(m_updatePkgSumsPath)) {
         m_buildAction->log()(Phrases::InfoMessage, "Updating checksums of ", packageName, " via ", m_makeContainerPkgPath.string(), '\n',
             ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
@@ -1050,6 +1055,9 @@ InvocationResult ConductBuild::invokeGpgForKeyImport(const BatchProcessingSessio
             }
             enqueueDownloads(downloadsSession, 1);
         });
+    if (!processSession) {
+        return InvocationResult::Skipped;
+    }
     processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, "--yes", "--import", keyFiles);
     m_buildAction->log()(Phrases::InfoMessage, "Importing ", keyFiles.size(), " keys for package \"", packageName, '\"', '\n');
     return InvocationResult::Ok;
@@ -1094,6 +1102,9 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
             }
             enqueueDownloads(downloadsSession, 1);
         });
+    if (!processSession) {
+        return InvocationResult::Skipped;
+    }
     auto additionalFlags = std::vector<std::string>();
     auto lock = lockToRead();
     if (const auto &sourceInfo = m_buildPreparation.buildData[packageName].sourceInfo) {
@@ -1268,6 +1279,9 @@ void ConductBuild::invokeMakechrootpkgStep2(const BatchProcessingSession::Shared
     auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
         std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
             std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
+    if (!processSession) {
+        return cb(InvocationResult::Skipped);
+    }
     processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
         std::bind(
             &ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2)));
@@ -1349,6 +1363,9 @@ void ConductBuild::invokeMakecontainerpkg(const BatchProcessingSession::SharedPo
     auto processSession = m_buildAction->makeBuildProcess(packageName + " build", packageProgress.buildDirectory + "/build.log",
         std::bind(&ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo, this, makepkgchrootSession, std::ref(packageName),
             std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2));
+    if (!processSession) {
+        return cb(InvocationResult::Skipped);
+    }
     processSession->registerNewDataHandler(BufferSearch("Updated version: ", "\e\n", "Starting build",
         std::bind(
             &ConductBuild::assignNewVersion, this, std::ref(packageName), std::ref(packageProgress), std::placeholders::_1, std::placeholders::_2)));
@@ -1592,6 +1609,9 @@ void ConductBuild::invokeGpg(
             // consider the package failed
             signingSession->addResponse(std::move(binaryPackageName));
         });
+    if (!processSession) {
+        return;
+    }
     auto pinentryArgs = std::vector<std::string>();
     if (!m_gpgPassphrase.empty()) {
         pinentryArgs = { "--pinentry-mode", "loopback", "--passphrase-fd", "0" };

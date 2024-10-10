@@ -558,6 +558,9 @@ void BuildServiceCleanup::invokePaccache()
             }
             invokePaccache();
         });
+    if (!processSession) {
+        return;
+    }
     ++m_concreteCacheDirsIterator;
     processSession->launch(m_paccachePath, m_dryCacheCleanup ? "--dryrun" : "--remove", "--cachedir", cacheDirPath.string());
 }
