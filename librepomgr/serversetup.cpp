@@ -589,7 +589,7 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
         if (iniSection == "definitions") {
             globalDefinitions.reserve(globalDefinitions.size() + iniEntry.second.size());
             for (auto &definition : iniEntry.second) {
-                globalDefinitions['$' + definition.first] = move(definition.second);
+                globalDefinitions['$' + definition.first] = std::move(definition.second);
             }
             continue;
         }
@@ -613,24 +613,24 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
                 }
             }
             if (key == "arch") {
-                db->arch = move(value);
+                db->arch = std::move(value);
                 dbDefinitions["$arch"] = db->arch;
             } else if (key == "depends") {
                 db->dependencies = splitString<vector<string>>(value, " ", EmptyPartsTreat::Omit);
             } else if (key == "pkgdir") {
-                db->localPkgDir = move(value);
+                db->localPkgDir = std::move(value);
             } else if (key == "dbdir") {
-                db->localDbDir = move(value);
+                db->localDbDir = std::move(value);
             } else if (key == "path") {
-                db->path = move(value);
+                db->path = std::move(value);
             } else if (key == "filespath") {
-                db->filesPath = move(value);
+                db->filesPath = std::move(value);
             } else if (key == "sync_from_mirror") {
                 db->syncFromMirror = value == "on";
             } else if (key == "mirror") {
-                db->mirrors.emplace_back(move(value));
+                db->mirrors.emplace_back(std::move(value));
             } else {
-                dbDefinitions["$" + key] = move(value);
+                dbDefinitions["$" + key] = std::move(value);
             }
         }
     }
