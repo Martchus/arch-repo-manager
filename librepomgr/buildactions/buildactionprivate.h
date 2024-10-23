@@ -481,6 +481,8 @@ private:
     void populateDbConfig(const std::vector<LibPkg::Database *> &dbOrder, bool forStaging = false);
     bool isExistingPackageRelevant(const std::string &dependencyName, LibPkg::PackageSearchResult &package, PackageBuildData &packageBuildData,
         const LibPkg::Database &destinationDb);
+    void invokeVariantConversion(
+        std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &packageName, const PackageBuildData &buildData);
     void makeSrcInfo(
         std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &sourceDirectory, const std::string &packageName);
     static void processSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &sourceDirectory, const std::string &packageName,
@@ -501,6 +503,7 @@ private:
     std::string m_workingDirectory;
     boost::filesystem::path m_makePkgPath;
     boost::filesystem::path m_makeContainerPkgPath;
+    boost::filesystem::path m_conversionScriptPath;
     std::vector<std::string> m_pkgbuildsDirs;
     std::regex m_ignoreLocalPkgbuildsRegex;
     std::unordered_map<std::string, PackageBuildData> m_buildDataByPackage;
@@ -611,8 +614,6 @@ private:
         const BatchProcessingSession::SharedPointerType &makepkgchrootSession, std::size_t maxParallelInvocations, std::size_t invocation = 0);
     bool checkForFailedDependency(
         const std::string &packageNameToCheck, const std::vector<const std::vector<LibPkg::Dependency> *> &dependencies) const;
-    InvocationResult invokeConversion(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
-        const PackageBuildData &packageBuildData, PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeUpdatePkgSums(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, const std::string &buildDirectory);
     InvocationResult invokeGpgForKeyImport(const BatchProcessingSession::SharedPointerType &downloadsSession, const std::string &packageName,
@@ -674,7 +675,6 @@ private:
     boost::filesystem::path m_makeChrootPkgPath;
     boost::filesystem::path m_makeContainerPkgPath;
     boost::filesystem::path m_updatePkgSumsPath;
-    boost::filesystem::path m_conversionScriptPath;
     boost::filesystem::path m_repoAddPath;
     boost::filesystem::path m_gpgPath;
     std::filesystem::path m_makepkgConfigPath;

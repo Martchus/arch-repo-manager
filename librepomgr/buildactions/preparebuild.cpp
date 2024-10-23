@@ -19,6 +19,7 @@
 
 #include <boost/asio/read.hpp>
 
+#include <boost/process/v1/env.hpp>
 #include <boost/process/v1/search_path.hpp>
 #include <boost/process/v1/start_dir.hpp>
 
@@ -100,6 +101,7 @@ void PrepareBuild::run()
     } else {
         m_makePkgPath = findExecutable(m_setup.building.makePkgPath);
     }
+    m_conversionScriptPath = findExecutable(m_setup.building.conversionScriptPath);
     copySecondVectorIntoFirstVector(m_pkgbuildsDirs, m_setup.building.pkgbuildsDirs);
     m_ignoreLocalPkgbuildsRegex = m_setup.building.ignoreLocalPkgbuildsRegex;
     m_workingDirectory = determineWorkingDirectory(buildDataWorkingDirectory);
@@ -311,6 +313,58 @@ bool PrepareBuild::isExistingPackageRelevant(
     return (m_baseDbs.empty() && dependencyPresentInRequiredDbs) || (m_baseDbs.find(db->name) != m_baseDbs.end());
 }
 
+void PrepareBuild::invokeVariantConversion(std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &packageName, const PackageBuildData &buildData)
+{
+    auto &sourceDirectory = buildData.sourceDirectory;
+    auto origDirectory = std::string(), convDirectory = std::string();
+    try {
+        auto convDirectoryPath = std::filesystem::absolute(sourceDirectory);
+        auto origDirectoryPath = std::filesystem::absolute(sourceDirectory + "/../src-original");
+        auto origDirectoryExists = std::filesystem::exists(origDirectoryPath);
+        convDirectory = convDirectoryPath.string();
+        origDirectory = origDirectoryPath.string();
+        if (m_cleanSourceDirectory && origDirectoryExists) {
+            std::filesystem::remove_all(origDirectoryPath);
+        }
+        std::filesystem::rename(convDirectoryPath, origDirectoryPath);
+        std::filesystem::create_directory(convDirectoryPath);
+    } catch (const std::filesystem::filesystem_error &e) {
+        multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+            .errorOutput = e.what(),
+            .packages = {},
+            .error = argsToString("Unable to invoke package conversion: ", e.what()) });
+        return;
+    }
+    auto &convertFrom = *buildData.convertFrom;
+    auto processSession = m_buildAction->makeBuildProcess(packageName + " conversion", sourceDirectory + "/conversion.log",
+        [this, multiSession, &sourceDirectory, &packageName](boost::process::child &&child, ProcessResult &&result) mutable {
+            if (result.errorCode) {
+                multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+                    .errorOutput = std::move(result.error),
+                    .packages = {},
+                    .error = argsToString("Unable to invoke conversion: ", result.errorCode.message()) });
+                return;
+            }
+            if (child.exit_code() != 0) {
+                multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
+                    .errorOutput = std::move(result.error),
+                    .packages = {},
+                    .error = argsToString("conversion exited with non-zero exit code: ", child.exit_code()) });
+                return;
+            }
+            makeSrcInfo(multiSession, sourceDirectory, packageName);
+        });
+    if (!processSession) {
+        return;
+    }
+    m_buildAction->log()(Phrases::InfoMessage, "Converting PKGBUILD of ", packageName, " via ", m_conversionScriptPath.string(), '\n',
+        ps(Phrases::SubMessage), "conversion: ", convertFrom.sourceVariant, " => ", convertFrom.destinationVariant, '\n', ps(Phrases::SubMessage),
+        "source: ", origDirectory, '\n', ps(Phrases::SubMessage), "destination: ", convDirectory, '\n');
+    processSession->launch(boost::process::start_dir(origDirectory), boost::process::env["FORCE_VARIANT_CONVERSION"] = "1", m_conversionScriptPath,
+        convertFrom.sourceVariant, convertFrom.destinationVariant, origDirectory, convDirectory);
+    return;
+}
+
 void PrepareBuild::addPackageToLogLine(std::string &logLine, const std::string &packageName)
 {
     logLine += ' ';
@@ -389,8 +443,17 @@ void PrepareBuild::fetchMissingBuildData()
     // fetch build data (PKGBUILD, .SRCINFO, ...) for all the packages we want to build
     for (auto &[packageName, buildData] : m_buildDataByPackage) {
 
-        // skip packages where the source has already been fetched in a previous invocation or which have already failed on a previous invocation
-        if (buildData.hasSource || !buildData.error.empty()) {
+        // skip packages which have already failed on a previous invocation
+        if (!buildData.error.empty()) {
+            continue;
+        }
+
+        if (buildData.hasSource) {
+            // invoke variant conversion if sources were downloaded but source info was discarded in presence of necessary conversion
+            if (!buildData.sourceInfo.has_value() && buildData.convertFrom.has_value()) {
+                invokeVariantConversion(multiSession, packageName, buildData);
+            }
+            // otherwise skip the package as the source has already been fetched in a previous invocation
             continue;
         }
 
@@ -866,6 +929,13 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         buildData.error = std::move(response.error);
         buildData.hasSource = buildData.sourceInfo && !buildData.packages.empty() && buildData.error.empty();
         if (buildData.hasSource) {
+            if (buildData.convertFrom.has_value() && buildData.sourceInfo->name != response.packageName) {
+                // reset source info and packages; need to do variant conversion
+                buildData.sourceInfo.reset();
+                buildData.packages.clear();
+                needToFetchAgain = true;
+                continue;
+            }
             const auto buildActionsWriteLock = m_setup.building.lockToWrite();
             m_buildAction->artefacts.emplace_back(buildData.sourceDirectory + "/PKGBUILD"); // FIXME: add all files as artefacts
             continue;
@@ -905,7 +975,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
             continue;
         }
         auto &buildData = m_buildDataByPackage[response.packageName];
-        if (!buildData.hasSource) {
+        if (!buildData.sourceInfo.has_value()) {
             continue;
         }
         furtherDependenciesNeeded = pullFurtherDependencies(buildData.sourceInfo->makeDependencies) || furtherDependenciesNeeded;
