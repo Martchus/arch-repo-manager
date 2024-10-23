@@ -1858,7 +1858,8 @@ void ConductBuild::copyPkgbuildToOriginalSourceDirectory(
         return;
     }
     try {
-        std::filesystem::copy(buildDirectory + "/PKGBUILD", originalSourceDirectory + "/PKGBUILD", std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(
+            buildDirectory + "/PKGBUILD", originalSourceDirectory + "/PKGBUILD", std::filesystem::copy_options::update_existing);
     } catch (const std::filesystem::filesystem_error &e) {
         const auto lock = lockToWrite();
         packageProgress.warnings.emplace_back(argsToString("Unable to copy back updated PKGBUILD: ", e.what()));

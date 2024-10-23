@@ -485,7 +485,9 @@ void BuildActionsTests::testConductingBuild()
 
     // create fake build preparation
     const auto origPkgbuildFile = workingCopyPathAs("building/build-data/conduct-build-test/boost/src/PKGBUILD", "orig-src-dir/boost/PKGBUILD");
+    const auto origPkgbuildData = readFile(origPkgbuildFile);
     const auto origSourceDir = std::filesystem::absolute(directory(origPkgbuildFile));
+    CPPUNIT_ASSERT_MESSAGE("comment from updatepkgsums not initially present", !origPkgbuildData.contains("fake updatepkgsums ran on this file"));
     auto prepData = readFile(testFilePath("building/build-data/conduct-build-test/build-preparation.json"));
     findAndReplace(prepData, "$ORIGINAL_SOURCE_DIRECTORY", origSourceDir.native());
     findAndReplace(prepData, "$TEST_FILES_PATH", "TODO");
@@ -605,6 +607,10 @@ void BuildActionsTests::testConductingBuild()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: signature looks as expected",
         "fake signature with GPG key 1234567890 boost-libs-1.73.0-1-x86_64.pkg.tar.zst\n"s,
         readFile("repos/boost/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+
+    // check whether PKGBUILD has been copied back to original source directory
+    const auto updatedOrigPkgbuildData = readFile(origPkgbuildFile);
+    CPPUNIT_ASSERT_MESSAGE("comment from updatepkgsums present", updatedOrigPkgbuildData.contains("fake updatepkgsums ran on this file"));
 
     // add packages needing a rebuild to trigger auto-staging
     m_setup.config.loadAllPackages(false, true);
