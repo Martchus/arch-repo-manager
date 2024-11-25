@@ -313,7 +313,8 @@ bool PrepareBuild::isExistingPackageRelevant(
     return (m_baseDbs.empty() && dependencyPresentInRequiredDbs) || (m_baseDbs.find(db->name) != m_baseDbs.end());
 }
 
-void PrepareBuild::invokeVariantConversion(std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &packageName, const PackageBuildData &buildData)
+void PrepareBuild::invokeVariantConversion(
+    std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &packageName, const PackageBuildData &buildData)
 {
     auto &sourceDirectory = buildData.sourceDirectory;
     auto origDirectory = std::string(), convDirectory = std::string();
@@ -1246,9 +1247,6 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                         } catch (const std::filesystem::filesystem_error &e) {
                             m_buildAction->appendOutput(
                                 Phrases::ErrorMessage, "Unable to determine whether PKGBUILD has been updated: ", e.what(), '\n');
-                        }
-                        if (m_noCheck) {
-                            buildProgress.makepkgFlags.emplace_back("--nocheck");
                         }
                     }
                     return progress.toJsonDocument();
