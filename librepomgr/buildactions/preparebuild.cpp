@@ -1216,6 +1216,12 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                     progress.stagingRepoPath.clear();
                     for (const auto &[packageName, buildData] : resultData.buildData) {
                         auto &buildProgress = progress.progressByPackage[packageName];
+                        // add "--nocheck" flag
+                        if (m_noCheck
+                            && std::find(buildProgress.makepkgFlags.cbegin(), buildProgress.makepkgFlags.cend(), "--nocheck")
+                                == buildProgress.makepkgFlags.cend()) {
+                            buildProgress.makepkgFlags.emplace_back("--nocheck");
+                        }
                         // reset the build progress if the PKGBUILD has been updated
                         if (!buildProgress.hasBeenAnyProgressMade()) {
                             continue;
