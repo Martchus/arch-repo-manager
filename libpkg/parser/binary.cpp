@@ -675,7 +675,18 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
  */
 void Binary::parseAr(BinaryReader &reader)
 {
-    for (auto remainingSize = reader.readStreamsize(); remainingSize >= 60;) {
+    const auto size = reader.readStreamsize();
+    for (auto remainingSize = size; remainingSize >= 60;) {
+        // skip odd offsets as archive members are aligned to even byte boundaries
+        if ((reader.stream()->tellg() % 2) != 0) {
+            if (reader.readByte() != '\n') {
+                throw runtime_error("padding/newline to align archive entry on even byte boundaries is not present");
+            }
+            if ((remainingSize -= 1) < 60) {
+                break;
+            }
+        }
+
         // read file header
         char fileName[17] = { 0 };
         reader.read(fileName, sizeof(fileName) - 1);
@@ -705,7 +716,8 @@ void Binary::parseAr(BinaryReader &reader)
         const auto fileSize = stringToNumber<iostream::off_type>(fileSizeStr);
         const auto nextFileOffset = fileOffset + fileSize;
         const auto fileNameView = std::string_view(fileName);
-        if (fileNameView.ends_with(".o") || fileNameView.ends_with(".dll")) {
+        const auto dllOrDrv = fileNameView.ends_with(".dll") || fileNameView.ends_with(".DLL") || fileNameView.ends_with(".drv") || fileNameView.ends_with(".DRV");
+        if (dllOrDrv || fileNameView.ends_with(".o")) {
             const auto magic = reader.readUInt32BE();
             if (magic == 0x7f454c46u) {
                 return; // we're not interested in static libraries containing ELF files
@@ -713,7 +725,7 @@ void Binary::parseAr(BinaryReader &reader)
 
             reader.stream()->seekg(-4, ios_base::cur);
             parsePe(reader, fileOffset);
-            if (name.empty() && fileNameView.ends_with(".dll")) {
+            if (name.empty() && dllOrDrv) {
                 name = fileNameView;
             }
             if (!name.empty()) {
@@ -724,6 +736,9 @@ void Binary::parseAr(BinaryReader &reader)
 
         // parse the next file
         remainingSize -= fileSize;
+        if (nextFileOffset >= size) {
+            break;
+        }
         reader.stream()->seekg(nextFileOffset);
     }
 }
