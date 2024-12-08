@@ -237,7 +237,7 @@ void cachePackages(LogContext &log, std::shared_ptr<PackageCachingSession> &&pac
     std::size_t maxParallelDownloads)
 {
     for (std::size_t startedDownloads = 0;
-         startedDownloads < maxParallelDownloads && (!packageCachingSession->aborted || !*packageCachingSession->aborted); ++startedDownloads) {
+        startedDownloads < maxParallelDownloads && (!packageCachingSession->aborted || !*packageCachingSession->aborted); ++startedDownloads) {
         auto *const cachingData = packageCachingSession->getCurrentDataAndSelectNext();
         if (!cachingData) {
             return;

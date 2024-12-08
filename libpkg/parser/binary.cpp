@@ -716,7 +716,8 @@ void Binary::parseAr(BinaryReader &reader)
         const auto fileSize = stringToNumber<iostream::off_type>(fileSizeStr);
         const auto nextFileOffset = fileOffset + fileSize;
         const auto fileNameView = std::string_view(fileName);
-        const auto dllOrDrv = fileNameView.ends_with(".dll") || fileNameView.ends_with(".DLL") || fileNameView.ends_with(".drv") || fileNameView.ends_with(".DRV");
+        const auto dllOrDrv
+            = fileNameView.ends_with(".dll") || fileNameView.ends_with(".DLL") || fileNameView.ends_with(".drv") || fileNameView.ends_with(".DRV");
         if (dllOrDrv || fileNameView.ends_with(".o")) {
             const auto magic = reader.readUInt32BE();
             if (magic == 0x7f454c46u) {

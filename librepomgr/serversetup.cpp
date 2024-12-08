@@ -441,7 +441,7 @@ void ServiceSetup::BuildSetup::forEachBuildAction(
     for (auto i = reverse ? txn.rbegin<decltype(txn)::DirectStorage, BuildActionBase>()
                           : txn.lower_bound<decltype(txn)::DirectStorage, BuildActionBase>(static_cast<LibPkg::StorageID>(
                                 start > std::numeric_limits<LibPkg::StorageID>::max() ? std::numeric_limits<LibPkg::StorageID>::max() : start));
-         i != txn.end() && limit; reverse ? --i : ++i, --limit) {
+        i != txn.end() && limit; reverse ? --i : ++i, --limit) {
         if (func(i.getID(), std::move(i.value()))) {
             return;
         }

@@ -1470,7 +1470,7 @@ void ConductBuild::invokeGpg(const BatchProcessingSession::SharedPointerType &ma
     constexpr auto gpgParallelLimit = 4;
     const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
     for (auto i = 0; i != gpgParallelLimit && signingSession->currentPackage != signingSession->binaryPackages.end();
-         ++i, ++signingSession->currentPackage) {
+        ++i, ++signingSession->currentPackage) {
         invokeGpg(signingSession, packageName, packageProgress);
     }
 }

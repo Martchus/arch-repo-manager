@@ -529,10 +529,10 @@ void PrepareBuild::fetchMissingBuildData()
                     std::filesystem::exists(pkgbuildsDir % '/' % lookupPackageName + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(directPkgbuildPath);
                 } else if (const auto variantPkgbuildPath = pkgbuildsDir % '/' % packageNameData.actualName % '/' % variant;
-                           filesystem::exists(variantPkgbuildPath + "/PKGBUILD")) {
+                    filesystem::exists(variantPkgbuildPath + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(variantPkgbuildPath);
                 } else if (const auto svnPkgbuildPath = pkgbuildsDir % '/' % lookupPackageName % "/trunk";
-                           filesystem::exists(svnPkgbuildPath + "/PKGBUILD")) {
+                    filesystem::exists(svnPkgbuildPath + "/PKGBUILD")) {
                     buildData.originalSourceDirectory = tupleToString(svnPkgbuildPath);
                 } else {
                     continue;

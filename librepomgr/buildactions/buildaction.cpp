@@ -493,7 +493,7 @@ void BuildServiceCleanup::run()
     m_concreteCacheDirs.reserve(8);
     try {
         for (auto i = std::filesystem::directory_iterator(packageCachePath, std::filesystem::directory_options::follow_directory_symlink);
-             auto &entry : i) {
+            auto &entry : i) {
             const auto filename = entry.path().filename();
             if (filename == "." || filename == "..") {
                 continue;
