@@ -165,6 +165,14 @@ void ParserTests::testParsingPackageName()
     CPPUNIT_ASSERT_EQUAL(""sv, qwt.targetPrefix);
     CPPUNIT_ASSERT_EQUAL("qt6-svn"sv, qwt.vcsSuffix);
     CPPUNIT_ASSERT(qwt.isVcsPackage());
+    const auto androidEnv = PackageNameData::decompose("android-environment");
+    CPPUNIT_ASSERT_EQUAL("environment"sv, androidEnv.actualName);
+    CPPUNIT_ASSERT_EQUAL("android"sv, androidEnv.targetPrefix);
+    CPPUNIT_ASSERT_EQUAL(""sv, androidEnv.vcsSuffix);
+    const auto androidArchPackage = PackageNameData::decompose("android-x86-64-qt6-base");
+    CPPUNIT_ASSERT_EQUAL("qt6-base"sv, androidArchPackage.actualName);
+    CPPUNIT_ASSERT_EQUAL("android-x86-64"sv, androidArchPackage.targetPrefix);
+    CPPUNIT_ASSERT_EQUAL(""sv, androidArchPackage.vcsSuffix);
 }
 
 void ParserTests::testParsingConfig()
