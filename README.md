@@ -402,7 +402,7 @@ npm install @xterm/xterm @xterm/addon-search
 ```
 
 ## Copyright notice and license
-Copyright © 2017-2024 Marius Kittler
+Copyright © 2017-2025 Marius Kittler
 
 All code is licensed under [GPL-2-or-later](LICENSE). This does *not* apply to
 code contained in Git repositories included as Git submodule (which contain
