@@ -90,6 +90,7 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     UseContainer = (1 << 7),
     AurOnly = (1 << 8),
     NoCheck = (1 << 9),
+    PullInComplementaryVariants = (1 << 10),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,

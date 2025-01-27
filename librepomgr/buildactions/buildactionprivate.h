@@ -479,6 +479,8 @@ struct LIBREPOMGR_EXPORT PrepareBuild : public InternalBuildAction {
 
 private:
     void populateDbConfig(const std::vector<LibPkg::Database *> &dbOrder, bool forStaging = false);
+    bool isDependencyInBuildList(const LibPkg::Dependency &dependency) const;
+    bool isDependencyGiven(const LibPkg::Dependency & dependency, PackageBuildData &packageBuildData);
     bool isExistingPackageRelevant(const std::string &dependencyName, LibPkg::PackageSearchResult &package, PackageBuildData &packageBuildData,
         const LibPkg::Database &destinationDb);
     void invokeVariantConversion(
@@ -527,6 +529,7 @@ private:
     bool m_useContainer = false;
     bool m_aurOnly = false;
     bool m_noCheck = false;
+    bool m_pullInComplementaryVariants = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {

@@ -208,7 +208,13 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                       .name = "No checks",
                       .desc = "Skips the check() function of PKGBUILDs",
                       .param = "no-check",
-                  },
+                },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::PullInComplementaryVariants),
+                    .name = "Pull-in complementary variants",
+                    .desc = "Adds complementary variants to the list of packages to be built",
+                    .param = "pull-in-complementary",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

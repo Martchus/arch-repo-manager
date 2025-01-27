@@ -208,6 +208,14 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     }
 }
 
+void ServiceSetup::BuildSetup::readComplementaryVariants(const std::multimap<std::string, std::string> &multimap)
+{
+    for (const auto &[variant, complementaryVariantsStr] : multimap) {
+        complementaryVariants[variant]
+            = CppUtilities::splitString<std::vector<std::string>>(complementaryVariantsStr, " ", CppUtilities::EmptyPartsTreat::Omit);
+    }
+}
+
 void ServiceSetup::BuildSetup::readPresets(const std::string &configFilePath, const std::string &presetsFileRelativePath)
 {
     if (presetsFileRelativePath.empty()) {
@@ -560,6 +568,8 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
                 std::string presetsFile;
                 convertValue(iniEntry.second, "presets", presetsFile);
                 building.readPresets(configFilePath, presetsFile);
+            } else if (iniEntry.first == "complementary_variants") {
+                building.readComplementaryVariants(iniEntry.second);
             } else if (startsWith(iniEntry.first, "user/")) {
                 auth.applyConfig(iniEntry.first.substr(5), iniEntry.second);
             }

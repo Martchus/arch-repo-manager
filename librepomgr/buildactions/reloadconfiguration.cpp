@@ -19,6 +19,7 @@ void ReloadConfiguration::run()
     m_setup.config.markAllDatabasesToBeDiscarded();
     auto setupLock = m_setup.lockToWrite();
     m_setup.auth.users.clear();
+    m_setup.building.complementaryVariants.clear();
     m_setup.loadConfigFiles(false);
     setupLock.unlock();
     m_setup.config.discardDatabases();

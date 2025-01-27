@@ -81,6 +81,7 @@ void PrepareBuild::run()
     m_useContainer = flags & PrepareBuildFlags::UseContainer;
     m_aurOnly = flags & PrepareBuildFlags::AurOnly;
     m_noCheck = flags & PrepareBuildFlags::NoCheck;
+    m_pullInComplementaryVariants = flags & PrepareBuildFlags::PullInComplementaryVariants;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -283,6 +284,40 @@ void PrepareBuild::populateDbConfig(const std::vector<LibPkg::Database *> &dbOrd
             dbConfig.emplace_back(IniFile::Scope(db->name, std::move(scopeData)));
         }
     }
+}
+
+/*!
+ * \brief Returns whether the specified \a dependency is already being built.
+ */
+bool PrepareBuild::isDependencyInBuildList(const LibPkg::Dependency &dependency) const
+{
+    if (m_buildDataByPackage.find(dependency.name) != m_buildDataByPackage.end()) {
+        return true;
+    }
+    for (const auto &[packageName, buildData] : m_buildDataByPackage) {
+        for (const auto &[packageID, package] : buildData.packages) {
+            if (package->providesDependency(dependency)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/*!
+ * \brief Returns whether the specified \a dependency is "given" gathering build data of those existing packages.
+ * \sa See note in run() function for details.
+ */
+bool PrepareBuild::isDependencyGiven(const LibPkg::Dependency &dependency, PackageBuildData &packageBuildData)
+{
+    auto existingPackages = m_setup.config.findPackages(dependency);
+    auto dependencyExists = false;
+    for (auto &package : existingPackages) {
+        if (isExistingPackageRelevant(dependency.name, package, packageBuildData, **m_destinationDbs.begin())) {
+            dependencyExists = true;
+        }
+    }
+    return dependencyExists;
 }
 
 /*!
@@ -590,7 +625,6 @@ bool PrepareBuild::pullFurtherDependencies(const std::vector<LibPkg::Dependency>
 {
     // pull further dependencies; similar to initial dependency lookup in run()
     auto dependencyAdded = false;
-    const auto *const destinationDb = *m_destinationDbs.begin();
     for (const auto &dependency : dependencies) {
         // skip empty dependencies which might be present if split package contains `depends=()`
         if (dependency.name.empty()) {
@@ -598,36 +632,14 @@ bool PrepareBuild::pullFurtherDependencies(const std::vector<LibPkg::Dependency>
         }
 
         // skip if the dependency is already in the list of packages to be built (check for cycles is done later when computing batches)
-        auto dependencyExists = false;
-        if (m_buildDataByPackage.find(dependency.name) != m_buildDataByPackage.end()) {
-            continue;
-        }
-        for (const auto &[packageName, buildData] : m_buildDataByPackage) {
-            for (const auto &[packageID, package] : buildData.packages) {
-                if (package->providesDependency(dependency)) {
-                    dependencyExists = true;
-                    break;
-                }
-            }
-            if (dependencyExists) {
-                break;
-            }
-        }
-        if (dependencyExists) {
+        if (isDependencyInBuildList(dependency)) {
             continue;
         }
 
         // skip dependency if it is already present in one of the dependencies considered as "given" (see note in run() function)
         auto packageBuildData = PackageBuildData();
         auto existingPackages = m_setup.config.findPackages(dependency);
-        for (auto &package : existingPackages) {
-            // skip if package not relevant
-            if (!isExistingPackageRelevant(dependency.name, package, packageBuildData, *destinationDb)) {
-                continue;
-            }
-            dependencyExists = true;
-        }
-        if (dependencyExists) {
+        if (isDependencyGiven(dependency, packageBuildData)) {
             continue;
         }
 
@@ -985,6 +997,34 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         }
         for (const auto &[packageID, package] : buildData.packages) {
             furtherDependenciesNeeded = pullFurtherDependencies(package->dependencies) || furtherDependenciesNeeded;
+            if (m_pullInComplementaryVariants) {
+                auto packageNameData = LibPkg::PackageNameData::decompose(package->name);
+                auto complementaryVariants = m_setup.building.complementaryVariants.find(packageNameData.targetPrefix);
+                if (complementaryVariants == m_setup.building.complementaryVariants.end()) {
+                    continue;
+                }
+                for (const auto &complementaryVariant : complementaryVariants->second) {
+                    packageNameData.targetPrefix = complementaryVariant;
+
+                    // skip if the dependency is already in the list of packages to be built
+                    const auto dependency = LibPkg::Dependency(packageNameData.compose());
+                    auto dependencyExists = isDependencyInBuildList(dependency);
+                    if (dependencyExists) {
+                        continue;
+                    }
+
+                    // add dependency only if it is already present in one of the dependencies considered as "given" (see note in run() function)
+                    auto packageBuildData = PackageBuildData();
+                    if (!isDependencyGiven(dependency, packageBuildData)) {
+                        continue;
+                    }
+
+                    // assume the dependency is provided by a package with the pkgbase of the dependency denotation
+                    // FIXME: support split packages
+                    m_buildDataByPackage[dependency.name] = std::move(packageBuildData);
+                    needToFetchAgain = true;
+                }
+            }
         }
     }
     configReadLock.unlock();

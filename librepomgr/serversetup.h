@@ -35,6 +35,22 @@ struct LIBREPOMGR_EXPORT ThreadPool {
 struct ServiceStatus;
 struct Storage;
 
+struct StringHash {
+    using is_transparent = void;
+    [[nodiscard]] size_t operator()(const char *txt) const
+    {
+        return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] size_t operator()(std::string_view txt) const
+    {
+        return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] size_t operator()(const std::string &txt) const
+    {
+        return std::hash<std::string>{}(txt);
+    }
+};
+
 struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     // the overall configuration (databases, packages, ...) used at various places
     // -> acquire the config lock for these
@@ -139,6 +155,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::uint64_t packageDownloadSizeLimit = 500 * 1024 * 1024;
         std::string testFilesDir;
         BuildPresets presets;
+        std::unordered_map<std::string, std::vector<std::string>, StringHash, std::equal_to<>> complementaryVariants;
         CppUtilities::TimeSpan buildActionRetention = CppUtilities::TimeSpan::fromDays(14);
         bool loadFilesDbs = false;
         bool forceLoadingDbs = false;
@@ -151,6 +168,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         void initStorage(const char *path);
         bool hasStorage() const;
         void applyConfig(const std::multimap<std::string, std::string> &multimap);
+        void readComplementaryVariants(const std::multimap<std::string, std::string> &multimap);
         void readPresets(const std::string &configFilePath, const std::string &presetsFile);
         Worker allocateBuildWorker();
         LibPkg::StorageID allocateBuildActionID();
