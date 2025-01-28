@@ -27,7 +27,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/process/v1/extend.hpp>
 
-#ifdef CPP_UTILITIES_DEBUG_BUILD
+#ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED
 #include <boost/asio/deadline_timer.hpp>
 #endif
 
