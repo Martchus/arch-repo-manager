@@ -480,7 +480,7 @@ struct LIBREPOMGR_EXPORT PrepareBuild : public InternalBuildAction {
 private:
     void populateDbConfig(const std::vector<LibPkg::Database *> &dbOrder, bool forStaging = false);
     bool isDependencyInBuildList(const LibPkg::Dependency &dependency) const;
-    bool isDependencyGiven(const LibPkg::Dependency & dependency, PackageBuildData &packageBuildData);
+    bool isDependencyGiven(const LibPkg::Dependency &dependency, PackageBuildData &packageBuildData);
     bool isExistingPackageRelevant(const std::string &dependencyName, LibPkg::PackageSearchResult &package, PackageBuildData &packageBuildData,
         const LibPkg::Database &destinationDb);
     void invokeVariantConversion(
