@@ -30,6 +30,7 @@ class BinaryParserTests : public TestFixture {
     CPPUNIT_TEST(testParsingPeAarch64);
     CPPUNIT_TEST(testParsingAr);
     CPPUNIT_TEST(testParsingArAarch64);
+    CPPUNIT_TEST(testParsingArExtended);
     CPPUNIT_TEST(testParsingElfFromPkgFile);
     CPPUNIT_TEST(testParsingPeFromPkgFile);
     CPPUNIT_TEST(testParsingArFromPkgFile);
@@ -44,6 +45,7 @@ public:
     void testParsingPeAarch64();
     void testParsingAr();
     void testParsingArAarch64();
+    void testParsingArExtended();
     void testParsingElfFromPkgFile();
     void testParsingPeFromPkgFile();
     void testParsingArFromPkgFile();
@@ -133,6 +135,24 @@ void BinaryParserTests::testParsingArAarch64()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "aarch64"s, bin3.architecture);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "MFPlat.DLL"s, bin3.name);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("rpath", std::string(), bin3.rpath);
+}
+
+void BinaryParserTests::testParsingArExtended()
+{
+    auto bin1 = Binary();
+    bin1.load(testFilePath("aarch64-libsqlite3.dll.a"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Ar, bin1.type);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("subtype", BinarySubType::WindowsImportLibrary, bin1.subType);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "aarch64"s, bin1.architecture);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "libsqlite3-0.dll"s, bin1.name);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("rpath", std::string(), bin1.rpath);
+    auto bin2 = Binary();
+    bin2.load(testFilePath("x86_64-libsqlite3.dll.a"));
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("type", BinaryType::Ar, bin2.type);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("subtype", BinarySubType::WindowsImportLibrary, bin2.subType);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("arch", "x86_64"s, bin2.architecture);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("name", "libsqlite3-0.dll"s, bin2.name);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("rpath", std::string(), bin2.rpath);
 }
 
 void BinaryParserTests::testParsingElfFromPkgFile()

@@ -670,15 +670,24 @@ void Binary::parsePe(BinaryReader &reader, iostream::off_type baseFileOffset)
     }
 }
 
+/// \cond
+static bool isDllOrDrv(std::string_view fileNameView)
+{
+    return fileNameView.ends_with(".dll") || fileNameView.ends_with(".DLL") || fileNameView.ends_with(".drv") || fileNameView.ends_with(".DRV");
+}
+/// \endcond
+
 /*!
  * \sa https://en.wikipedia.org/wiki/Ar_(Unix)
  */
 void Binary::parseAr(BinaryReader &reader)
 {
     const auto size = reader.readStreamsize();
+    auto extendedFileNames = std::vector<std::string>();
     for (auto remainingSize = size; remainingSize >= 60;) {
         // skip odd offsets as archive members are aligned to even byte boundaries
-        if ((reader.stream()->tellg() % 2) != 0) {
+        const auto startOffset = reader.stream()->tellg();
+        if ((startOffset % 2) != 0) {
             if (reader.readByte() != '\n') {
                 throw runtime_error("padding/newline to align archive entry on even byte boundaries is not present");
             }
@@ -698,10 +707,14 @@ void Binary::parseAr(BinaryReader &reader)
         }
 
         // make file name and file size zero-terminated
-        for (auto &c : fileName) {
-            if (c == ' ' || c == '/') {
-                c = '\0';
-                break;
+        if (fileName[0] == '/' && fileName[1] == '/' && fileName[2] == ' ') {
+            fileName[2] = '\0';
+        } else {
+            for (auto &c : fileName) {
+                if (c == ' ' || (&c != fileName && c == '/')) {
+                    c = '\0';
+                    break;
+                }
             }
         }
         for (auto &c : fileSizeStr) {
@@ -715,10 +728,30 @@ void Binary::parseAr(BinaryReader &reader)
         static_assert(std::is_scalar_v<std::decay_t<decltype(fileSizeStr)>>);
         const auto fileSize = stringToNumber<iostream::off_type>(fileSizeStr);
         const auto nextFileOffset = fileOffset + fileSize;
-        const auto fileNameView = std::string_view(fileName);
-        const auto dllOrDrv
-            = fileNameView.ends_with(".dll") || fileNameView.ends_with(".DLL") || fileNameView.ends_with(".drv") || fileNameView.ends_with(".DRV");
-        if (dllOrDrv || fileNameView.ends_with(".o")) {
+        auto fileNameView = std::string_view(fileName);
+        if (fileNameView != "//" && fileNameView.starts_with('/')) {
+            try {
+                if (const auto fileNameNumber = stringToNumber<std::size_t>(fileNameView.substr(1)); fileNameNumber < extendedFileNames.size()) {
+                    fileNameView = extendedFileNames[fileNameNumber];
+                }
+            } catch (const CppUtilities::ConversionException &e) {
+            }
+        }
+        if (fileNameView == "//") {
+            for (auto fileNamesSize = static_cast<std::size_t>(fileSize);;) {
+                auto extendedFileName = reader.readTerminatedString(fileNamesSize, '\n');
+                auto extendedFileNameSize = extendedFileName.size() + 1;
+                while (!extendedFileName.empty() && (extendedFileName.back() == '\0' || extendedFileName.back() == '/')) {
+                    extendedFileName.resize(extendedFileName.size() - 1);
+                }
+                extendedFileNames.emplace_back(std::move(extendedFileName));
+                if (extendedFileNameSize >= fileNamesSize) {
+                    break;
+                } else {
+                    fileNamesSize -= extendedFileNameSize;
+                }
+            }
+        } else if (const auto dllOrDrv = isDllOrDrv(fileNameView); dllOrDrv || fileNameView.ends_with(".o")) {
             const auto magic = reader.readUInt32BE();
             if (magic == 0x7f454c46u) {
                 return; // we're not interested in static libraries containing ELF files
@@ -736,7 +769,7 @@ void Binary::parseAr(BinaryReader &reader)
         }
 
         // parse the next file
-        remainingSize -= fileSize;
+        remainingSize -= fileOffset - startOffset + fileSize;
         if (nextFileOffset >= size) {
             break;
         }
