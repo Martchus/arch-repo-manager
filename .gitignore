@@ -43,6 +43,10 @@ Makefile*
 # clang-format
 .clang-format
 
+# clangd
+compile_commands.json
+.cache
+
 # dynamically created testfiles
 libpkg/testfiles/repo/foo/missing-0-any.pkg.tar.zst
 
