@@ -102,8 +102,11 @@ enum class PackageStagingNeeded {
 struct LIBREPOMGR_EXPORT PackageBuildProgress : public ReflectiveRapidJSON::JsonSerializable<PackageBuildProgress>,
                                                 public ReflectiveRapidJSON::BinarySerializable<PackageBuildProgress, 1> {
     bool hasBeenAnyProgressMade() const;
+    void addMakepkgFlag(const std::string &flag);
     void resetProgress();
     void resetChrootSettings();
+    void continueBuild();
+    void repackage();
 
     CppUtilities::DateTime started;
     CppUtilities::DateTime finished;

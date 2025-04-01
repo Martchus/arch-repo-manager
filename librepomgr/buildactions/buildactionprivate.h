@@ -499,6 +499,7 @@ private:
     void deduceBatchesFromSpecifiedOrder();
     void computeBatches();
     void addBatchesToResult(BatchList &&batches, Batch &&cyclicLeftovers);
+    void configureBuildProgress(PackageBuildProgress &buildProgress, bool reset = true) const;
     BuildPreparation makeResultData(std::string &&error = std::string());
 
     std::mutex m_mutex;
@@ -530,6 +531,8 @@ private:
     bool m_aurOnly = false;
     bool m_noCheck = false;
     bool m_pullInComplementaryVariants = false;
+    bool m_continueBuild = false;
+    bool m_repackage = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {

@@ -91,6 +91,8 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     AurOnly = (1 << 8),
     NoCheck = (1 << 9),
     PullInComplementaryVariants = (1 << 10),
+    ContinueBuild = (1 << 11),
+    Repackage = (1 << 12),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,

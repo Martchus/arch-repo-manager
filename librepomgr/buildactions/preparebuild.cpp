@@ -40,6 +40,13 @@ bool PackageBuildProgress::hasBeenAnyProgressMade() const
     return checksumsUpdated || hasSources || !finished.isNull() || addedToRepo || stagingNeeded != PackageStagingNeeded::Undetermined;
 }
 
+void PackageBuildProgress::addMakepkgFlag(const std::string &flag)
+{
+    if (std::find(makepkgFlags.cbegin(), makepkgFlags.cend(), flag) == makepkgFlags.cend()) {
+        makepkgFlags.emplace_back(flag);
+    }
+}
+
 void PackageBuildProgress::resetProgress()
 {
     checksumsUpdated = false;
@@ -54,6 +61,18 @@ void PackageBuildProgress::resetChrootSettings()
     chrootDirectory.clear();
     chrootUser.clear();
     skipChrootUpgrade = skipChrootCleanup = keepPreviousSourceTree = false;
+}
+
+void PackageBuildProgress::continueBuild()
+{
+    skipChrootCleanup = keepPreviousSourceTree = true;
+}
+
+void PackageBuildProgress::repackage()
+{
+    skipChrootUpgrade = skipChrootCleanup = keepPreviousSourceTree = true;
+    static const auto repackageFlag = std::string("--repackage");
+    addMakepkgFlag(repackageFlag);
 }
 
 PrepareBuild::PrepareBuild(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction)
@@ -82,6 +101,8 @@ void PrepareBuild::run()
     m_aurOnly = flags & PrepareBuildFlags::AurOnly;
     m_noCheck = flags & PrepareBuildFlags::NoCheck;
     m_pullInComplementaryVariants = flags & PrepareBuildFlags::PullInComplementaryVariants;
+    m_continueBuild = flags & PrepareBuildFlags::ContinueBuild;
+    m_repackage = flags & PrepareBuildFlags::Repackage;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -1206,6 +1227,22 @@ void PrepareBuild::addBatchesToResult(BatchList &&batches, Batch &&cyclicLeftove
     std::transform(cyclicLeftovers.cbegin(), cyclicLeftovers.cend(), std::back_inserter(m_cyclicLeftovers), returnItemName);
 }
 
+void PrepareBuild::configureBuildProgress(PackageBuildProgress &buildProgress, bool reset) const
+{
+    if (reset) {
+        buildProgress.resetProgress();
+        if (m_resetChrootSettings) {
+            buildProgress.resetChrootSettings();
+        }
+    }
+    if (m_continueBuild) {
+        buildProgress.continueBuild();
+    }
+    if (m_repackage) {
+        buildProgress.repackage();
+    }
+}
+
 BuildPreparation PrepareBuild::makeResultData(std::string &&error)
 {
     auto resultData = BuildPreparation{
@@ -1258,20 +1295,17 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                     for (const auto &[packageName, buildData] : resultData.buildData) {
                         auto &buildProgress = progress.progressByPackage[packageName];
                         // add "--nocheck" flag
-                        if (m_noCheck
-                            && std::find(buildProgress.makepkgFlags.cbegin(), buildProgress.makepkgFlags.cend(), "--nocheck")
-                                == buildProgress.makepkgFlags.cend()) {
-                            buildProgress.makepkgFlags.emplace_back("--nocheck");
+                        if (m_noCheck) {
+                            static const auto nocheckFlag = std::string("--nocheck");
+                            buildProgress.addMakepkgFlag(nocheckFlag);
                         }
-                        // reset the build progress if the PKGBUILD has been updated
+                        // reset/configure the build progress if the PKGBUILD has been updated
                         if (!buildProgress.hasBeenAnyProgressMade()) {
+                            configureBuildProgress(buildProgress, false);
                             continue;
                         }
                         if (buildProgress.buildDirectory.empty()) {
-                            buildProgress.resetProgress();
-                            if (m_resetChrootSettings) {
-                                buildProgress.resetChrootSettings();
-                            }
+                            configureBuildProgress(buildProgress);
                             continue;
                         }
                         const std::filesystem::path srcDirPkgbuild = buildData.sourceDirectory + "/PKGBUILD";
@@ -1279,10 +1313,7 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                         try {
                             if (!std::filesystem::exists(buildDirPkgbuild)
                                 || std::filesystem::last_write_time(srcDirPkgbuild) > std::filesystem::last_write_time(buildDirPkgbuild)) {
-                                buildProgress.resetProgress();
-                                if (m_resetChrootSettings) {
-                                    buildProgress.resetChrootSettings();
-                                }
+                                configureBuildProgress(buildProgress);
                             }
                         } catch (const std::filesystem::filesystem_error &e) {
                             m_buildAction->appendOutput(

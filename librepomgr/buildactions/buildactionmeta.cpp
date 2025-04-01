@@ -215,6 +215,18 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Adds complementary variants to the list of packages to be built",
                     .param = "pull-in-complementary",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::ContinueBuild),
+                    .name = "Set flags to continue build",
+                    .desc = "Prevent cleanup of chroot and sources",
+                    .param = "continue-build",
+                },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::Repackage),
+                    .name = "Set flags to repackage",
+                    .desc = "Prevent cleanup of chroot and sources, skip actual build",
+                    .param = "repackage",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{
