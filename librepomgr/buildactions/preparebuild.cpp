@@ -332,13 +332,12 @@ bool PrepareBuild::isDependencyInBuildList(const LibPkg::Dependency &dependency)
 bool PrepareBuild::isDependencyGiven(const LibPkg::Dependency &dependency, PackageBuildData &packageBuildData)
 {
     auto existingPackages = m_setup.config.findPackages(dependency);
-    auto dependencyExists = false;
     for (auto &package : existingPackages) {
         if (isExistingPackageRelevant(dependency.name, package, packageBuildData, **m_destinationDbs.begin())) {
-            dependencyExists = true;
+            return true;
         }
     }
-    return dependencyExists;
+    return false;
 }
 
 /*!
