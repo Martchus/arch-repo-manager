@@ -1040,7 +1040,6 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
                     }
 
                     // assume the dependency is provided by a package with the pkgbase of the dependency denotation
-                    // FIXME: support split packages
                     m_buildDataByPackage[dependency.name] = std::move(packageBuildData);
                     needToFetchAgain = true;
                 }
@@ -1065,13 +1064,43 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     // check for errors
     auto failedPackages = std::set<std::string>();
     auto localPackages = std::set<std::string>();
+    auto packagesToRemove = std::set<std::string>();
     auto errorMessage = std::string();
-    for (const auto &buildData : m_buildDataByPackage) {
-        if (!buildData.second.error.empty()) {
-            failedPackages.emplace(buildData.first);
-        } else if (m_aurOnly && !buildData.second.originalSourceDirectory.empty()) {
-            localPackages.emplace(buildData.first);
+    for (auto &[packageName, buildData] : m_buildDataByPackage) {
+        if (!buildData.error.empty()) {
+            // check whether this is a pulled-in package
+            if (m_pullInComplementaryVariants && buildData.convertFrom.has_value() && buildData.specifiedIndex == std::numeric_limits<decltype(buildData.specifiedIndex)>::max()) {
+                // check whether the erroneous pulled-in package is provided by another already present package so we can just remove it again
+                // note: This would e.g. remove "mingw-w64-clang-aarch64-harfbuzz-icu" as it is provided by "mingw-w64-clang-aarch64-harfbuzz".
+                auto dependency = LibPkg::Dependency(packageName);
+                auto provided = true;
+                buildData.error.clear();
+                for (const auto &[otherPackageName, otherBuildData] : m_buildDataByPackage) {
+                    if (otherPackageName == packageName) {
+                        continue;
+                    }
+                    for (const auto &[packageID, package] : otherBuildData.packages) {
+                        if (package->providesDependency(dependency)) {
+                            provided = true;
+                            break;
+                        }
+                    }
+                    if (provided) {
+                        break;
+                    }
+                }
+                if (provided) {
+                    packagesToRemove.emplace(packageName);
+                    continue;
+                }
+            }
+            failedPackages.emplace(packageName);
+        } else if (m_aurOnly && !buildData.originalSourceDirectory.empty()) {
+            localPackages.emplace(packageName);
         }
+    }
+    for (const auto &package : packagesToRemove) {
+        m_buildDataByPackage.erase(package);
     }
     if (!failedPackages.empty()) {
         errorMessage = "Unable to retrieve the following packages (see result data for details): " + joinStrings(failedPackages, " ");
