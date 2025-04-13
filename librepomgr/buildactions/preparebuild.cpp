@@ -416,8 +416,8 @@ void PrepareBuild::invokeVariantConversion(
     m_buildAction->log()(Phrases::InfoMessage, "Converting PKGBUILD of ", packageName, " via ", m_conversionScriptPath.string(), '\n',
         ps(Phrases::SubMessage), "conversion: ", convertFrom.sourceVariant, " => ", convertFrom.destinationVariant, '\n', ps(Phrases::SubMessage),
         "source: ", origDirectory, '\n', ps(Phrases::SubMessage), "destination: ", convDirectory, '\n');
-    processSession->launch(boost::process::v1::start_dir(origDirectory), boost::process::v1::env["FORCE_VARIANT_CONVERSION"] = "1", m_conversionScriptPath,
-        convertFrom.sourceVariant, convertFrom.destinationVariant, origDirectory, convDirectory);
+    processSession->launch(boost::process::v1::start_dir(origDirectory), boost::process::v1::env["FORCE_VARIANT_CONVERSION"] = "1",
+        m_conversionScriptPath, convertFrom.sourceVariant, convertFrom.destinationVariant, origDirectory, convDirectory);
     return;
 }
 

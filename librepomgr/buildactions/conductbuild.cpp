@@ -1040,9 +1040,11 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
     if (m_useContainer) {
         const auto debugFlag = m_saveChrootDirsOfFailures ? "on-failure" : "";
         processSession->launch(boost::process::v1::start_dir(buildDirectory), boost::process::v1::env["DEBUG"] = debugFlag,
-            boost::process::v1::env["PKGNAME"] = packageName, m_makeContainerPkgPath, "--", "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+            boost::process::v1::env["PKGNAME"] = packageName, m_makeContainerPkgPath, "--", "-f", "--nodeps", "--nobuild", "--source",
+            additionalFlags);
     } else {
-        processSession->launch(boost::process::v1::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+        processSession->launch(
+            boost::process::v1::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     }
     return InvocationResult::Ok;
 }
@@ -1554,7 +1556,8 @@ void ConductBuild::invokeRepoAdd(const BatchProcessingSession::SharedPointerType
                 m_buildAction->log()(
                     Phrases::InfoMessage, "Going to invoke repo-add for ", packageName, " via ", m_makeContainerPkgPath.string(), '\n');
                 processSession->launch(boost::process::v1::start_dir(*buildResult.repoPath), boost::process::v1::env["PKGNAME"] = packageName,
-                    boost::process::v1::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath, buildResult.binaryPackageNames);
+                    boost::process::v1::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath,
+                    buildResult.binaryPackageNames);
             } else {
                 processSession->launch(
                     boost::process::v1::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);

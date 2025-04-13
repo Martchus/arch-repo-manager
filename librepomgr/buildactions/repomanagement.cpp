@@ -178,8 +178,8 @@ void RemovePackages::run()
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
                     m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_result.processedPackages);
             } else {
-                repoRemoveProcess->launch(
-                    boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
+                repoRemoveProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile,
+                    m_result.processedPackages);
             }
             buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", m_destinationRepoDirectory, "\" for \"",
                 m_destinationDatabaseFile, "\", see logfile for details\n");
@@ -336,7 +336,8 @@ void MovePackages::run()
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-add",
                     m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_fileNames);
             } else {
-                repoAddProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
+                repoAddProcess->launch(
+                    boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", m_destinationRepoDirectory, "\" for \"",
                 m_destinationDatabaseFile, "\", see logfile for details\n");
@@ -365,7 +366,8 @@ void MovePackages::run()
         });
 }
 
-void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
+void MovePackages::handleRepoRemoveResult(
+    MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
 {
     // handle error
     CPP_UTILITIES_UNUSED(processSession)
@@ -401,7 +403,8 @@ void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType 
     }
 }
 
-void MovePackages::handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
+void MovePackages::handleRepoAddResult(
+    MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
 {
     // handle error
     CPP_UTILITIES_UNUSED(processSession)

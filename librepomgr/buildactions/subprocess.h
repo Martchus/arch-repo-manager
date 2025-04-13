@@ -131,7 +131,8 @@ template <typename... ChildArgs> void ProcessSession::launch(ChildArgs &&...chil
 {
     try {
         child = boost::process::v1::child(
-            m_ioContext, group, std::forward<ChildArgs>(childArgs)..., boost::process::v1::std_out > outputPipe, boost::process::v1::std_err > errorPipe,
+            m_ioContext, group, std::forward<ChildArgs>(childArgs)..., boost::process::v1::std_out > outputPipe,
+            boost::process::v1::std_err > errorPipe,
             boost::process::v1::on_exit =
                 [session = shared_from_this()](int exitCode, const std::error_code &errorCode) {
                     session->result.exitCode = exitCode;

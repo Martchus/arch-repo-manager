@@ -59,21 +59,22 @@ void CustomCommand::run()
 
     // prepare process and finish handler
     m_command = &command;
-    m_process = m_buildAction->makeBuildProcess("command", m_workingDirectory + "/the.log", [this](boost::process::v1::child &&, ProcessResult &&result) {
-        if (result.errorCode) {
-            m_buildAction->appendOutput(Phrases::InfoMessage, "Unable to invoke command: ", result.errorCode.message());
-            reportError(result.errorCode.message());
-            return;
-        }
-        m_buildAction->appendOutput(
-            result.exitCode == 0 ? Phrases::InfoMessage : Phrases::ErrorMessage, "Command exited with return code ", result.exitCode);
-        if (result.exitCode != 0) {
-            reportError(argsToString("non-zero exit code ", result.exitCode));
-            return;
-        }
-        const auto buildLock = m_setup.building.lockToWrite();
-        reportSuccess();
-    });
+    m_process
+        = m_buildAction->makeBuildProcess("command", m_workingDirectory + "/the.log", [this](boost::process::v1::child &&, ProcessResult &&result) {
+              if (result.errorCode) {
+                  m_buildAction->appendOutput(Phrases::InfoMessage, "Unable to invoke command: ", result.errorCode.message());
+                  reportError(result.errorCode.message());
+                  return;
+              }
+              m_buildAction->appendOutput(
+                  result.exitCode == 0 ? Phrases::InfoMessage : Phrases::ErrorMessage, "Command exited with return code ", result.exitCode);
+              if (result.exitCode != 0) {
+                  reportError(argsToString("non-zero exit code ", result.exitCode));
+                  return;
+              }
+              const auto buildLock = m_setup.building.lockToWrite();
+              reportSuccess();
+          });
     if (!m_process) {
         return;
     }
