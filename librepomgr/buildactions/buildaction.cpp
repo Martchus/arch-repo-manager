@@ -548,7 +548,7 @@ void BuildServiceCleanup::invokePaccache()
     const auto &cacheDirArch = m_concreteCacheDirsIterator->first;
     const auto &cacheDirPath = m_concreteCacheDirsIterator->second;
     auto processSession = m_buildAction->makeBuildProcess(
-        "paccache-" + cacheDirArch, "paccache-" % cacheDirArch + ".log", [this](boost::process::child &&child, ProcessResult &&result) {
+        "paccache-" + cacheDirArch, "paccache-" % cacheDirArch + ".log", [this](boost::process::v1::child &&child, ProcessResult &&result) {
             CPP_UTILITIES_UNUSED(child)
             if (result.errorCode) {
                 const auto errorMessage = result.errorCode.message();
@@ -631,7 +631,7 @@ void DummyBuildAction::run()
 
     // launch subprocess producing a logfile
     m_logProcess
-        = m_buildAction->makeBuildProcess("dummy", m_workingDirectory + "/foo.log", [this](boost::process::child &&child, ProcessResult &&result) {
+        = m_buildAction->makeBuildProcess("dummy", m_workingDirectory + "/foo.log", [this](boost::process::v1::child &&child, ProcessResult &&result) {
               CPP_UTILITIES_UNUSED(child)
               m_logProcess = nullptr;
               m_buildAction->appendOutput("log process exited with code: ", result.exitCode, '\n');

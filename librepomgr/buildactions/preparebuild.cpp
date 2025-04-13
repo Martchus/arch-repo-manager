@@ -393,7 +393,7 @@ void PrepareBuild::invokeVariantConversion(
     }
     auto &convertFrom = *buildData.convertFrom;
     auto processSession = m_buildAction->makeBuildProcess(packageName + " conversion", sourceDirectory + "/conversion.log",
-        [this, multiSession, &sourceDirectory, &packageName](boost::process::child &&child, ProcessResult &&result) mutable {
+        [this, multiSession, &sourceDirectory, &packageName](boost::process::v1::child &&child, ProcessResult &&result) mutable {
             if (result.errorCode) {
                 multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
                     .errorOutput = std::move(result.error),
@@ -416,7 +416,7 @@ void PrepareBuild::invokeVariantConversion(
     m_buildAction->log()(Phrases::InfoMessage, "Converting PKGBUILD of ", packageName, " via ", m_conversionScriptPath.string(), '\n',
         ps(Phrases::SubMessage), "conversion: ", convertFrom.sourceVariant, " => ", convertFrom.destinationVariant, '\n', ps(Phrases::SubMessage),
         "source: ", origDirectory, '\n', ps(Phrases::SubMessage), "destination: ", convDirectory, '\n');
-    processSession->launch(boost::process::start_dir(origDirectory), boost::process::env["FORCE_VARIANT_CONVERSION"] = "1", m_conversionScriptPath,
+    processSession->launch(boost::process::v1::start_dir(origDirectory), boost::process::v1::env["FORCE_VARIANT_CONVERSION"] = "1", m_conversionScriptPath,
         convertFrom.sourceVariant, convertFrom.destinationVariant, origDirectory, convDirectory);
     return;
 }
@@ -431,15 +431,15 @@ void PrepareBuild::makeSrcInfo(
     std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &sourceDirectory, const std::string &packageName)
 {
     auto processSession = make_shared<ProcessSession>(
-        m_setup.building.ioContext, [multiSession, &sourceDirectory, &packageName](boost::process::child &&child, ProcessResult &&result) {
+        m_setup.building.ioContext, [multiSession, &sourceDirectory, &packageName](boost::process::v1::child &&child, ProcessResult &&result) {
             processSrcInfo(*multiSession, sourceDirectory, packageName, std::move(child), std::move(result));
         });
     processSession->launch(
-        boost::process::start_dir(sourceDirectory), (m_useContainer ? m_makeContainerPkgPath : m_makePkgPath).string(), "--printsrcinfo");
+        boost::process::v1::start_dir(sourceDirectory), (m_useContainer ? m_makeContainerPkgPath : m_makePkgPath).string(), "--printsrcinfo");
 }
 
 void PrepareBuild::processSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &sourceDirectory,
-    const std::string &packageName, boost::process::child &&child, ProcessResult &&result)
+    const std::string &packageName, boost::process::v1::child &&child, ProcessResult &&result)
 {
     if (result.errorCode) {
         multiSession.addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,

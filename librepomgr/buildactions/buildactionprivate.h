@@ -183,7 +183,7 @@ private:
     void conclude();
 
     std::shared_ptr<BuildAction> m_buildAction;
-    boost::process::async_pipe m_pipe;
+    boost::process::v1::async_pipe m_pipe;
     BufferPoolType m_bufferPool;
     BufferType m_buffer;
     std::string m_displayName;
@@ -246,9 +246,9 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
         return;
     }
     try {
-        child = boost::process::child(
-            m_ioContext, group, std::forward<ChildArgs>(childArgs)..., (boost::process::std_out & boost::process::std_err) > m_pipe,
-            boost::process::extend::on_success =
+        child = boost::process::v1::child(
+            m_ioContext, group, std::forward<ChildArgs>(childArgs)..., (boost::process::v1::std_out & boost::process::v1::std_err) > m_pipe,
+            boost::process::v1::extend::on_success =
                 [session = shared_from_this()](auto &executor) {
                     if (session->m_buildAction) {
                         session->m_buildAction->appendOutput(CppUtilities::EscapeCodes::Phrases::InfoMessage, "Launched \"", session->m_displayName,
@@ -263,18 +263,18 @@ template <typename... ChildArgs> void BuildProcessSession::launch(ChildArgs &&..
                             '\n');
                     }
                 },
-            boost::process::on_exit =
+            boost::process::v1::on_exit =
                 [session = shared_from_this()](int exitCode, const std::error_code &errorCode) {
                     session->result.exitCode = exitCode;
                     session->result.errorCode = errorCode;
                     session->conclude();
                 },
-            boost::process::extend::on_error =
+            boost::process::v1::extend::on_error =
                 [session = shared_from_this()](auto &, const std::error_code &errorCode) {
                     session->result.errorCode = errorCode;
                     session->conclude();
                 });
-    } catch (const boost::process::process_error &e) {
+    } catch (const boost::process::v1::process_error &e) {
         result.errorCode = e.code();
         result.error = CppUtilities::argsToString("unable to launch: ", e.what());
         conclude();
@@ -352,7 +352,7 @@ struct LIBREPOMGR_EXPORT RemovePackages : public PackageMovementAction {
     void run();
 
 private:
-    void handleRepoRemoveResult(boost::process::child &&child, ProcessResult &&result);
+    void handleRepoRemoveResult(boost::process::v1::child &&child, ProcessResult &&result);
     void movePackagesToArchive();
 };
 
@@ -361,8 +361,8 @@ struct LIBREPOMGR_EXPORT MovePackages : public PackageMovementAction {
     void run();
 
 private:
-    void handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::child &&child, ProcessResult &&result);
-    void handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::child &&child, ProcessResult &&result);
+    void handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result);
+    void handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result);
     void conclude();
 
     std::string m_addErrorMessage;
@@ -488,7 +488,7 @@ private:
     void makeSrcInfo(
         std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &sourceDirectory, const std::string &packageName);
     static void processSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &sourceDirectory, const std::string &packageName,
-        boost::process::child &&child, ProcessResult &&result);
+        boost::process::v1::child &&child, ProcessResult &&result);
     static void addResultFromSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &packageName, const std::string &srcInfo);
     static void addPackageToLogLine(std::string &logLine, const std::string &packageName);
     void fetchMissingBuildData();
@@ -651,9 +651,9 @@ private:
         const std::string &packageName, PackageBuildProgress &packageProgress, BuildResult &&buildResult,
         MultiSession<std::string>::ContainerType &&failedPackages);
     void handleMakechrootpkgErrorsAndAddPackageToRepo(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
-        const std::string &packageName, PackageBuildProgress &packageProgress, boost::process::child &&child, ProcessResult &&result);
+        const std::string &packageName, PackageBuildProgress &packageProgress, boost::process::v1::child &&child, ProcessResult &&result);
     void handleRepoAddErrorsAndMakeNextPackage(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
-        PackageBuildProgress &packageProgress, boost::process::child &&child, ProcessResult &&result);
+        PackageBuildProgress &packageProgress, boost::process::v1::child &&child, ProcessResult &&result);
     void checkBuildErrors(BatchProcessingSession::ContainerType &&failedPackages);
     void dumpBuildProgress();
     void addLogFile(std::string &&logFilePath);

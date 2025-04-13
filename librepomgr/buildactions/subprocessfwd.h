@@ -14,7 +14,7 @@ class child;
 namespace LibRepoMgr {
 
 struct ProcessResult;
-using ProcessHandler = std::function<void(boost::process::child &&child, ProcessResult &&)>;
+using ProcessHandler = std::function<void(boost::process::v1::child &&child, ProcessResult &&)>;
 class BaseProcessSession;
 class BasicProcessSession;
 class ProcessSession;

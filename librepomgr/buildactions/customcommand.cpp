@@ -59,7 +59,7 @@ void CustomCommand::run()
 
     // prepare process and finish handler
     m_command = &command;
-    m_process = m_buildAction->makeBuildProcess("command", m_workingDirectory + "/the.log", [this](boost::process::child &&, ProcessResult &&result) {
+    m_process = m_buildAction->makeBuildProcess("command", m_workingDirectory + "/the.log", [this](boost::process::v1::child &&, ProcessResult &&result) {
         if (result.errorCode) {
             m_buildAction->appendOutput(Phrases::InfoMessage, "Unable to invoke command: ", result.errorCode.message());
             reportError(result.errorCode.message());
@@ -113,7 +113,7 @@ void LibRepoMgr::CustomCommand::acquireNextExclusiveLock()
 {
     if (m_exclusiveLockNamesIterator == m_exclusiveLockNames.end()) {
         // execute process once all locks are acquired
-        m_process->launch(boost::process::start_dir(m_workingDirectory), boost::process::search_path("bash"), "-ec", *m_command);
+        m_process->launch(boost::process::v1::start_dir(m_workingDirectory), boost::process::v1::search_path("bash"), "-ec", *m_command);
         m_process.reset();
         return;
     }

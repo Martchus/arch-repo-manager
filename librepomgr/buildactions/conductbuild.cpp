@@ -861,7 +861,7 @@ InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession:
         return InvocationResult::Skipped;
     }
     auto processSession = m_buildAction->makeBuildProcess(packageName + " checksum update", packageProgress.buildDirectory + "/updpkgsums.log",
-        [this, downloadsSession, &packageProgress, &packageName, buildDirectory](boost::process::child &&child, ProcessResult &&result) {
+        [this, downloadsSession, &packageProgress, &packageName, buildDirectory](boost::process::v1::child &&child, ProcessResult &&result) {
             const auto hasError = result.errorCode || result.exitCode != 0;
             auto lock = lockToWrite();
             if (result.errorCode) {
@@ -904,12 +904,12 @@ InvocationResult ConductBuild::invokeUpdatePkgSums(const BatchProcessingSession:
     if (m_useContainer && !checkExecutable(m_updatePkgSumsPath)) {
         m_buildAction->log()(Phrases::InfoMessage, "Updating checksums of ", packageName, " via ", m_makeContainerPkgPath.string(), '\n',
             ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
-        processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["PKGNAME"] = packageName,
-            boost::process::env["TOOL"] = "updpkgsums", m_makeContainerPkgPath);
+        processSession->launch(boost::process::v1::start_dir(buildDirectory), boost::process::v1::env["PKGNAME"] = packageName,
+            boost::process::v1::env["TOOL"] = "updpkgsums", m_makeContainerPkgPath);
     } else {
         m_buildAction->log()(Phrases::InfoMessage, "Updating checksums of ", packageName, " via ", m_updatePkgSumsPath.string(), '\n',
             ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
-        processSession->launch(boost::process::start_dir(buildDirectory), m_updatePkgSumsPath);
+        processSession->launch(boost::process::v1::start_dir(buildDirectory), m_updatePkgSumsPath);
     }
     return InvocationResult::Ok;
 }
@@ -952,7 +952,7 @@ InvocationResult ConductBuild::invokeGpgForKeyImport(const BatchProcessingSessio
     // invoke "gpg --import …"
     auto processSession = m_buildAction->makeBuildProcess(packageName + " key import", packageProgress.buildDirectory + "/key-import.log",
         [this, downloadsSession, &packageProgress, &packageName, buildDirectory = buildDirectory](
-            boost::process::child &&child, ProcessResult &&result) {
+            boost::process::v1::child &&child, ProcessResult &&result) {
             if (result.errorCode) {
                 auto lock = lockToWrite();
                 auto errorMessage = result.errorCode.message();
@@ -976,7 +976,7 @@ InvocationResult ConductBuild::invokeGpgForKeyImport(const BatchProcessingSessio
     if (!processSession) {
         return InvocationResult::Skipped;
     }
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, "--yes", "--import", keyFiles);
+    processSession->launch(boost::process::v1::start_dir(packageProgress.buildDirectory), m_gpgPath, "--yes", "--import", keyFiles);
     m_buildAction->log()(Phrases::InfoMessage, "Importing ", keyFiles.size(), " keys for package \"", packageName, '\"', '\n');
     return InvocationResult::Ok;
 }
@@ -1000,7 +1000,7 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
     }
 
     auto processSession = m_buildAction->makeBuildProcess(packageName + " download", packageProgress.buildDirectory + "/download.log",
-        [this, downloadsSession, &packageProgress, &packageName](boost::process::child &&child, ProcessResult &&result) {
+        [this, downloadsSession, &packageProgress, &packageName](boost::process::v1::child &&child, ProcessResult &&result) {
             auto lock = lockToWrite();
             if (result.errorCode) {
                 const auto errorMessage = result.errorCode.message();
@@ -1039,10 +1039,10 @@ InvocationResult ConductBuild::invokeMakepkgToMakeSourcePackage(const BatchProce
         ps(Phrases::SubMessage), "build dir: ", buildDirectory, '\n');
     if (m_useContainer) {
         const auto debugFlag = m_saveChrootDirsOfFailures ? "on-failure" : "";
-        processSession->launch(boost::process::start_dir(buildDirectory), boost::process::env["DEBUG"] = debugFlag,
-            boost::process::env["PKGNAME"] = packageName, m_makeContainerPkgPath, "--", "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+        processSession->launch(boost::process::v1::start_dir(buildDirectory), boost::process::v1::env["DEBUG"] = debugFlag,
+            boost::process::v1::env["PKGNAME"] = packageName, m_makeContainerPkgPath, "--", "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     } else {
-        processSession->launch(boost::process::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
+        processSession->launch(boost::process::v1::start_dir(buildDirectory), m_makePkgPath, "-f", "--nodeps", "--nobuild", "--source", additionalFlags);
     }
     return InvocationResult::Ok;
 }
@@ -1233,9 +1233,9 @@ void ConductBuild::invokeMakechrootpkgStep3(std::shared_ptr<BuildProcessSession>
     locks.emplace_back(std::move(chrootLock));
     auto lock = lockToRead();
     auto &packageProgress = m_buildProgress.progressByPackage[packageName];
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, sudoArgs, makechrootpkgFlags, "-Y",
+    processSession->launch(boost::process::v1::start_dir(packageProgress.buildDirectory), m_makeChrootPkgPath, sudoArgs, makechrootpkgFlags, "-Y",
         m_globalPackageCacheDir, "-r", chrootDir, "-l", packageProgress.chrootUser, packageProgress.makechrootpkgFlags, "--", makepkgFlags,
-        packageProgress.makepkgFlags, boost::process::std_in < boost::asio::buffer(m_sudoPassword));
+        packageProgress.makepkgFlags, boost::process::v1::std_in < boost::asio::buffer(m_sudoPassword));
     lock.unlock();
     return cb(InvocationResult::Ok);
 }
@@ -1291,7 +1291,7 @@ void ConductBuild::invokeMakecontainerpkg(const BatchProcessingSession::SharedPo
     // invoke makechrootpkg to build package
     m_buildAction->log()(Phrases::InfoMessage, "Building ", packageName, " within container via ", m_makeContainerPkgPath.string(), '\n',
         ps(Phrases::SubMessage), "build dir: ", packageProgress.buildDirectory, '\n');
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_makeContainerPkgPath, makecontainerpkgFlags, "--",
+    processSession->launch(boost::process::v1::start_dir(packageProgress.buildDirectory), m_makeContainerPkgPath, makecontainerpkgFlags, "--",
         makepkgFlags, packageProgress.makepkgFlags);
     lock.unlock();
     return cb(InvocationResult::Ok);
@@ -1482,7 +1482,7 @@ void ConductBuild::invokeGpg(
     auto processSession = m_buildAction->makeBuildProcess("gpg for " + binaryPackage.name,
         packageProgress.buildDirectory % "/gpg-" % binaryPackage.name + ".log",
         [this, signingSession, &packageName, &packageProgress, isAny = binaryPackage.isAny, binaryPackageName = binaryPackage.fileName](
-            boost::process::child &&child, ProcessResult &&result) mutable {
+            boost::process::v1::child &&child, ProcessResult &&result) mutable {
             // make the next gpg invocation
             if (const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
                 signingSession->currentPackage != signingSession->binaryPackages.end()
@@ -1534,8 +1534,8 @@ void ConductBuild::invokeGpg(
     if (!m_gpgPassphrase.empty()) {
         pinentryArgs = { "--pinentry-mode", "loopback", "--passphrase-fd", "0" };
     }
-    processSession->launch(boost::process::start_dir(packageProgress.buildDirectory), m_gpgPath, pinentryArgs, "--detach-sign", "--yes",
-        "--use-agent", "--no-armor", "-u", m_gpgKey, binaryPackage.fileName, boost::process::std_in < boost::asio::buffer(m_gpgPassphrase));
+    processSession->launch(boost::process::v1::start_dir(packageProgress.buildDirectory), m_gpgPath, pinentryArgs, "--detach-sign", "--yes",
+        "--use-agent", "--no-armor", "-u", m_gpgKey, binaryPackage.fileName, boost::process::v1::std_in < boost::asio::buffer(m_gpgPassphrase));
     m_buildAction->log()(Phrases::InfoMessage, "Signing ", binaryPackage.fileName, '\n');
 }
 
@@ -1553,11 +1553,11 @@ void ConductBuild::invokeRepoAdd(const BatchProcessingSession::SharedPointerType
             if (m_useContainer && !checkExecutable(m_repoAddPath)) {
                 m_buildAction->log()(
                     Phrases::InfoMessage, "Going to invoke repo-add for ", packageName, " via ", m_makeContainerPkgPath.string(), '\n');
-                processSession->launch(boost::process::start_dir(*buildResult.repoPath), boost::process::env["PKGNAME"] = packageName,
-                    boost::process::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath, buildResult.binaryPackageNames);
+                processSession->launch(boost::process::v1::start_dir(*buildResult.repoPath), boost::process::v1::env["PKGNAME"] = packageName,
+                    boost::process::v1::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath, buildResult.binaryPackageNames);
             } else {
                 processSession->launch(
-                    boost::process::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);
+                    boost::process::v1::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);
             }
             buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage),
                 "repo path: ", buildResult.repoPath, '\n', ps(Phrases::SubMessage), "db path: ", buildResult.dbFilePath, '\n',
@@ -1623,7 +1623,7 @@ static void assignNewChrootUser(std::string &&newChrootUser, PackageBuildProgres
 }
 
 void ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
-    const string &packageName, PackageBuildProgress &packageProgress, boost::process::child &&child, ProcessResult &&result)
+    const string &packageName, PackageBuildProgress &packageProgress, boost::process::v1::child &&child, ProcessResult &&result)
 {
     // check for makechrootpkg error
     const auto hasError = result.errorCode || child.exit_code() != 0;
@@ -1685,7 +1685,7 @@ void ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo(const BatchProce
 }
 
 void ConductBuild::handleRepoAddErrorsAndMakeNextPackage(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
-    const string &packageName, PackageBuildProgress &packageProgress, boost::process::child &&child, ProcessResult &&result)
+    const string &packageName, PackageBuildProgress &packageProgress, boost::process::v1::child &&child, ProcessResult &&result)
 {
     // handle repo-add error; update build progress JSON after each package
     auto lock = lockToWrite();

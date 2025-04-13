@@ -249,7 +249,7 @@ void BuildActionsTests::testLogging()
 void BuildActionsTests::testProcessSession()
 {
     auto &ioc = m_setup.building.ioContext;
-    auto session = std::make_shared<ProcessSession>(ioc, [&ioc](boost::process::child &&child, ProcessResult &&result) {
+    auto session = std::make_shared<ProcessSession>(ioc, [&ioc](boost::process::v1::child &&child, ProcessResult &&result) {
         CPP_UTILITIES_UNUSED(child)
         CPPUNIT_ASSERT_EQUAL(std::error_code(), result.errorCode);
         CPPUNIT_ASSERT_EQUAL(0, result.exitCode);
@@ -257,7 +257,7 @@ void BuildActionsTests::testProcessSession()
         CPPUNIT_ASSERT_EQUAL("line1\nline2"s, result.output);
         ioc.stop();
     });
-    session->launch(boost::process::search_path("echo"), "-n", "line1\nline2");
+    session->launch(boost::process::v1::search_path("echo"), "-n", "line1\nline2");
     session.reset();
     ioc.run();
 }
@@ -278,7 +278,7 @@ void BuildActionsTests::testBuildActionProcess()
 
     auto &ioc = m_setup.building.ioContext;
     auto session = std::make_shared<BuildProcessSession>(
-        m_buildAction.get(), ioc, "test", std::string(logFilePath), [this](boost::process::child &&child, ProcessResult &&result) {
+        m_buildAction.get(), ioc, "test", std::string(logFilePath), [this](boost::process::v1::child &&child, ProcessResult &&result) {
             CPPUNIT_ASSERT_EQUAL(std::error_code(), result.errorCode);
             CPPUNIT_ASSERT_EQUAL(0, result.exitCode);
             CPPUNIT_ASSERT_GREATER(0, child.native_handle());

@@ -44,8 +44,8 @@ public:
     explicit BaseProcessSession(boost::asio::io_context &ioContext, Handler &&handler);
     ~BaseProcessSession();
 
-    boost::process::group group;
-    boost::process::child child;
+    boost::process::v1::group group;
+    boost::process::v1::child child;
     ProcessResult result;
 
 protected:
@@ -84,16 +84,16 @@ inline BasicProcessSession::BasicProcessSession(boost::asio::io_context &ioConte
 template <typename... ChildArgs> void BasicProcessSession::launch(ChildArgs &&...childArgs)
 {
     try {
-        child = boost::process::child(
+        child = boost::process::v1::child(
             m_ioContext, group, std::forward<ChildArgs>(childArgs)...,
-            boost::process::on_exit =
+            boost::process::v1::on_exit =
                 [session = shared_from_this()](int exitCode, const std::error_code &errorCode) {
                     session->result.exitCode = exitCode;
                     session->result.errorCode = errorCode;
                 },
-            boost::process::extend::on_error
+            boost::process::v1::extend::on_error
             = [session = shared_from_this()](auto &, const std::error_code &errorCode) { session->result.errorCode = errorCode; });
-    } catch (const boost::process::process_error &e) {
+    } catch (const boost::process::v1::process_error &e) {
         result.errorCode = e.code();
         result.error = CppUtilities::argsToString("unable to launch: ", e.what());
         return;
@@ -106,7 +106,7 @@ public:
     explicit ProcessSession(boost::asio::io_context &ioContext, Handler &&handler);
     template <typename... ChildArgs> void launch(ChildArgs &&...childArgs);
 
-    boost::process::async_pipe outputPipe, errorPipe;
+    boost::process::v1::async_pipe outputPipe, errorPipe;
 
 private:
     static std::string streambufToString(boost::asio::streambuf &buf);
@@ -130,16 +130,16 @@ inline std::string ProcessSession::streambufToString(boost::asio::streambuf &buf
 template <typename... ChildArgs> void ProcessSession::launch(ChildArgs &&...childArgs)
 {
     try {
-        child = boost::process::child(
-            m_ioContext, group, std::forward<ChildArgs>(childArgs)..., boost::process::std_out > outputPipe, boost::process::std_err > errorPipe,
-            boost::process::on_exit =
+        child = boost::process::v1::child(
+            m_ioContext, group, std::forward<ChildArgs>(childArgs)..., boost::process::v1::std_out > outputPipe, boost::process::v1::std_err > errorPipe,
+            boost::process::v1::on_exit =
                 [session = shared_from_this()](int exitCode, const std::error_code &errorCode) {
                     session->result.exitCode = exitCode;
                     session->result.errorCode = errorCode;
                 },
-            boost::process::extend::on_error
+            boost::process::v1::extend::on_error
             = [session = shared_from_this()](auto &, const std::error_code &errorCode) { session->result.errorCode = errorCode; });
-    } catch (const boost::process::process_error &e) {
+    } catch (const boost::process::v1::process_error &e) {
         result.errorCode = e.code();
         result.error = CppUtilities::argsToString("unable to launch: ", e.what());
         return;
@@ -158,7 +158,7 @@ template <typename... ChildArgs> void ProcessSession::launch(ChildArgs &&...chil
 
 inline boost::filesystem::path findExecutable(const std::string &nameOrPath)
 {
-    return nameOrPath.find('/') == std::string::npos ? boost::process::search_path(nameOrPath) : boost::filesystem::path(nameOrPath);
+    return nameOrPath.find('/') == std::string::npos ? boost::process::v1::search_path(nameOrPath) : boost::filesystem::path(nameOrPath);
 }
 
 inline bool checkExecutable(const boost::filesystem::path &path)

@@ -174,19 +174,19 @@ void RemovePackages::run()
             }
             repoRemoveProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
-                repoRemoveProcess->launch(boost::process::start_dir(m_destinationRepoDirectory),
-                    boost::process::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::env["TOOL"] = "repo-remove",
+                repoRemoveProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory),
+                    boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
                     m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_result.processedPackages);
             } else {
                 repoRemoveProcess->launch(
-                    boost::process::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
+                    boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile, m_result.processedPackages);
             }
             buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", m_destinationRepoDirectory, "\" for \"",
                 m_destinationDatabaseFile, "\", see logfile for details\n");
         });
 }
 
-void RemovePackages::handleRepoRemoveResult(boost::process::child &&child, ProcessResult &&result)
+void RemovePackages::handleRepoRemoveResult(boost::process::v1::child &&child, ProcessResult &&result)
 {
     CPP_UTILITIES_UNUSED(child)
     if (result.errorCode) {
@@ -332,11 +332,11 @@ void MovePackages::run()
             }
             repoAddProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
-                repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory),
-                    boost::process::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::env["TOOL"] = "repo-add",
+                repoAddProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory),
+                    boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-add",
                     m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_fileNames);
             } else {
-                repoAddProcess->launch(boost::process::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
+                repoAddProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", m_destinationRepoDirectory, "\" for \"",
                 m_destinationDatabaseFile, "\", see logfile for details\n");
@@ -353,19 +353,19 @@ void MovePackages::run()
             }
             repoRemoveProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
-                repoRemoveProcess->launch(boost::process::start_dir(m_sourceRepoDirectory),
-                    boost::process::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::env["TOOL"] = "repo-remove",
+                repoRemoveProcess->launch(boost::process::v1::start_dir(m_sourceRepoDirectory),
+                    boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
                     m_makeContainerPkgPath, "--", m_sourceDatabaseFile, m_result.processedPackages);
             } else {
                 repoRemoveProcess->launch(
-                    boost::process::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
+                    boost::process::v1::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", m_sourceRepoDirectory, "\" for \"", m_sourceDatabaseFile,
                 "\", see logfile for details\n");
         });
 }
 
-void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::child &&child, ProcessResult &&result)
+void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
 {
     // handle error
     CPP_UTILITIES_UNUSED(processSession)
@@ -401,7 +401,7 @@ void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType 
     }
 }
 
-void MovePackages::handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::child &&child, ProcessResult &&result)
+void MovePackages::handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
 {
     // handle error
     CPP_UTILITIES_UNUSED(processSession)
