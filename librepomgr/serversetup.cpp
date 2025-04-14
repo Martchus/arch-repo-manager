@@ -825,6 +825,10 @@ int ServiceSetup::run()
         printLimits();
         printIoUringUsage();
         loadConfigFiles(true);
+        if (!config.storage()) {
+            cerr << Phrases::SubError << "Stopping as database could not be initialized." << endl;
+            return EXIT_FAILURE + 1;
+        }
         config.discardDatabases();
         config.loadAllPackages(building.loadFilesDbs, building.forceLoadingDbs);
 #ifndef CPP_UTILITIES_DEBUG_BUILD
