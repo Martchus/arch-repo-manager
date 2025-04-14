@@ -555,11 +555,6 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
                     }
                 }
             }
-            // restore state/cache and discard databases
-            if (doFirstTimeSetup) {
-                initStorage();
-                doFirstTimeSetup = false;
-            }
             // read webserver, build and user configuration (partially cached so read it after the cache has been restored to override cached values)
             for (const auto &iniEntry : configIni.data()) {
                 if (iniEntry.first == "webserver") {
@@ -581,9 +576,10 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
         }
     }
 
-    // restore state/cache and discard databases if not done yet
+    // restore state/cache and discard databases
     if (doFirstTimeSetup) {
         initStorage();
+        doFirstTimeSetup = false;
     } else {
         config.setPackageCacheLimit(packageCacheLimit);
     }
