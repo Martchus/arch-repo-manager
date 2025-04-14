@@ -6,6 +6,8 @@
 
 #include <c++utilities/application/argumentparser.h>
 
+#include <filesystem>
+
 using namespace CppUtilities;
 using namespace LibRepoMgr;
 using namespace LibPkg;
@@ -32,7 +34,20 @@ int main(int argc, const char *argv[])
             const auto &values = configFileArg.values();
             setup.configFilePaths.reserve(values.size());
             for (const auto &value : values) {
-                setup.configFilePaths.emplace_back(value);
+                try {
+                    const auto path = std::filesystem::path(value);
+                    if (std::filesystem::is_directory(path)) {
+                        for (auto it = std::filesystem::directory_iterator(path, std::filesystem::directory_options::follow_directory_symlink | std::filesystem::directory_options::skip_permission_denied); const auto &entry : it) {
+                            if (!entry.is_directory()) {
+                                setup.configFilePaths.emplace_back(std::filesystem::absolute(entry.path()));
+                            }
+                        }
+                    } else {
+                        setup.configFilePaths.emplace_back(std::filesystem::absolute(path));
+                    }
+                } catch (const std::filesystem::filesystem_error &e) {
+                    std::cerr << EscapeCodes::Phrases::ErrorMessage << "Unable to locate config file \"" << value << "\": " << e.what() << EscapeCodes::Phrases::End;
+                }
             }
         }
     };
