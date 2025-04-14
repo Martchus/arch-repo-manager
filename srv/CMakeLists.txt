@@ -106,4 +106,4 @@ install(
 
 # make files for systemd service
 include(SystemdService)
-add_systemd_service(ARGUMENTS run -c "/etc/${META_PROJECT_NAME}${META_CONFIG_SUFFIX}/server.conf")
+add_systemd_service(ARGUMENTS run -c "/etc/${META_PROJECT_NAME}${META_CONFIG_SUFFIX}/server.conf" "/etc/${META_PROJECT_NAME}${META_CONFIG_SUFFIX}/server.conf.d")
