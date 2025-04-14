@@ -130,7 +130,7 @@ void BuildActionsTests::loadBasicTestSetup()
     m_setup.building.gpgPath = std::filesystem::absolute(testFilePath("scripts/fake_gpg.sh"));
     m_setup.building.defaultGpgKey = "1234567890";
     m_setup.building.packageCacheDir = m_setup.building.workingDirectory + "/test-cache-dir";
-    m_setup.configFilePath = std::filesystem::absolute(testFilePath("test-config/server.conf"));
+    m_setup.configFilePaths.emplace_back(std::filesystem::absolute(testFilePath("test-config/server.conf")));
 
     std::filesystem::remove_all(m_setup.workingDirectory);
     std::filesystem::create_directories(m_setup.building.workingDirectory);
@@ -851,7 +851,7 @@ void BuildActionsTests::testRepoCleanup()
     const auto workingDir = std::filesystem::absolute(TestApplication::instance()->workingDirectory()) / "cleanup-test";
     std::filesystem::remove_all(workingDir);
     m_setup.workingDirectory = workingDir;
-    m_setup.configFilePath = std::filesystem::absolute(testFilePath("test-config/server.conf"));
+    m_setup.configFilePaths.emplace_back(std::filesystem::absolute(testFilePath("test-config/server.conf")));
     const auto origRepoDir = std::filesystem::absolute(testDirPath("test-config/repos/misc/os"));
     const auto repoDir = workingDir / "misc/os";
     const auto repoDirAny = repoDir / "any", repoDirSrc = repoDir / "src";

@@ -508,74 +508,77 @@ std::vector<std::shared_ptr<BuildAction>> ServiceSetup::BuildSetup::followUpBuil
 
 void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
 {
-    // read config file
-    cout << Phrases::InfoMessage << "Reading config file: " << configFilePath << Phrases::EndFlush;
+    // read config files
     auto configIni = IniFile();
-    try {
-        // parse ini
-        auto configFile = std::ifstream();
-        configFile.exceptions(std::fstream::badbit | std::fstream::failbit);
-        configFile.open(configFilePath, std::fstream::in);
-        configIni.parse(configFile);
-        // read basic configuration values (not cached)
-        for (const auto &iniEntry : configIni.data()) {
-            if (iniEntry.first.empty()) {
-                convertValue(iniEntry.second, "pacman_config_file_path", pacmanConfigFilePath);
-                convertValue(iniEntry.second, "working_directory", workingDirectory);
-                convertValue(iniEntry.second, "default_arch", defaultArch);
-                convertValue(iniEntry.second, "db_path", dbPath);
-                convertValue(iniEntry.second, "max_dbs", maxDbs);
-                convertValue(iniEntry.second, "package_cache_limit", packageCacheLimit);
-            }
-        }
-        // apply working directory
-        // note: As this function can run multiple times (as live-reconfigurations are supported) we
-        //       must restore the initial working directory here so relative paths are always treated
-        //       relative to the initial working directory.
-        if (!workingDirectory.empty()) {
-            try {
-                if (initialWorkingDirectory.empty()) {
-                    initialWorkingDirectory = std::filesystem::current_path();
-                } else {
-                    std::filesystem::current_path(initialWorkingDirectory);
+    for (const auto &configFilePath : configFilePaths) {
+        std::cout << Phrases::InfoMessage << "Reading config file: " << configFilePath << Phrases::EndFlush;
+        try {
+            // parse ini
+            auto configFile = std::ifstream();
+            configFile.exceptions(std::fstream::badbit | std::fstream::failbit);
+            configFile.open(configFilePath, std::fstream::in);
+            configIni.parse(configFile);
+            // read basic configuration values (not cached)
+            for (const auto &iniEntry : configIni.data()) {
+                if (iniEntry.first.empty()) {
+                    convertValue(iniEntry.second, "pacman_config_file_path", pacmanConfigFilePath);
+                    convertValue(iniEntry.second, "working_directory", workingDirectory);
+                    convertValue(iniEntry.second, "default_arch", defaultArch);
+                    convertValue(iniEntry.second, "db_path", dbPath);
+                    convertValue(iniEntry.second, "max_dbs", maxDbs);
+                    convertValue(iniEntry.second, "package_cache_limit", packageCacheLimit);
                 }
-                workingDirectory = std::filesystem::absolute(workingDirectory);
-            } catch (const std::filesystem::filesystem_error &e) {
-                cerr << Phrases::WarningMessage << "Unable to determine absolute path of specified working directory: " << e.what()
-                     << Phrases::EndFlush;
             }
-            if (chdir(workingDirectory.c_str()) != 0) {
-                cerr << Phrases::WarningMessage << "Unable to change the working directory to \"" << workingDirectory
-                     << "\": " << std::strerror(errno) << Phrases::EndFlush;
+            // apply working directory
+            // note: As this function can run multiple times (as live-reconfigurations are supported) we
+            //       must restore the initial working directory here so relative paths are always treated
+            //       relative to the initial working directory.
+            if (!workingDirectory.empty()) {
                 try {
-                    workingDirectory = std::filesystem::current_path();
+                    if (initialWorkingDirectory.empty()) {
+                        initialWorkingDirectory = std::filesystem::current_path();
+                    } else {
+                        std::filesystem::current_path(initialWorkingDirectory);
+                    }
+                    workingDirectory = std::filesystem::absolute(workingDirectory);
                 } catch (const std::filesystem::filesystem_error &e) {
-                    cerr << Phrases::WarningMessage << "Unable to determine effective working directory: " << e.what() << Phrases::EndFlush;
+                    std::cerr << Phrases::WarningMessage << "Unable to determine absolute path of specified working directory: " << e.what()
+                              << Phrases::EndFlush;
+                }
+                if (chdir(workingDirectory.c_str()) != 0) {
+                    std::cerr << Phrases::WarningMessage << "Unable to change the working directory to \"" << workingDirectory
+                              << "\": " << std::strerror(errno) << Phrases::EndFlush;
+                    try {
+                        workingDirectory = std::filesystem::current_path();
+                    } catch (const std::filesystem::filesystem_error &e) {
+                        std::cerr << Phrases::WarningMessage << "Unable to determine effective working directory: " << e.what() << Phrases::EndFlush;
+                    }
                 }
             }
-        }
-        // restore state/cache and discard databases
-        if (doFirstTimeSetup) {
-            initStorage();
-            doFirstTimeSetup = false;
-        }
-        // read webserver, build and user configuration (partially cached so read it after the cache has been restored to override cached values)
-        for (const auto &iniEntry : configIni.data()) {
-            if (iniEntry.first == "webserver") {
-                webServer.applyConfig(iniEntry.second);
-            } else if (iniEntry.first == "building") {
-                building.applyConfig(iniEntry.second);
-                std::string presetsFile;
-                convertValue(iniEntry.second, "presets", presetsFile);
-                building.readPresets(configFilePath, presetsFile);
-            } else if (iniEntry.first == "complementary_variants") {
-                building.readComplementaryVariants(iniEntry.second);
-            } else if (startsWith(iniEntry.first, "user/")) {
-                auth.applyConfig(iniEntry.first.substr(5), iniEntry.second);
+            // restore state/cache and discard databases
+            if (doFirstTimeSetup) {
+                initStorage();
+                doFirstTimeSetup = false;
             }
+            // read webserver, build and user configuration (partially cached so read it after the cache has been restored to override cached values)
+            for (const auto &iniEntry : configIni.data()) {
+                if (iniEntry.first == "webserver") {
+                    webServer.applyConfig(iniEntry.second);
+                } else if (iniEntry.first == "building") {
+                    building.applyConfig(iniEntry.second);
+                    std::string presetsFile;
+                    convertValue(iniEntry.second, "presets", presetsFile);
+                    building.readPresets(configFilePath, presetsFile);
+                } else if (iniEntry.first == "complementary_variants") {
+                    building.readComplementaryVariants(iniEntry.second);
+                } else if (startsWith(iniEntry.first, "user/")) {
+                    auth.applyConfig(iniEntry.first.substr(5), iniEntry.second);
+                }
+            }
+        } catch (const std::ios_base::failure &) {
+            std::cerr << Phrases::WarningMessage << "An IO error occurred when parsing \"" << configFilePath << "\", using defaults"
+                      << Phrases::EndFlush;
         }
-    } catch (const ios_base::failure &) {
-        cerr << Phrases::WarningMessage << "An IO error occurred when parsing \"" << configFilePath << "\", using defaults" << Phrases::EndFlush;
     }
 
     // restore state/cache and discard databases if not done yet
