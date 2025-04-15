@@ -599,14 +599,14 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
     // add databases declared in config
     std::unordered_map<std::string, std::string> globalDefinitions, dbDefinitions;
     for (auto &iniEntry : configIni.data()) {
-        const auto &iniSection = iniEntry.first;
-        if (iniSection == "definitions") {
-            globalDefinitions.reserve(globalDefinitions.size() + iniEntry.second.size());
+        if (const auto &iniSection = iniEntry.first; iniSection == "definitions") {
             for (auto &definition : iniEntry.second) {
                 globalDefinitions['$' + definition.first] = std::move(definition.second);
             }
-            continue;
         }
+    }
+    for (auto &iniEntry : configIni.data()) {
+        const auto &iniSection = iniEntry.first;
         if (!startsWith(iniSection, "database/")) {
             continue;
         }
