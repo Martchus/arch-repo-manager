@@ -230,8 +230,12 @@ function handleGlobalStatusUpdate(ajaxRequest)
     const presets = responseJson.presets;
     globalInfo.presets = presets;
     optgroupElements = {};
-    for (const [presetId, presetInfo] of Object.entries(presets.tasks)) {
-        const category = presetInfo.category || 'Misc';
+    const sortedTasks = Object.entries(presets.tasks).sort(([,a],[,b]) => {
+        const categoryCmp = a.category.localeCompare(b.category);
+        return categoryCmp !== 0 ? categoryCmp : a.name.localeCompare(b.name);
+    });
+    for (const [presetId, presetInfo] of sortedTasks) {
+        const category = presetInfo.category ?? 'Misc';
         const optionElement = document.createElement('option');
         optionElement.value = presetId;
         optionElement.appendChild(document.createTextNode(presetInfo.name));
