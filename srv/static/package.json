@@ -1,6 +1,6 @@
 {
   "dependencies": {
     "@xterm/addon-search": "^0.14.0",
-    "@xterm/xterm": "^5.4.0"
+    "@xterm/xterm": "^5.5.0"
   }
 }
