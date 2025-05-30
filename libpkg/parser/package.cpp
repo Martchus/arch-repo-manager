@@ -804,6 +804,15 @@ void Package::addDepsAndProvidesFromContainedDirectory(std::string_view director
 void Package::addDepsAndProvidesFromContainedFile(
     std::string_view directoryPath, const ArchiveFile &file, std::set<std::string> &dllsReferencedByImportLibs)
 {
+    // ignore files under "/opt" except Android libraries as those files are not for system-wide use
+    // note: Otherwise, if a package contains e.g. an old version of libxml2 this library would be considered available and a possibly required rebuild
+    //       due to an update of the system-wide libxml2 library not be considered.
+    // note: For Android we should only consider custom libs and sysroot libs provided by the NDK. Other libraries are also just distracting.
+    if (directoryPath.starts_with("opt/")
+        && !(directoryPath.starts_with("opt/android-libs/")
+            || (directoryPath.starts_with("opt/android-ndk/") && directoryPath.contains("/sysroot/")))) {
+        return;
+    }
     try {
         Binary binary;
         binary.load(file.content, file.name, directoryPath, file.type == ArchiveFileType::Regular);
