@@ -26,7 +26,8 @@ int main(int argc, const char *argv[])
     auto configFileArg = ConfigValueArgument("config-file", 'c', "specifies the path of the config file", { "path" });
     configFileArg.setEnvironmentVariable(PROJECT_VARNAME_UPPER "_CONFIG_FILE");
     configFileArg.setRequiredValueCount(Argument::varValueCount);
-    auto forceLoadingDBsArg = ConfigValueArgument("force-loading-dbs", 'f', "forces loading DBs, even if DB files have not been modified since last parse");
+    auto forceLoadingDBsArg
+        = ConfigValueArgument("force-loading-dbs", 'f', "forces loading DBs, even if DB files have not been modified since last parse");
     runArg.setSubArguments({ &configFileArg, &forceLoadingDBsArg });
     runArg.setImplicit(true);
     const auto assignConfigFiles = [&configFileArg, &setup]() {
@@ -37,7 +38,10 @@ int main(int argc, const char *argv[])
                 try {
                     const auto path = std::filesystem::path(value);
                     if (std::filesystem::is_directory(path)) {
-                        for (auto it = std::filesystem::directory_iterator(path, std::filesystem::directory_options::follow_directory_symlink | std::filesystem::directory_options::skip_permission_denied); const auto &entry : it) {
+                        for (auto it = std::filesystem::directory_iterator(path,
+                                 std::filesystem::directory_options::follow_directory_symlink
+                                     | std::filesystem::directory_options::skip_permission_denied);
+                            const auto &entry : it) {
                             if (!entry.is_directory()) {
                                 setup.configFilePaths.emplace_back(std::filesystem::absolute(entry.path()));
                             }
@@ -46,7 +50,8 @@ int main(int argc, const char *argv[])
                         setup.configFilePaths.emplace_back(std::filesystem::absolute(path));
                     }
                 } catch (const std::filesystem::filesystem_error &e) {
-                    std::cerr << EscapeCodes::Phrases::ErrorMessage << "Unable to locate config file \"" << value << "\": " << e.what() << EscapeCodes::Phrases::End;
+                    std::cerr << EscapeCodes::Phrases::ErrorMessage << "Unable to locate config file \"" << value << "\": " << e.what()
+                              << EscapeCodes::Phrases::End;
                 }
             }
         }
