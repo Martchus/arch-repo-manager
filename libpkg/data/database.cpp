@@ -559,7 +559,14 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
         deps = std::move(*dbs);
     }
     if (auto *const protectedDb = config.findDatabase(protectedName(), arch)) {
-        deps.emplace_back(protectedDb);
+        const auto protectedDepOrder = config.computeDatabaseDependencyOrder(*protectedDb, true);
+        if (auto *const dbs = std::get_if<std::vector<Database *>>(&protectedDepOrder)) {
+            for (auto *const db : *dbs) {
+                if (std::find(deps.begin(), deps.end(), db) == deps.end()) {
+                    deps.emplace_back(db);
+                }
+            }
+        }
     }
 
     // check whether all required dependencies are still provided
