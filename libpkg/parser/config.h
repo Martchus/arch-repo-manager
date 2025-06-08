@@ -7,6 +7,6 @@ namespace LibPkg {
 
 // TODO: parseDatabaseUsage()
 // TODO: parseSignatureLevel()
-}
+} // namespace LibPkg
 
 #endif // LIBPKG_PARSER_CONFIG_H
