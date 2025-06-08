@@ -198,6 +198,10 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     PackageUpdates checkForUpdates(const std::vector<Database *> &updateSources, UpdateCheckOptions options = UpdateCheckOptions::None);
     PackageLocation locatePackage(const std::string &packageName) const;
     std::string filesPathFromRegularPath() const;
+    bool isStaging() const;
+    bool isTesting() const;
+    std::string_view specialSuffix() const;
+    std::string protectedName() const;
 
 public:
     std::string name;

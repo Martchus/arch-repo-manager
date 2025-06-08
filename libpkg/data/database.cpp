@@ -558,7 +558,7 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
     if (auto *const dbs = std::get_if<std::vector<Database *>>(&depOrder)) {
         deps = std::move(*dbs);
     }
-    if (auto *const protectedDb = config.findDatabase(name + "-protected", arch)) {
+    if (auto *const protectedDb = config.findDatabase(protectedName(), arch)) {
         deps.emplace_back(protectedDb);
     }
 
@@ -758,6 +758,28 @@ std::string Database::filesPathFromRegularPath() const
     }
     const auto ext = path.rfind(".db");
     return ext == std::string::npos ? path : argsToString(std::string_view(path.data(), ext), ".files");
+}
+
+bool Database::isStaging() const
+{
+    return name.ends_with("-staging");
+}
+
+bool Database::isTesting() const
+{
+    return name.ends_with("-testing");
+}
+
+std::string_view Database::specialSuffix() const
+{
+    static constexpr auto suffixLength = std::string_view("-staging").size();
+    return isStaging() || isTesting() ? std::string_view(name.data() + name.size() - suffixLength) : std::string_view();
+}
+
+std::string Database::protectedName() const
+{
+    const auto suffix = specialSuffix();
+    return argsToString(std::string_view(name.data(), name.size() - suffix.size()), "-protected", suffix);
 }
 
 PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage, bool clear)
