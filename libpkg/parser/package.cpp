@@ -810,7 +810,10 @@ void Package::addDepsAndProvidesFromContainedFile(
     // note: For Android we should only consider custom libs and sysroot libs provided by the NDK. Other libraries are also just distracting.
     if (directoryPath.starts_with("opt/")
         && !(directoryPath.starts_with("opt/android-libs/")
-            || (directoryPath.starts_with("opt/android-ndk/") && directoryPath.contains("/sysroot/")))) {
+            || (directoryPath.starts_with("opt/android-ndk/")
+                && (directoryPath.contains("/sysroot/") // Android platform libs, e.g. libc.so, libm.so, libandroid.so …
+                    || directoryPath.contains("/lib/linux/") // compiler runtime and libomp.so
+                    )))) {
         return;
     }
     try {
