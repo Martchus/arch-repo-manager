@@ -41,6 +41,7 @@ class DataTests : public TestFixture {
     CPPUNIT_TEST(testDependencyExport);
     CPPUNIT_TEST(testPackageUpdater);
     CPPUNIT_TEST(stresstestPackageUpdater);
+    CPPUNIT_TEST(testProtectedName);
     CPPUNIT_TEST(testMisc);
     CPPUNIT_TEST_SUITE_END();
 
@@ -66,6 +67,7 @@ public:
     void testDependencyExport();
     void testPackageUpdater();
     void stresstestPackageUpdater();
+    void testProtectedName();
     void testMisc();
 
 private:
@@ -632,6 +634,13 @@ void DataTests::stresstestPackageUpdater()
         CPPUNIT_ASSERT_EQUAL(newLibprovides, updatedPackage->libprovides);
     }
     std::cerr << "Running stress test: done\n";
+}
+
+void DataTests::testProtectedName()
+{
+    CPPUNIT_ASSERT_EQUAL("foo-protected"s, Database("foo").protectedName());
+    CPPUNIT_ASSERT_EQUAL("foo-protected-testing"s, Database("foo-testing").protectedName());
+    CPPUNIT_ASSERT_EQUAL("foo-protected-staging"s, Database("foo-staging").protectedName());
 }
 
 void DataTests::testMisc()
