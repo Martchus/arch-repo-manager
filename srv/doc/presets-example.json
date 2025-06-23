@@ -7,12 +7,9 @@
             "destinationDbs": [
                 "core",
                 "extra",
-                "community",
                 "multilib",
                 "staging",
                 "testing",
-                "community-staging",
-                "community-testing",
                 "multilib-staging",
                 "multilib-testing",
                 "kde-unstable",
@@ -63,7 +60,7 @@
         "prepare-ownstuff": {
             "directory": "misc",
             "packageNames": [],
-            "sourceDbs": ["ownstuff", "core", "extra", "community", "multilib"],
+            "sourceDbs": ["ownstuff", "core", "extra", "multilib"],
             "destinationDbs": ["ownstuff"],
             "settings": {},
             "flags": 2,
@@ -72,7 +69,7 @@
         "prepare-ownstuff-testing": {
             "directory": "misc",
             "packageNames": [],
-            "sourceDbs": ["ownstuff-testing", "ownstuff", "core", "extra", "community", "multilib", "testing", "community-testing", "multilib-testing"],
+            "sourceDbs": ["ownstuff-testing", "ownstuff", "core", "extra", "multilib", "testing", "multilib-testing"],
             "destinationDbs": ["ownstuff-testing"],
             "settings": {},
             "flags": 2,
@@ -81,7 +78,7 @@
         "prepare-ownstuff-staging": {
             "directory": "misc",
             "packageNames": [],
-            "sourceDbs": ["ownstuff-staging", "ownstuff-testing", "ownstuff", "core", "extra", "community", "multilib", "staging", "community-staging", "multilib-staging", "testing", "community-testing", "multilib-testing"],
+            "sourceDbs": ["ownstuff-staging", "ownstuff-testing", "ownstuff", "core", "extra", "multilib", "staging", "multilib-staging", "testing", "multilib-testing"],
             "destinationDbs": ["ownstuff-staging"],
             "settings": {},
             "flags": 2,
