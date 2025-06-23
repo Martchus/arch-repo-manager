@@ -107,7 +107,7 @@ void BuildActionsTests::initStorage()
 {
     if (!m_setup.config.storage()) {
         m_configDbFile = workingCopyPath("test-build-actions-config.db", WorkingCopyMode::Cleanup);
-        m_setup.config.initStorage(m_configDbFile.data());
+        m_setup.config.initStorage(m_configDbFile.data(), 100);
     }
     if (!m_setup.building.hasStorage()) {
         m_buildingDbFile = workingCopyPath("test-build-actions-building.db", WorkingCopyMode::Cleanup);
@@ -409,8 +409,10 @@ void BuildActionsTests::testPreparingBuild()
     CPPUNIT_ASSERT_EQUAL_MESSAGE("target db set", "boost"s, buildPreparation.targetDb);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("target arch set", "x86_64"s, buildPreparation.targetArch);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("staging db set", "boost-staging"s, buildPreparation.stagingDb);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("debug db set", "boost-debug"s, buildPreparation.debugDb);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("staging debug db set", "boost-staging-debug"s, buildPreparation.stagingDebugDb);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no cyclic leftovers", 0_st, buildPreparation.cyclicLeftovers.size());
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("no warnings", 0_st, buildPreparation.warnings.size());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no warnings", std::vector<std::string>{}, buildPreparation.warnings);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no error", std::string(), buildPreparation.error);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("manually ordered not set", false, buildPreparation.manuallyOrdered);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("db config has 2 dbs", 2_st, buildPreparation.dbConfig.size());
@@ -570,8 +572,11 @@ void BuildActionsTests::testConductingBuild()
         buildDir / "build-data/conduct-build-test/boost/pkg/boost-1.73.0-1-x86_64.pkg.tar.zst");
     std::filesystem::copy(testFilePath("test-config/fake-build-artefacts/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"),
         buildDir / "build-data/conduct-build-test/boost/pkg/boost-libs-1.73.0-1-x86_64.pkg.tar.zst");
+    std::filesystem::copy(testFilePath("test-config/fake-build-artefacts/boost-debug-1.73.0-1-x86_64.pkg.tar.zst"),
+        buildDir / "build-data/conduct-build-test/boost/pkg/boost-debug-1.73.0-1-x86_64.pkg.tar.zst");
 
     // conduct build without staging
+    writeFile(progressFile.native(), progressData); // reset "build-progress.json" to clear previous error
     runBuildAction("conduct build without staging");
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: success", BuildActionResult::Success, m_buildAction->result);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no result data present", ""s, std::get<std::string>(m_buildAction->resultData));
@@ -579,6 +584,7 @@ void BuildActionsTests::testConductingBuild()
     CPPUNIT_ASSERT_MESSAGE("no staging needed: rebuild list empty", internalData->m_buildProgress.rebuildList.empty());
     CPPUNIT_ASSERT_MESSAGE(
         "no staging needed: package considered finished", !internalData->m_buildProgress.progressByPackage["boost"].finished.isNull());
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no error occurred", ""s, internalData->m_buildProgress.progressByPackage["boost"].error);
     CPPUNIT_ASSERT_MESSAGE("no staging needed: package added to repo", internalData->m_buildProgress.progressByPackage["boost"].addedToRepo);
 
     // check whether log files have been created accordingly
@@ -599,10 +605,14 @@ void BuildActionsTests::testConductingBuild()
     CPPUNIT_ASSERT_MESSAGE(
         "no staging needed: package added to repo (1)", std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst"));
     CPPUNIT_ASSERT_MESSAGE("no staging needed: package added to repo (2)",
+        std::filesystem::is_regular_file("repos/boost-debug/os/x86_64/boost-debug-1.73.0-1-x86_64.pkg.tar.zst"));
+    CPPUNIT_ASSERT_MESSAGE("no staging needed: package added to repo (3)",
         std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst"));
     CPPUNIT_ASSERT_MESSAGE("no staging needed: signature added to repo (0)",
         std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-1.73.0-1-x86_64.pkg.tar.zst.sig"));
     CPPUNIT_ASSERT_MESSAGE("no staging needed: signature added to repo (1)",
+        std::filesystem::is_regular_file("repos/boost-debug/os/x86_64/boost-debug-1.73.0-1-x86_64.pkg.tar.zst.sig"));
+    CPPUNIT_ASSERT_MESSAGE("no staging needed: signature added to repo (2)",
         std::filesystem::is_regular_file("repos/boost/os/x86_64/boost-libs-1.73.0-1-x86_64.pkg.tar.zst.sig"));
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: signature looks as expected",
         "fake signature with GPG key 1234567890 boost-libs-1.73.0-1-x86_64.pkg.tar.zst\n"s,

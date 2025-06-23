@@ -329,6 +329,7 @@ struct LIBPKG_EXPORT PackageNameData {
     std::string_view actualName;
     std::string_view targetPrefix;
     std::string_view vcsSuffix;
+    bool isDebugPackage = false;
 };
 
 struct DependencySet;
@@ -385,9 +386,12 @@ struct LIBPKG_EXPORT PackageBase : public ReflectiveRapidJSON::JsonSerializable<
     PackageBase &operator=(PackageBase &&other) = default;
 
     bool isSame(const PackageBase &other) const;
+    bool isDebug() const;
     PackageVersionComparison compareVersion(const PackageBase &other) const;
     std::string_view computeRegularPackageName() const;
     void clear();
+
+    static constexpr auto debugSuffix = std::string_view("-debug");
 
     PackageOrigin origin = PackageOrigin::Default;
     CppUtilities::DateTime timestamp, buildDate;
@@ -458,6 +462,11 @@ struct LIBPKG_EXPORT Package : public PackageBase,
 inline bool PackageBase::isSame(const PackageBase &other) const
 {
     return name == other.name && version == other.version;
+}
+
+inline bool PackageBase::isDebug() const
+{
+    return name.ends_with(debugSuffix);
 }
 
 inline PackageNameData Package::decomposeName() const

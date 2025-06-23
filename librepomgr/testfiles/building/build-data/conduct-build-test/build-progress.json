@@ -33,6 +33,10 @@
     "targetRepoPath": "",
     "stagingDbFilePath": "",
     "stagingRepoPath": "",
+    "targetDebugDbFilePath": "",
+    "targetDebugRepoPath": "",
+    "stagingDebugDbFilePath": "",
+    "stagingDebugRepoPath": "",
     "producedProvides": {},
     "removedProvides": {},
     "rebuildList": {}

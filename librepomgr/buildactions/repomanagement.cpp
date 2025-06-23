@@ -69,15 +69,33 @@ bool PackageMovementAction::prepareRepoAction(RequiredDatabases requiredDatabase
     setupLock.unlock();
 
     // locate databases and packages
-    const auto *const destinationDb = *m_destinationDbs.begin();
+    auto *const destinationDb = *m_destinationDbs.begin();
+    auto *const destinationDebugDb = m_setup.config.findDatabase(destinationDb->debugName(), destinationDb->arch);
     m_destinationRepoDirectory = destinationDb->localPkgDir;
     m_destinationDatabaseFile = fileName(destinationDb->path);
     m_destinationDatabaseLockName = ServiceSetup::Locks::forDatabase(*destinationDb);
+    if (destinationDebugDb) {
+        m_destinationDebugDb = destinationDebugDb;
+        m_destinationDebugRepoDirectory = destinationDebugDb->localPkgDir;
+        m_destinationDebugDatabaseFile = fileName(destinationDebugDb->path);
+        m_destinationDebugDatabaseLockName = ServiceSetup::Locks::forDatabase(*destinationDebugDb);
+    }
     if (requiredDatabases & RequiredDatabases::OneSource) {
-        const auto *const sourceDb = *m_sourceDbs.begin();
+        auto *const sourceDb = *m_sourceDbs.begin();
+        auto *const sourceDebugDb = m_setup.config.findDatabase(sourceDb->debugName(), sourceDb->arch);
         m_sourceRepoDirectory = sourceDb->localPkgDir;
         m_sourceDatabaseFile = fileName(sourceDb->path);
         m_sourceDatabaseLockName = ServiceSetup::Locks::forDatabase(*sourceDb);
+        if (sourceDebugDb) {
+            m_sourceDebugDb = sourceDebugDb;
+            m_sourceDebugRepoDirectory = sourceDebugDb->localPkgDir;
+            m_sourceDebugDatabaseFile = fileName(sourceDebugDb->path);
+            m_sourceDebugDatabaseLockName = ServiceSetup::Locks::forDatabase(*sourceDebugDb);
+        }
+        if ((destinationDebugDb == nullptr) != (sourceDebugDb == nullptr)) {
+            reportError("Existance of debug repository is not consistent between source and destination DB.");
+            return false;
+        }
     }
     locatePackages();
     configReadLock = std::monostate();
@@ -116,27 +134,42 @@ void PackageMovementAction::initWorkingDirectory()
     }
 }
 
+bool PackageMovementAction::locatePackage(LibPkg::Database *db, const std::string &packageName, PackageLocations &res)
+{
+    const auto package = db->findPackage(packageName);
+    if (!package) {
+        return false;
+    }
+    auto packageLocation = db->locatePackage(package->computeFileName());
+    if (packageLocation.error.has_value()) {
+        m_result.failedPackages.emplace_back(
+            packageName, argsToString("unable to locate package within repo directory: ", packageLocation.error.value().what()));
+        return true;
+    }
+    if (!packageLocation.exists) {
+        m_result.failedPackages.emplace_back(packageName, "package not present within repo directory");
+        return true;
+    }
+    res.emplace_back(packageName, std::move(packageLocation), true);
+    return true;
+}
+
 void PackageMovementAction::locatePackages()
 {
     // determine repo path and package paths
     auto *const db = m_sourceDbs.empty() ? *m_destinationDbs.begin() : *m_sourceDbs.begin();
+    auto *const debugDb = m_sourceDbs.empty() ? m_destinationDebugDb : m_sourceDebugDb;
     for (const auto &packageName : m_buildAction->packageNames) {
-        const auto package = db->findPackage(packageName);
-        if (!package) {
+        const auto isDebugPackage = packageName.ends_with(LibPkg::Package::debugSuffix);
+        // locate debug packages preferrably in the corresponding debug repo; otherwise just check for package in the regular repo
+        if (!(isDebugPackage && debugDb && locatePackage(debugDb, packageName, m_debugPackageLocations))
+            && !locatePackage(db, packageName, m_packageLocations)) {
             m_result.failedPackages.emplace_back(packageName, "package not listed in database file");
-            continue;
         }
-        auto packageLocation = db->locatePackage(package->computeFileName());
-        if (packageLocation.error.has_value()) {
-            m_result.failedPackages.emplace_back(
-                packageName, argsToString("unable to locate package within repo directory: ", packageLocation.error.value().what()));
-            continue;
+        // consider a potentially existing debug package in the corresponding debug repo as well
+        if (!isDebugPackage && debugDb) {
+            locatePackage(debugDb, argsToString(packageName, LibPkg::Package::debugSuffix), m_debugPackageLocations);
         }
-        if (!packageLocation.exists) {
-            m_result.failedPackages.emplace_back(packageName, "package not present within repo directory");
-            continue;
-        }
-        m_packageLocations.emplace_back(packageName, std::move(packageLocation), true);
     }
 }
 
@@ -152,6 +185,42 @@ RemovePackages::RemovePackages(ServiceSetup &setup, const std::shared_ptr<BuildA
 {
 }
 
+void RemovePackages::fillPackageListFromLocations(const PackageLocations &locations, std::vector<std::string> &res)
+{
+    res.reserve(locations.size()); // a fresh std::vector with zero capacity and elements is expected here
+    for (const auto &[packageName, packageLocation, ok] : locations) {
+        res.emplace_back(packageName);
+    }
+}
+
+void RemovePackages::removePackagesFromDatabaseFile(const typename MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
+    std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &packageNames,
+    const PackageLocations &packageLocations)
+{
+    if (packageNames.empty()) {
+        return;
+    }
+    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(dbLockName),
+        [this, session, destinationRepoDir, destinationDbFile, &packageNames, buildAction = m_buildAction,
+            repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", argsToString(m_workingDirectory, '/', logFile),
+                std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2, std::ref(packageNames),
+                    std::cref(packageLocations)))](UniqueLoggingLock &&lock) {
+            if (!repoRemoveProcess) {
+                return;
+            }
+            repoRemoveProcess->locks().emplace_back(std::move(lock));
+            if (m_useContainer) {
+                repoRemoveProcess->launch(boost::process::v1::start_dir(destinationRepoDir),
+                    boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
+                    m_makeContainerPkgPath, "--", destinationDbFile, packageNames);
+            } else {
+                repoRemoveProcess->launch(boost::process::v1::start_dir(destinationRepoDir), m_repoRemovePath, destinationDbFile, packageNames);
+            }
+            buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", destinationRepoDir, "\" for \"", destinationDbFile,
+                "\", see logfile for details\n");
+        });
+}
+
 void RemovePackages::run()
 {
     if (!prepareRepoAction(RequiredDatabases::OneDestination)) {
@@ -159,62 +228,52 @@ void RemovePackages::run()
     }
 
     // make list of package names to pass to repo-remove
-    m_result.processedPackages.reserve(m_packageLocations.size());
-    for (const auto &[packageName, packageLocation, ok] : m_packageLocations) {
-        m_result.processedPackages.emplace_back(packageName);
-    }
+    fillPackageListFromLocations(m_packageLocations, m_result.processedPackages);
+    fillPackageListFromLocations(m_debugPackageLocations, m_result.processedDebugPackages);
 
-    // remove package from database file
-    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName),
-        [this, buildAction = m_buildAction,
-            repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
-                std::bind(&RemovePackages::handleRepoRemoveResult, this, std::placeholders::_1, std::placeholders::_2))](UniqueLoggingLock &&lock) {
-            if (!repoRemoveProcess) {
-                return;
-            }
-            repoRemoveProcess->locks().emplace_back(std::move(lock));
-            if (m_useContainer) {
-                repoRemoveProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory),
-                    boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
-                    m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_result.processedPackages);
-            } else {
-                repoRemoveProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoRemovePath, m_destinationDatabaseFile,
-                    m_result.processedPackages);
-            }
-            buildAction->log()(Phrases::InfoMessage, "Invoking repo-remove within \"", m_destinationRepoDirectory, "\" for \"",
-                m_destinationDatabaseFile, "\", see logfile for details\n");
-        });
+    // remove packages from database files
+    const auto session = MultiSession<void>::create(m_setup.building.ioContext, std::bind(&RemovePackages::conclude, this));
+    removePackagesFromDatabaseFile(session, std::move(m_destinationDatabaseLockName), "repo-remove.log", m_destinationRepoDirectory,
+        m_destinationDatabaseFile, m_result.processedPackages, m_packageLocations);
+    removePackagesFromDatabaseFile(session, std::move(m_destinationDebugDatabaseLockName), "repo-remove-debug.log", m_destinationDebugRepoDirectory,
+        m_destinationDebugDatabaseFile, m_result.processedDebugPackages, m_debugPackageLocations);
 }
 
-void RemovePackages::handleRepoRemoveResult(boost::process::v1::child &&child, ProcessResult &&result)
+void RemovePackages::handleRepoRemoveResult(
+    boost::process::v1::child &&child, ProcessResult &&result, std::vector<std::string> &packageNames, const PackageLocations &packageLocations)
 {
     CPP_UTILITIES_UNUSED(child)
     if (result.errorCode) {
         const auto errorCodeMessage = result.errorCode.message();
         const auto &errorMessage = result.error.empty() ? errorCodeMessage : result.error;
+        auto resultLock = std::unique_lock(m_resultMutex);
         m_result.errorMessage = "unable to remove packages: " + errorMessage;
+        resultLock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "Unable to invoke repo-remove: ", errorMessage, '\n');
     } else if (result.exitCode != 0) {
-        m_result.errorMessage = argsToString("unable to remove package: repo-remove returned with exit code ", result.exitCode);
+        auto error = argsToString("unable to remove package: repo-remove returned with exit code ", result.exitCode);
+        auto resultLock = std::unique_lock(m_resultMutex);
+        m_result.errorMessage = std::move(error);
+        resultLock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "repo-remove invocation exited with non-zero exit code: ", result.exitCode, '\n');
     } else {
-        movePackagesToArchive();
+        movePackagesToArchive(packageNames, packageLocations);
         return;
     }
-    m_result.failedPackages.reserve(m_result.failedPackages.size() + m_result.processedPackages.size());
-    for (auto &processedPackage : m_result.processedPackages) {
+    auto resultLock = std::unique_lock(m_resultMutex);
+    for (auto &processedPackage : packageNames) {
         m_result.failedPackages.emplace_back(std::move(processedPackage), "repo-remove error");
     }
-    m_result.processedPackages.clear();
-    reportResultWithData(BuildActionResult::Failure);
+    resultLock.unlock();
+    packageNames.clear();
 }
 
-void RemovePackages::movePackagesToArchive()
+void RemovePackages::movePackagesToArchive(std::vector<std::string> &packageNames, const PackageLocations &packageLocations)
 {
     m_buildAction->log()(Phrases::InfoMessage, "Moving packages to archive directory");
     std::filesystem::path archivePath, destPath, signatureFile;
-    auto processedPackageIterator = m_result.processedPackages.begin();
-    for (const auto &[packageName, packageLocation, ok] : m_packageLocations) {
+    auto processedPackageIterator = packageNames.begin();
+    for (const auto &[packageName, packageLocation, ok] : packageLocations) {
         try {
             archivePath = packageLocation.pathWithinRepo.parent_path() / "archive";
             destPath = archivePath / packageLocation.pathWithinRepo.filename();
@@ -238,10 +297,16 @@ void RemovePackages::movePackagesToArchive()
             }
             ++processedPackageIterator;
         } catch (const std::filesystem::filesystem_error &e) {
-            processedPackageIterator = m_result.processedPackages.erase(processedPackageIterator);
-            m_result.failedPackages.emplace_back(packageName, argsToString("unable to archive: ", e.what()));
+            processedPackageIterator = packageNames.erase(processedPackageIterator);
+            auto error = argsToString("unable to archive: ", e.what());
+            auto resultLock = std::unique_lock(m_resultMutex);
+            m_result.failedPackages.emplace_back(packageName, std::move(error));
         }
     }
+}
+
+void RemovePackages::conclude()
+{
     if (m_result.failedPackages.empty()) {
         reportResultWithData(BuildActionResult::Success);
         return;
@@ -266,10 +331,40 @@ void MovePackages::run()
 
     // copy packages from the source repo to the destination repo
     // make list of package names to pass to repo-add
-    m_result.processedPackages.reserve(m_packageLocations.size());
-    for (auto &[packageName, packageLocation, ok] : m_packageLocations) {
+    copyPackagesFromSourceToDestinationRepo(m_packageLocations, m_result.processedPackages, m_fileNames, m_destinationRepoDirectory);
+    copyPackagesFromSourceToDestinationRepo(
+        m_debugPackageLocations, m_result.processedDebugPackages, m_debugFileNames, m_destinationDebugRepoDirectory);
+
+    // error-out early if not even a single package could be copied
+    if (m_fileNames.empty() && m_debugFileNames.empty()) {
+        m_result.errorMessage = "none of the specified packages could be copied to the destination repo";
+        reportResultWithData(BuildActionResult::Failure);
+        return;
+    }
+
+    // conclude build action when both, repo-add and repo-remove have been exited and handled
+    const auto session = MultiSession<void>::create(m_setup.building.ioContext, std::bind(&MovePackages::conclude, this));
+
+    // add packages to database file of destination repo
+    addPackagesToDestinationDatabaseFile(session, std::move(m_destinationDatabaseLockName), "repo-add.log", m_destinationRepoDirectory,
+        m_destinationDatabaseFile, m_result.processedPackages, m_packageLocations);
+    addPackagesToDestinationDatabaseFile(session, std::move(m_destinationDebugDatabaseLockName), "repo-add-debug.log",
+        m_destinationDebugRepoDirectory, m_destinationDebugDatabaseFile, m_result.processedDebugPackages, m_debugPackageLocations);
+
+    // remove package from database file of source repo
+    removePackagesFromSourceDatabaseFile(session, std::move(m_sourceDatabaseLockName), "repo-remove.log", m_sourceRepoDirectory, m_sourceDatabaseFile,
+        m_result.processedPackages, m_packageLocations);
+    removePackagesFromSourceDatabaseFile(session, std::move(m_sourceDebugDatabaseLockName), "repo-remove-debug.log", m_sourceDebugRepoDirectory,
+        m_sourceDebugDatabaseFile, m_result.processedDebugPackages, m_debugPackageLocations);
+}
+
+void MovePackages::copyPackagesFromSourceToDestinationRepo(
+    PackageLocations &locations, std::vector<std::string> &packageNames, std::vector<std::string> &fileNames, const std::string &destinationRepoDir)
+{
+    packageNames.reserve(locations.size());
+    for (auto &[packageName, packageLocation, ok] : locations) {
         try {
-            const auto destPath = m_destinationRepoDirectory / packageLocation.pathWithinRepo.filename();
+            const auto destPath = destinationRepoDir / packageLocation.pathWithinRepo.filename();
             const auto signatureFile = std::filesystem::path(argsToString(packageLocation.pathWithinRepo, ".sig"));
             if (packageLocation.storageLocation.empty()) {
                 std::filesystem::copy_file(packageLocation.pathWithinRepo, destPath);
@@ -285,7 +380,7 @@ void MovePackages::run()
                             "\" is a symlink with absolute target path (only relative target paths supported)"));
                     continue;
                 }
-                const auto newStorageLocation = m_destinationRepoDirectory / symlinkTarget;
+                const auto newStorageLocation = destinationRepoDir / symlinkTarget;
                 const auto storageSignatureFile = std::filesystem::path(argsToString(packageLocation.storageLocation, ".sig"));
                 std::filesystem::create_directory(
                     newStorageLocation.parent_path()); // ensure the parent, e.g. the "any" directory exists; assume further parents already exist
@@ -307,67 +402,63 @@ void MovePackages::run()
                 continue;
             }
         }
-        m_fileNames.emplace_back(packageLocation.pathWithinRepo.filename());
-        m_result.processedPackages.emplace_back(packageName);
+        fileNames.emplace_back(packageLocation.pathWithinRepo.filename());
+        packageNames.emplace_back(packageName);
     }
+}
 
-    // error-out early if not even a single package could be copied
-    if (m_fileNames.empty()) {
-        m_result.errorMessage = "none of the specified packages could be copied to the destination repo";
-        reportResultWithData(BuildActionResult::Failure);
-        return;
-    }
-
-    // conclude build action when both, repo-add and repo-remove have been exited and handled
-    const auto processSession = MultiSession<void>::create(m_setup.building.ioContext, std::bind(&MovePackages::conclude, this));
-
-    // add packages to database file of destination repo
-    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_destinationDatabaseLockName),
-        [this, buildAction = m_buildAction,
-            repoAddProcess = m_buildAction->makeBuildProcess("repo-add", m_workingDirectory + "/repo-add.log",
-                std::bind(&MovePackages::handleRepoAddResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
-            UniqueLoggingLock &&lock) {
+void MovePackages::addPackagesToDestinationDatabaseFile(const MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
+    std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &packageNames,
+    PackageLocations &packageLocations)
+{
+    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(dbLockName),
+        [this, buildAction = m_buildAction, destinationRepoDir, destinationDbFile,
+            repoAddProcess = m_buildAction->makeBuildProcess("repo-add", argsToString(m_workingDirectory, '/', logFile),
+                std::bind(&MovePackages::handleRepoAddResult, this, session, std::placeholders::_1, std::placeholders::_2, std::ref(packageNames),
+                    std::ref(packageLocations)))](UniqueLoggingLock &&lock) {
             if (!repoAddProcess) {
                 return;
             }
             repoAddProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
-                repoAddProcess->launch(boost::process::v1::start_dir(m_destinationRepoDirectory),
+                repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir),
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-add",
-                    m_makeContainerPkgPath, "--", m_destinationDatabaseFile, m_fileNames);
+                    m_makeContainerPkgPath, "--", destinationDbFile, m_fileNames);
             } else {
-                repoAddProcess->launch(
-                    boost::process::v1::start_dir(m_destinationRepoDirectory), m_repoAddPath, m_destinationDatabaseFile, m_fileNames);
+                repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir), m_repoAddPath, destinationDbFile, m_fileNames);
             }
-            m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", m_destinationRepoDirectory, "\" for \"",
-                m_destinationDatabaseFile, "\", see logfile for details\n");
+            m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", destinationRepoDir, "\" for \"", destinationDbFile,
+                "\", see logfile for details\n");
         });
+}
 
-    // remove package from database file of source repo
-    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(m_sourceDatabaseLockName),
-        [this, buildAction = m_buildAction,
-            repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", m_workingDirectory + "/repo-remove.log",
-                std::bind(&MovePackages::handleRepoRemoveResult, this, processSession, std::placeholders::_1, std::placeholders::_2))](
-            UniqueLoggingLock &&lock) {
+void MovePackages::removePackagesFromSourceDatabaseFile(const MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
+    std::string_view logFile, const std::string &sourceRepoDir, const std::string &sourceDbFile, std::vector<std::string> &packageNames,
+    PackageLocations &packageLocations)
+{
+    m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(dbLockName),
+        [this, buildAction = m_buildAction, sourceRepoDir, sourceDbFile,
+            repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", argsToString(m_workingDirectory, '/', logFile),
+                std::bind(&MovePackages::handleRepoRemoveResult, this, session, std::placeholders::_1, std::placeholders::_2, std::ref(packageNames),
+                    std::ref(packageLocations)))](UniqueLoggingLock &&lock) {
             if (!repoRemoveProcess) {
                 return;
             }
             repoRemoveProcess->locks().emplace_back(std::move(lock));
             if (m_useContainer) {
-                repoRemoveProcess->launch(boost::process::v1::start_dir(m_sourceRepoDirectory),
+                repoRemoveProcess->launch(boost::process::v1::start_dir(sourceRepoDir),
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
-                    m_makeContainerPkgPath, "--", m_sourceDatabaseFile, m_result.processedPackages);
+                    m_makeContainerPkgPath, "--", sourceDbFile, m_result.processedPackages);
             } else {
-                repoRemoveProcess->launch(
-                    boost::process::v1::start_dir(m_sourceRepoDirectory), m_repoRemovePath, m_sourceDatabaseFile, m_result.processedPackages);
+                repoRemoveProcess->launch(boost::process::v1::start_dir(sourceRepoDir), m_repoRemovePath, sourceDbFile, m_result.processedPackages);
             }
-            m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", m_sourceRepoDirectory, "\" for \"", m_sourceDatabaseFile,
+            m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", sourceRepoDir, "\" for \"", sourceDbFile,
                 "\", see logfile for details\n");
         });
 }
 
-void MovePackages::handleRepoRemoveResult(
-    MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
+void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child,
+    ProcessResult &&result, std::vector<string> &packageNames, PackageLocations &packageLocations)
 {
     // handle error
     CPP_UTILITIES_UNUSED(processSession)
@@ -375,17 +466,23 @@ void MovePackages::handleRepoRemoveResult(
     if (result.errorCode) {
         const auto errorCodeMessage = result.errorCode.message();
         const auto &errorMessage = result.error.empty() ? errorCodeMessage : result.error;
-        m_result.errorMessage = "unable to remove packages: " + errorMessage;
+        auto error = "unable to remove packages: " + errorMessage;
+        auto resultLock = std::unique_lock(m_resultMutex);
+        m_result.errorMessage = std::move(error);
+        resultLock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "Unable to invoke repo-remove: ", errorMessage, '\n');
         return;
     } else if (result.exitCode != 0) {
-        m_result.errorMessage = argsToString("unable to remove package: repo-remove returned with exit code ", result.exitCode);
+        auto error = argsToString("unable to remove package: repo-remove returned with exit code ", result.exitCode);
+        auto resultLock = std::unique_lock(m_resultMutex);
+        m_result.errorMessage = std::move(error);
+        resultLock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "repo-remove invocation exited with non-zero exit code: ", result.exitCode, '\n');
         return;
     }
 
     // remove packages from source repo
-    for (auto &[packageName, packageLocation, ok] : m_packageLocations) {
+    for (auto &[packageName, packageLocation, ok] : packageLocations) {
         // ignore packages which we've couldn't even copy to destination repo
         if (!ok) {
             continue;
@@ -396,27 +493,37 @@ void MovePackages::handleRepoRemoveResult(
             std::filesystem::remove(argsToString(packageLocation.pathWithinRepo, ".sig"));
         } catch (const std::runtime_error &e) {
             ok = false;
-            m_result.failedPackages.emplace_back(packageName, argsToString("unable to remove from source repo: ", e.what()));
-            m_result.processedPackages.erase(
-                std::remove(m_result.processedPackages.begin(), m_result.processedPackages.end(), packageName), m_result.processedPackages.end());
+            auto error = argsToString("unable to remove from source repo: ", e.what());
+            auto resultLock = std::unique_lock(m_resultMutex);
+            m_result.failedPackages.emplace_back(packageName, std::move(error));
+            resultLock.unlock();
+            packageNames.erase(std::remove(packageNames.begin(), packageNames.end(), packageName), packageNames.end());
         }
     }
 }
 
-void MovePackages::handleRepoAddResult(
-    MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
+void MovePackages::handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child,
+    ProcessResult &&result, std::vector<string> &packageNames, PackageLocations &packageLocations)
 {
     // handle error
     CPP_UTILITIES_UNUSED(processSession)
     CPP_UTILITIES_UNUSED(child)
+    CPP_UTILITIES_UNUSED(packageNames)
+    CPP_UTILITIES_UNUSED(packageLocations)
     if (result.errorCode) {
         const auto errorCodeMessage = result.errorCode.message();
         const auto &errorMessage = result.error.empty() ? errorCodeMessage : result.error;
-        m_addErrorMessage = "unable to add packages: " + errorMessage;
+        auto error = "unable to add packages: " + errorMessage;
+        auto resultLock = std::unique_lock(m_resultMutex);
+        m_addErrorMessages.emplace_back(std::move(error));
+        resultLock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "Unable to invoke repo-add: ", errorMessage, '\n');
         return;
     } else if (result.exitCode != 0) {
-        m_addErrorMessage = argsToString("unable to add packages: repo-add returned with exit code ", result.exitCode);
+        auto error = argsToString("unable to add packages: repo-add returned with exit code ", result.exitCode);
+        auto resultLock = std::unique_lock(m_resultMutex);
+        m_addErrorMessages.emplace_back(std::move(error));
+        resultLock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "repo-add invocation exited with non-zero exit code: ", result.exitCode, '\n');
         return;
     }
@@ -428,14 +535,15 @@ void MovePackages::conclude()
 {
     // check for errors
     const auto hasRepoRemoveError = !m_result.errorMessage.empty();
-    const auto hasRepoAddError = !m_addErrorMessage.empty();
+    const auto hasRepoAddError = !m_addErrorMessages.empty();
+    auto addErrorMessage = joinStrings(m_addErrorMessages, "\n");
     std::string_view failureReason;
     if (hasRepoAddError && hasRepoRemoveError) {
         failureReason = "repo-add and repo-remove error";
-        m_result.errorMessage = argsToString(m_result.errorMessage, ',', ' ', m_addErrorMessage);
+        m_result.errorMessage = argsToString(m_result.errorMessage, ',', ' ', addErrorMessage);
     } else if (hasRepoAddError) {
         failureReason = "repo-add error";
-        m_result.errorMessage = std::move(m_addErrorMessage);
+        m_result.errorMessage = std::move(addErrorMessage);
     } else if (hasRepoRemoveError) {
         failureReason = "repo-remove error";
     }
@@ -450,11 +558,15 @@ void MovePackages::conclude()
     }
 
     // consider all packages failed if there are repo-add/repo-remove errors
-    m_result.failedPackages.reserve(m_result.failedPackages.size() + m_result.processedPackages.size());
+    m_result.failedPackages.reserve(m_result.failedPackages.size() + m_result.processedPackages.size() + m_result.processedDebugPackages.size());
     for (auto &processedPackage : m_result.processedPackages) {
         m_result.failedPackages.emplace_back(std::move(processedPackage), failureReason);
     }
+    for (auto &processedPackage : m_result.processedDebugPackages) {
+        m_result.failedPackages.emplace_back(std::move(processedPackage), failureReason);
+    }
     m_result.processedPackages.clear();
+    m_result.processedDebugPackages.clear();
     reportResultWithData(BuildActionResult::Failure);
 }
 

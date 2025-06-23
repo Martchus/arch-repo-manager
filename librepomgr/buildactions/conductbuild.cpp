@@ -384,7 +384,7 @@ void ConductBuild::run()
         if (const auto *const targetDb = m_setup.config.findDatabase(m_buildPreparation.targetDb, m_buildPreparation.targetArch)) {
             if (m_buildProgress.targetDbFilePath.empty()) {
                 m_buildProgress.targetDbFilePath = fileName(targetDb->path);
-                std::error_code ec;
+                auto ec = std::error_code();
                 auto symlinkTarget = std::filesystem::read_symlink(m_buildProgress.targetDbFilePath, ec);
                 if (!ec) {
                     m_buildProgress.targetDbFilePath = symlinkTarget;
@@ -394,11 +394,26 @@ void ConductBuild::run()
                 m_buildProgress.targetRepoPath = targetDb->localPkgDir;
             }
         }
+        if (const auto *const debugDb = m_setup.config.findDatabase(m_buildPreparation.debugDb, m_buildPreparation.targetArch)) {
+            if (m_buildProgress.targetDebugDbFilePath.empty()) {
+                m_buildProgress.targetDebugDbFilePath = fileName(debugDb->path);
+                auto ec = std::error_code();
+                auto symlinkTarget = std::filesystem::read_symlink(m_buildProgress.targetDebugDbFilePath, ec);
+                if (!ec) {
+                    m_buildProgress.targetDebugDbFilePath = symlinkTarget;
+                }
+            }
+            if (m_buildProgress.targetDebugRepoPath.empty()) {
+                m_buildProgress.targetDebugRepoPath = debugDb->localPkgDir;
+            }
+        } else if (m_buildProgress.targetDebugRepoPath.empty()) {
+            m_buildProgress.targetDebugRepoPath = m_buildProgress.targetRepoPath;
+        }
         if (const auto *const stagingDb
             = m_autoStaging ? m_setup.config.findDatabase(m_buildPreparation.stagingDb, m_buildPreparation.targetArch) : nullptr) {
             if (m_buildProgress.stagingDbFilePath.empty()) {
                 m_buildProgress.stagingDbFilePath = fileName(stagingDb->path);
-                std::error_code ec;
+                auto ec = std::error_code();
                 auto symlinkTarget = std::filesystem::read_symlink(m_buildProgress.stagingDbFilePath, ec);
                 if (!ec) {
                     m_buildProgress.stagingDbFilePath = symlinkTarget;
@@ -406,6 +421,22 @@ void ConductBuild::run()
             }
             if (m_buildProgress.stagingRepoPath.empty()) {
                 m_buildProgress.stagingRepoPath = stagingDb->localPkgDir;
+            }
+            if (const auto *const stagingDebugDb = m_setup.config.findDatabase(m_buildPreparation.stagingDebugDb, m_buildPreparation.targetArch)) {
+                if (m_buildProgress.stagingDebugDbFilePath.empty()) {
+                    m_buildProgress.stagingDebugDbFilePath = fileName(stagingDebugDb->path);
+                    auto ec = std::error_code();
+                    auto symlinkTarget = std::filesystem::read_symlink(m_buildProgress.stagingDebugDbFilePath, ec);
+                    if (!ec) {
+                        m_buildProgress.stagingDebugDbFilePath = symlinkTarget;
+                    }
+                }
+                if (m_buildProgress.stagingDebugRepoPath.empty()) {
+                    m_buildProgress.stagingDebugRepoPath = stagingDebugDb->localPkgDir;
+                }
+            }
+            if (m_buildProgress.stagingDebugRepoPath.empty()) {
+                m_buildProgress.stagingDebugRepoPath = m_buildProgress.stagingRepoPath;
             }
         } else if (m_autoStaging) {
             reportError("Auto-staging is enabled but the staging database \"" % m_buildPreparation.stagingDb % '@' % m_buildPreparation.targetArch
@@ -558,9 +589,9 @@ void LibRepoMgr::ConductBuild::readSecrets()
 }
 
 /// \cond
-static void findPackageExtension(const IniFile::ScopeData &iniScope, const std::string &key, std::string &result)
+static void findPackageExtension(const AdvancedIniFile::FieldList &iniFields, const std::string &key, std::string &result)
 {
-    const auto *const value = getLastValue(iniScope, key);
+    const auto *const value = getLastValue(iniFields, key);
     if (!value) {
         return;
     }
@@ -588,24 +619,27 @@ static void findPackageExtension(const IniFile::ScopeData &iniScope, const std::
  */
 void ConductBuild::makeMakepkgConfigFile(const std::filesystem::path &makepkgConfigPath)
 {
-    if (!filesystem::exists(makepkgConfigPath)) {
+    // configure databases and cache directory; validate architecture
+    const auto alreadyExists = filesystem::exists(makepkgConfigPath);
+    if (!alreadyExists) {
         filesystem::copy(m_globalMakepkgConfigFilePath, makepkgConfigPath);
     }
 
     // read PKGEXT from makepkg.conf
-    ifstream makepkgConfInputFile;
-    makepkgConfInputFile.exceptions(ios_base::badbit | ios_base::failbit);
-    makepkgConfInputFile.open(makepkgConfigPath, ios_base::in);
-    IniFile makepkgConfIni;
-    IniFile::ScopeList &iniData = makepkgConfIni.data();
-    makepkgConfIni.parse(makepkgConfInputFile);
+    auto inputFile = std::ifstream();
+    inputFile.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+    inputFile.open(makepkgConfigPath.string(), std::ios_base::in);
+    auto ini = AdvancedIniFile();
+    ini.parse(inputFile);
+    inputFile.close();
+    auto &sections = ini.sections;
     static const struct {
         std::string pkg = "PKGEXT";
         std::string src = "SRCEXT";
     } extensionKeys;
-    for (auto i = iniData.rbegin(), end = iniData.rend(); i != end; ++i) {
-        findPackageExtension(i->second, extensionKeys.pkg, m_binaryPackageExtension);
-        findPackageExtension(i->second, extensionKeys.src, m_sourcePackageExtension);
+    for (auto i = sections.rbegin(), end = sections.rend(); i != end; ++i) {
+        findPackageExtension(i->fields, extensionKeys.pkg, m_binaryPackageExtension);
+        findPackageExtension(i->fields, extensionKeys.src, m_sourcePackageExtension);
         if (!m_binaryPackageExtension.empty() && !m_sourcePackageExtension.empty()) {
             break;
         }
@@ -616,6 +650,28 @@ void ConductBuild::makeMakepkgConfigFile(const std::filesystem::path &makepkgCon
     if (m_sourcePackageExtension.empty()) {
         throw std::runtime_error("unable to read SRCEXT from makepkg.conf");
     }
+
+    // skip if already exists unless the build preparation is newer
+    // note: If the build preparation is newer but the config already exist the *existing* config is updated.
+    //       This allows keeping a custom config but still updating it on further build preparation runs.
+    if (alreadyExists && filesystem::last_write_time(makepkgConfigPath) > filesystem::last_write_time(m_buildPreparationFilePath)) {
+        return;
+    }
+
+    // add additional build options
+    if (m_buildPreparation.additionalBuildOptions.empty()) {
+        return;
+    }
+    auto outputFile = std::ofstream();
+    outputFile.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+    outputFile.open(makepkgConfigPath, std::ios_base::in | std::ios_base::out);
+    outputFile.seekp(0, std::ios_base::end);
+    outputFile << "BUILDENV+=(";
+    for (const auto &option : m_buildPreparation.additionalBuildOptions) {
+        outputFile << ' ' << option;
+    }
+    outputFile << " )\n";
+    outputFile.close();
 }
 
 /*!
@@ -627,20 +683,20 @@ void ConductBuild::makePacmanConfigFile(
     const std::filesystem::path &pacmanConfigPath, const std::vector<std::pair<std::string, std::multimap<std::string, std::string>>> &dbConfig)
 {
     // configure databases and cache directory; validate architecture
-    const auto pacmanConfigAlreadyExists = filesystem::exists(pacmanConfigPath);
-    if (pacmanConfigAlreadyExists && filesystem::last_write_time(pacmanConfigPath) > filesystem::last_write_time(m_buildPreparationFilePath)) {
+    const auto alreadyExists = filesystem::exists(pacmanConfigPath);
+    if (alreadyExists && filesystem::last_write_time(pacmanConfigPath) > filesystem::last_write_time(m_buildPreparationFilePath)) {
         // skip if already exists unless the build preparation is newer
-        // note: If the build preparation is newer but the pacman config already exist the *existing* config is updated.
+        // note: If the build preparation is newer but the config already exist the *existing* config is updated.
         //       This allows keeping a custom config but still updating it on further build preparation runs.
         return;
     }
-    ifstream pacmanConfInputFile;
-    pacmanConfInputFile.exceptions(ios_base::badbit | ios_base::failbit);
-    pacmanConfInputFile.open(pacmanConfigAlreadyExists ? pacmanConfigPath.string() : m_globalPacmanConfigPath, ios_base::in);
-    AdvancedIniFile pacmanConfIni;
-    pacmanConfIni.parse(pacmanConfInputFile);
-    pacmanConfInputFile.close();
-    auto &sections = pacmanConfIni.sections;
+    auto inputFile = std::ifstream();
+    inputFile.exceptions(ios_base::badbit | ios_base::failbit);
+    inputFile.open(alreadyExists ? pacmanConfigPath.string() : m_globalPacmanConfigPath, ios_base::in);
+    auto ini = AdvancedIniFile();
+    ini.parse(inputFile);
+    inputFile.close();
+    auto &sections = ini.sections;
     // -> remove all existing database sections
     sections.erase(remove_if(sections.begin(), sections.end(), [](const AdvancedIniFile::Section &section) { return section.name != "options"; }),
         sections.end());
@@ -683,11 +739,11 @@ void ConductBuild::makePacmanConfigFile(
         }
     }
     // -> write changes to disk
-    ofstream pacmanConfOutputFile;
-    pacmanConfOutputFile.exceptions(ios_base::badbit | ios_base::failbit);
-    pacmanConfOutputFile.open(pacmanConfigPath, ios_base::out);
-    pacmanConfIni.make(pacmanConfOutputFile);
-    pacmanConfOutputFile.close();
+    auto outputFile = std::ofstream();
+    outputFile.exceptions(ios_base::badbit | ios_base::failbit);
+    outputFile.open(pacmanConfigPath, ios_base::out);
+    ini.make(outputFile);
+    outputFile.close();
 }
 
 /*!
@@ -1312,17 +1368,27 @@ void ConductBuild::addPackageToRepo(
     const auto &firstPackage = buildData.packages.front().pkg;
     auto sourcePackageName = buildData.sourceInfo->name % '-' % firstPackage->version + m_sourcePackageExtension;
 
-    // determine names of binary packages to be copied
-    binaryPackages.reserve(buildData.packages.size());
+    // determine name of debug package to be copied
+    // note: We also potentially consider debug packages as such in the loop below. However, it seems like debug packages are
+    //       not part of .SRCINFO and hence also won't be part of buildData.packages.
+    const auto &newVersion = packageProgress.updatedVersion.empty() ? firstPackage->version : packageProgress.updatedVersion;
+    auto debugPackageName = argsToString(
+        buildData.sourceInfo->name, LibPkg::Package::debugSuffix, '-', newVersion, '-', m_buildPreparation.targetArch, m_binaryPackageExtension);
+
+    // determine names of packages to be copied
+    binaryPackages.reserve(buildData.packages.size() + 1);
     buildResult.binaryPackageNames.reserve(buildData.packages.size());
     for (const auto &[packageID, package] : buildData.packages) {
         const auto isAny = package->isArchAny();
+        const auto isDebug = package->isDebug();
         const auto &arch = isAny ? "any" : m_buildPreparation.targetArch;
-        const auto &packageFileName = buildResult.binaryPackageNames.emplace_back(
-            package->name % '-' % (packageProgress.updatedVersion.empty() ? package->version : packageProgress.updatedVersion) % '-' % arch
-            + m_binaryPackageExtension);
+        const auto &packageFileName
+            = (isDebug ? buildResult.debugPackageNames : buildResult.binaryPackageNames)
+                  .emplace_back(
+                      package->name % '-' % (packageProgress.updatedVersion.empty() ? package->version : packageProgress.updatedVersion) % '-' % arch
+                      + m_binaryPackageExtension);
         binaryPackages.emplace_back(
-            BinaryPackageInfo{ package->name, packageFileName, packageProgress.buildDirectory % '/' + packageFileName, isAny, false });
+            BinaryPackageInfo{ package->name, packageFileName, packageProgress.buildDirectory % '/' + packageFileName, isAny, isDebug, false });
     }
 
     // check whether all packages exists
@@ -1335,6 +1401,12 @@ void ConductBuild::addPackageToRepo(
             if (!std::filesystem::is_regular_file(binaryPackage.path)) {
                 missingPackages.emplace_back(std::move(binaryPackage.fileName));
             }
+        }
+        const auto debugPackagePath = packageProgress.buildDirectory % '/' + debugPackageName;
+        if (std::filesystem::is_regular_file(debugPackagePath)) {
+            binaryPackages.emplace_back(
+                BinaryPackageInfo{ argsToString(packageName, LibPkg::Package::debugSuffix), debugPackageName, debugPackagePath, false, true, false });
+            buildResult.debugPackageNames.emplace_back(std::move(debugPackageName));
         }
     } catch (const std::filesystem::filesystem_error &e) {
         auto writeLock = lockToWrite(readLock);
@@ -1421,22 +1493,24 @@ void ConductBuild::addPackageToRepo(
     // copy source and binary packages
     buildResult.repoPath = buildResult.needsStaging ? &m_buildProgress.stagingRepoPath : &m_buildProgress.targetRepoPath;
     buildResult.dbFilePath = buildResult.needsStaging ? &m_buildProgress.stagingDbFilePath : &m_buildProgress.targetDbFilePath;
+    buildResult.debugRepoPath = buildResult.needsStaging ? &m_buildProgress.stagingDebugRepoPath : &m_buildProgress.targetDebugRepoPath;
+    buildResult.debugDbFilePath = buildResult.needsStaging ? &m_buildProgress.stagingDebugDbFilePath : &m_buildProgress.targetDebugDbFilePath;
     try {
         auto anyRepoPath = std::filesystem::path();
         const auto sourceRepoPath = std::filesystem::path(argsToString(buildResult.repoPath, "/../src/"));
         std::filesystem::create_directories(sourceRepoPath);
         std::filesystem::copy(sourcePackagePath, sourceRepoPath / sourcePackageName, std::filesystem::copy_options::overwrite_existing);
         for (const auto &binaryPackage : binaryPackages) {
+            const auto &repoPath = binaryPackage.isDebug ? *buildResult.debugRepoPath : *buildResult.repoPath;
             if (!binaryPackage.isAny) {
-                std::filesystem::copy(
-                    binaryPackage.path, *buildResult.repoPath % '/' + binaryPackage.fileName, std::filesystem::copy_options::overwrite_existing);
+                std::filesystem::copy(binaryPackage.path, repoPath % '/' + binaryPackage.fileName, std::filesystem::copy_options::overwrite_existing);
                 continue;
             }
             if (anyRepoPath.empty()) {
-                std::filesystem::create_directories(anyRepoPath = argsToString(buildResult.repoPath, "/../any"));
+                std::filesystem::create_directories(anyRepoPath = argsToString(repoPath, "/../any"));
             }
             std::filesystem::copy(binaryPackage.path, anyRepoPath / binaryPackage.fileName, std::filesystem::copy_options::overwrite_existing);
-            const auto symlink = std::filesystem::path(*buildResult.repoPath % '/' + binaryPackage.fileName);
+            const auto symlink = std::filesystem::path(repoPath % '/' + binaryPackage.fileName);
             std::filesystem::remove(symlink);
             std::filesystem::create_symlink("../any/" + binaryPackage.fileName, symlink);
         }
@@ -1463,12 +1537,13 @@ void ConductBuild::addPackageToRepo(
 void ConductBuild::invokeGpg(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const string &packageName,
     PackageBuildProgress &packageProgress, std::vector<BinaryPackageInfo> &&binaryPackages, BuildResult &&buildResult)
 {
-    const auto signingSession = std::make_shared<SigningSession>(std::move(binaryPackages), buildResult.repoPath, m_setup.building.ioContext,
-        [this, makepkgchrootSession, &packageName, &packageProgress, buildResult = std::move(buildResult)](
-            MultiSession<std::string>::ContainerType &&failedPackages) mutable {
-            checkGpgErrorsAndContinueAddingPackagesToRepo(
-                makepkgchrootSession, packageName, packageProgress, std::move(buildResult), std::move(failedPackages));
-        });
+    const auto signingSession
+        = std::make_shared<SigningSession>(std::move(binaryPackages), buildResult.repoPath, buildResult.debugRepoPath, m_setup.building.ioContext,
+            [this, makepkgchrootSession, &packageName, &packageProgress, buildResult = std::move(buildResult)](
+                MultiSession<std::string>::ContainerType &&failedPackages) mutable {
+                checkGpgErrorsAndContinueAddingPackagesToRepo(
+                    makepkgchrootSession, packageName, packageProgress, std::move(buildResult), std::move(failedPackages));
+            });
     constexpr auto gpgParallelLimit = 4;
     const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
     for (auto i = 0; i != gpgParallelLimit && signingSession->currentPackage != signingSession->binaryPackages.end();
@@ -1483,8 +1558,8 @@ void ConductBuild::invokeGpg(
     const auto &binaryPackage = *signingSession->currentPackage;
     auto processSession = m_buildAction->makeBuildProcess("gpg for " + binaryPackage.name,
         packageProgress.buildDirectory % "/gpg-" % binaryPackage.name + ".log",
-        [this, signingSession, &packageName, &packageProgress, isAny = binaryPackage.isAny, binaryPackageName = binaryPackage.fileName](
-            boost::process::v1::child &&child, ProcessResult &&result) mutable {
+        [this, signingSession, &packageName, &packageProgress, isDebug = binaryPackage.isDebug, isAny = binaryPackage.isAny,
+            binaryPackageName = binaryPackage.fileName](boost::process::v1::child &&child, ProcessResult &&result) mutable {
             // make the next gpg invocation
             if (const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
                 signingSession->currentPackage != signingSession->binaryPackages.end()
@@ -1503,19 +1578,20 @@ void ConductBuild::invokeGpg(
             } else {
                 // move signature to repository
                 try {
+                    const auto &repoPath = isDebug ? *signingSession->debugRepoPath : *signingSession->repoPath;
                     const auto buildDirSignaturePath
                         = std::filesystem::path(argsToString(packageProgress.buildDirectory, '/', binaryPackageName, ".sig"));
                     if (!std::filesystem::exists(buildDirSignaturePath)) {
                         m_buildAction->log()(Phrases::ErrorMessage, "Signature of \"", binaryPackageName,
                             "\" could not be created: ", buildDirSignaturePath, " does not exist after invoking gpg\n");
                     } else if (!isAny) {
-                        std::filesystem::copy(buildDirSignaturePath, *signingSession->repoPath % '/' % binaryPackageName + ".sig",
-                            std::filesystem::copy_options::overwrite_existing);
+                        std::filesystem::copy(
+                            buildDirSignaturePath, repoPath % '/' % binaryPackageName + ".sig", std::filesystem::copy_options::overwrite_existing);
                         return;
                     } else {
-                        std::filesystem::copy(buildDirSignaturePath, argsToString(signingSession->repoPath, "/../any/", binaryPackageName, ".sig"),
+                        std::filesystem::copy(buildDirSignaturePath, argsToString(repoPath, "/../any/", binaryPackageName, ".sig"),
                             std::filesystem::copy_options::overwrite_existing);
-                        const auto symlink = std::filesystem::path(argsToString(signingSession->repoPath, '/', binaryPackageName, ".sig"));
+                        const auto symlink = std::filesystem::path(argsToString(repoPath, '/', binaryPackageName, ".sig"));
                         std::filesystem::remove(symlink);
                         std::filesystem::create_symlink("../any/" % binaryPackageName + ".sig", symlink);
                         return;
@@ -1544,27 +1620,44 @@ void ConductBuild::invokeGpg(
 void ConductBuild::invokeRepoAdd(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const string &packageName,
     PackageBuildProgress &packageProgress, BuildResult &&buildResult)
 {
+    const auto session
+        = MultiSession<void>::create(m_setup.building.ioContext, std::bind(&ConductBuild::makeNextPackage, this, makepkgchrootSession));
+    invokeRepoAddFor(makepkgchrootSession, session, packageName, packageProgress, buildResult, m_buildPreparation.stagingDb,
+        m_buildPreparation.targetDb, buildResult.binaryPackageNames, *buildResult.repoPath, *buildResult.dbFilePath);
+    invokeRepoAddFor(makepkgchrootSession, session, packageName, packageProgress, buildResult, m_buildPreparation.stagingDebugDb,
+        m_buildPreparation.debugDb, buildResult.debugPackageNames, *buildResult.debugRepoPath, *buildResult.debugDbFilePath);
+}
+
+void ConductBuild::invokeRepoAddFor(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
+    const MultiSession<void>::SharedPointerType &session, const std::string &packageName, PackageBuildProgress &packageProgress,
+    const BuildResult &buildResult, const std::string &stagingDb, const std::string &targetDb, const std::vector<std::string> &packageNames,
+    const std::string &repoPath, const std::string &dbFilePath)
+{
+    if (packageNames.empty()) {
+        return;
+    }
     auto processSession = m_buildAction->makeBuildProcess("repo-add for " + packageName, packageProgress.buildDirectory + "/repo-add.log",
-        std::bind(&ConductBuild::handleRepoAddErrorsAndMakeNextPackage, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress),
+        std::bind(&ConductBuild::handleRepoAddErrors, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress), session,
             std::placeholders::_1, std::placeholders::_2));
     m_setup.locks.acquireToWrite(m_buildAction->log(),
-        ServiceSetup::Locks::forDatabase(
-            buildResult.needsStaging ? m_buildPreparation.stagingDb : m_buildPreparation.targetDb, m_buildPreparation.targetArch),
-        [this, &packageName, processSession, buildAction = m_buildAction, &buildResult](UniqueLoggingLock &&lock) {
+        ServiceSetup::Locks::forDatabase(buildResult.needsStaging ? stagingDb : targetDb, m_buildPreparation.targetArch),
+        [this, &packageName, processSession, buildAction = m_buildAction, &buildResult, &packageNames, &repoPath, &dbFilePath](
+            UniqueLoggingLock &&lock) {
+            if (!processSession) {
+                return;
+            }
             processSession->locks().emplace_back(std::move(lock));
             if (m_useContainer && !checkExecutable(m_repoAddPath)) {
                 m_buildAction->log()(
                     Phrases::InfoMessage, "Going to invoke repo-add for ", packageName, " via ", m_makeContainerPkgPath.string(), '\n');
-                processSession->launch(boost::process::v1::start_dir(*buildResult.repoPath), boost::process::v1::env["PKGNAME"] = packageName,
-                    boost::process::v1::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath,
-                    buildResult.binaryPackageNames);
+                processSession->launch(boost::process::v1::start_dir(repoPath), boost::process::v1::env["PKGNAME"] = packageName,
+                    boost::process::v1::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath, packageNames);
             } else {
-                processSession->launch(
-                    boost::process::v1::start_dir(*buildResult.repoPath), m_repoAddPath, *buildResult.dbFilePath, buildResult.binaryPackageNames);
+                processSession->launch(boost::process::v1::start_dir(repoPath), m_repoAddPath, dbFilePath, packageNames);
             }
             buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage),
-                "repo path: ", buildResult.repoPath, '\n', ps(Phrases::SubMessage), "db path: ", buildResult.dbFilePath, '\n',
-                ps(Phrases::SubMessage), "package(s): ", joinStrings(buildResult.binaryPackageNames), '\n');
+                "repo path: ", buildResult.repoPath, '\n', ps(Phrases::SubMessage), "db path: ", dbFilePath, '\n', ps(Phrases::SubMessage),
+                "package(s): ", joinStrings(packageNames), '\n');
         });
 }
 
@@ -1687,32 +1780,36 @@ void ConductBuild::handleMakechrootpkgErrorsAndAddPackageToRepo(const BatchProce
     addPackageToRepo(makepkgchrootSession, packageName, packageProgress);
 }
 
-void ConductBuild::handleRepoAddErrorsAndMakeNextPackage(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
-    const string &packageName, PackageBuildProgress &packageProgress, boost::process::v1::child &&child, ProcessResult &&result)
+void ConductBuild::handleRepoAddErrors(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+    PackageBuildProgress &packageProgress, MultiSession<void>::SharedPointerType session, boost::process::v1::child &&child, ProcessResult &&result)
 {
+    CPP_UTILITIES_UNUSED(session)
     // handle repo-add error; update build progress JSON after each package
     auto lock = lockToWrite();
     if (result.errorCode) {
         const auto errorMessage = result.errorCode.message();
         packageProgress.error = "unable to add package to repo: " + errorMessage;
-        dumpBuildProgress();
+        packageProgress.addedToRepo = false;
         lock.unlock();
         m_buildAction->log()(Phrases::ErrorMessage, "Unable to invoke repo-add for ", packageName, ": ", errorMessage, '\n');
         makepkgchrootSession->addResponse(string(packageName));
     } else if (child.exit_code() != 0) {
         packageProgress.error = argsToString("unable to add package to repo: repo-add returned with exit code ", child.exit_code());
-        dumpBuildProgress();
+        packageProgress.addedToRepo = false;
         lock.unlock();
         m_buildAction->log()(
             Phrases::ErrorMessage, "repo-add invocation for ", packageName, " exited with non-zero exit code: ", child.exit_code(), '\n');
         makepkgchrootSession->addResponse(std::string(packageName));
-    } else {
+    } else if (packageProgress.error.empty()) {
         packageProgress.addedToRepo = true;
-        dumpBuildProgress();
-        lock.unlock();
     }
+}
 
-    // make next package
+void ConductBuild::makeNextPackage(const BatchProcessingSession::SharedPointerType &makepkgchrootSession)
+{
+    auto lock = lockToRead();
+    dumpBuildProgress();
+    lock.unlock();
     enqueueMakechrootpkg(makepkgchrootSession, 1);
 }
 
@@ -1812,6 +1909,9 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
             throw std::runtime_error("Configured database \"" % dbName + "\" has been removed.");
         }
         for (const auto &builtPackage : builtPackages) {
+            if (builtPackage.isDebug) {
+                continue;
+            }
             auto existingPackage = db->findPackage(builtPackage.name);
             if (!existingPackage) {
                 continue;
@@ -1827,6 +1927,9 @@ PackageStagingNeeded ConductBuild::checkWhetherStagingIsNeededAndPopulateRebuild
     // parse built packages
     // -> make list of provides which would be added when adding the newly built package to the repo
     for (const auto &builtPackage : builtPackages) {
+        if (builtPackage.isDebug) {
+            continue;
+        }
         LibPkg::Package::exportProvides(LibPkg::Package::fromPkgFile(builtPackage.path), addedProvides, addedLibProvides);
     }
 

@@ -82,7 +82,7 @@ REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
 // clang-format on
 
 struct LIBREPOMGR_EXPORT BuildPreparation : public ReflectiveRapidJSON::JsonSerializable<BuildPreparation>,
-                                            public ReflectiveRapidJSON::BinarySerializable<BuildPreparation, 1> {
+                                            public ReflectiveRapidJSON::BinarySerializable<BuildPreparation, 2> {
     std::unordered_map<std::string, PackageBuildData> buildData;
     std::vector<std::pair<std::string, std::multimap<std::string, std::string>>> dbConfig, stagingDbConfig;
     std::string targetDb, targetArch, stagingDb;
@@ -91,6 +91,10 @@ struct LIBREPOMGR_EXPORT BuildPreparation : public ReflectiveRapidJSON::JsonSeri
     std::vector<std::string> warnings;
     std::string error;
     bool manuallyOrdered = false;
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2)
+        : std::string debugDb
+        , stagingDebugDb;
+    std::vector<std::string> additionalBuildOptions; // options to append to BUILDENV in makepkg.conf
 };
 
 enum class PackageStagingNeeded {
@@ -141,7 +145,7 @@ using RebuildInfoByPackage = std::unordered_map<std::string, RebuildInfo>;
 using RebuildInfoByDatabase = std::unordered_map<std::string, RebuildInfoByPackage>;
 
 struct LIBREPOMGR_EXPORT BuildProgress : public ReflectiveRapidJSON::JsonSerializable<BuildProgress>,
-                                         public ReflectiveRapidJSON::BinarySerializable<BuildProgress, 1> {
+                                         public ReflectiveRapidJSON::BinarySerializable<BuildProgress, 2> {
     std::unordered_map<std::string, PackageBuildProgress> progressByPackage;
     std::string targetDbFilePath;
     std::string targetRepoPath;
@@ -149,13 +153,20 @@ struct LIBREPOMGR_EXPORT BuildProgress : public ReflectiveRapidJSON::JsonSeriali
     std::string stagingRepoPath;
     RebuildInfoByPackage producedProvides, removedProvides;
     RebuildInfoByDatabase rebuildList;
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2)
+        : std::string targetDebugDbFilePath;
+    std::string targetDebugRepoPath;
+    std::string stagingDebugDbFilePath;
+    std::string stagingDebugRepoPath;
 };
 
 struct LIBREPOMGR_EXPORT PackageMovementResult : public ReflectiveRapidJSON::JsonSerializable<PackageMovementResult>,
-                                                 public ReflectiveRapidJSON::BinarySerializable<PackageMovementResult, 1> {
+                                                 public ReflectiveRapidJSON::BinarySerializable<PackageMovementResult, 2> {
     std::vector<std::pair<std::string, std::string>> failedPackages;
     std::vector<std::string> processedPackages;
     std::string errorMessage;
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2)
+        : std::vector<std::string> processedDebugPackages;
 };
 
 struct LIBREPOMGR_EXPORT RepositoryProblem : public ReflectiveRapidJSON::JsonSerializable<RepositoryProblem>,

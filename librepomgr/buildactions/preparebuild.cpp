@@ -144,6 +144,11 @@ void PrepareBuild::run()
 
     // find dependencies of the destination repository
     auto *const destinationDb = (*m_destinationDbs.begin());
+    if (destinationDb->isDebug()) {
+        configReadLock = std::monostate{};
+        reportError("A debug DB must not be specified directly as destination DB.");
+        return;
+    }
     auto databaseDependencyOrderRes = m_setup.config.computeDatabaseDependencyOrder(*destinationDb);
     if (std::holds_alternative<std::string>(databaseDependencyOrderRes)) {
         configReadLock = std::monostate{};
@@ -156,17 +161,14 @@ void PrepareBuild::run()
     }
 
     // find dependencies of the staging repository
-    auto *stagingDb = m_setup.config.findDatabase(destinationDb->name + "-staging", destinationDb->arch);
+    auto *stagingDb = destinationDb->isStaging() ? destinationDb : m_setup.config.findDatabase(destinationDb->stagingName(), destinationDb->arch);
+    auto *debugDb = m_setup.config.findDatabase(destinationDb->debugName(), destinationDb->arch);
+    auto *stagingDebugDb = stagingDb ? m_setup.config.findDatabase(stagingDb->debugName(), stagingDb->arch) : nullptr;
     auto stagingDbOrder = std::variant<std::vector<LibPkg::Database *>, std::string>();
     auto hasStagingDbOrder = false;
-    if (!stagingDb && endsWith(destinationDb->name, "-testing")) {
-        stagingDb = m_setup.config.findDatabase(
-            argsToString(std::string_view(destinationDb->name.data(), destinationDb->name.size() - 8), "-staging"), destinationDb->arch);
-    }
-    if (!stagingDb && endsWith(destinationDb->name, "-staging")) {
-        // use the destination DB as staging DB if it ends with "-staging"; we can assume it was intended to use it and the auto-staging
-        // was just passed as usual
-        stagingDb = destinationDb;
+    auto makeDebugPackages = true;
+    if (stagingDb == destinationDb) {
+        // the specified destination DB is a staging DB so use it for auto-staging
         stagingDbOrder = databaseDependencyOrder;
         hasStagingDbOrder = true;
     }
@@ -177,8 +179,21 @@ void PrepareBuild::run()
         if (std::holds_alternative<std::string>(stagingDbOrder)) {
             m_warnings.emplace_back("Unable to find the staging DB's dependencies: " + get<string>(stagingDbOrder));
         }
+        if (debugDb && !stagingDebugDb) {
+            m_warnings.emplace_back(
+                "Found a debug database for the destination DB but not for the staging DB. Will not enable creation of debug packages.");
+            makeDebugPackages = false;
+        } else if (!debugDb && stagingDebugDb) {
+            m_warnings.emplace_back(
+                "Found a debug database for the staging DB but not for the destination DB. Will not enable creation of debug packages.");
+            makeDebugPackages = false;
+        }
     } else {
         m_warnings.emplace_back("Unable to find staging DB for \"" + destinationDb->name + "\". Auto-staging will not work.");
+    }
+    if (makeDebugPackages && !debugDb) {
+        m_warnings.emplace_back("Unable to find staging DB for \"" + destinationDb->name + "\". Will not enable creation of debug packages.");
+        makeDebugPackages = false;
     }
 
     // set target and staging info
@@ -186,6 +201,15 @@ void PrepareBuild::run()
     m_targetArch = destinationDb->arch;
     if (stagingDb) {
         m_stagingDbName = stagingDb->name;
+    }
+    if (debugDb) {
+        m_debugDbName = debugDb->name;
+    }
+    if (stagingDebugDb) {
+        m_stagingDebugDbName = stagingDebugDb->name;
+    }
+    if (makeDebugPackages) {
+        m_additionalBuildOptions.emplace_back("debug");
     }
 
     // make set of databases considered as given from the specified source databases
@@ -1256,6 +1280,9 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
         .warnings = std::move(m_warnings),
         .error = std::move(error),
         .manuallyOrdered = m_keepOrder,
+        .debugDb = std::move(m_debugDbName),
+        .stagingDebugDb = std::move(m_stagingDebugDbName),
+        .additionalBuildOptions = std::move(m_additionalBuildOptions),
     };
 
     // write results into the working directory so the actual build can pick it up

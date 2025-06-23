@@ -323,24 +323,37 @@ struct LIBREPOMGR_EXPORT PackageMovementAction : public InternalBuildAction {
     PackageMovementAction(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction);
 
 protected:
+    using PackageLocations = std::vector<std::tuple<std::string_view, LibPkg::PackageLocation, bool>>;
+
     bool prepareRepoAction(RequiredDatabases requiredDatabases);
     void reportResultWithData(BuildActionResult result);
 
 private:
     void initWorkingDirectory();
+    bool locatePackage(LibPkg::Database *db, const std::string &packageName, PackageLocations &res);
     void locatePackages();
 
 protected:
+    LibPkg::Database *m_sourceDebugDb = nullptr;
+    LibPkg::Database *m_destinationDebugDb = nullptr;
     std::string m_sourceRepoDirectory;
     std::string m_sourceDatabaseFile;
     std::string m_sourceDatabaseLockName;
+    std::string m_sourceDebugRepoDirectory;
+    std::string m_sourceDebugDatabaseFile;
+    std::string m_sourceDebugDatabaseLockName;
     std::string m_destinationRepoDirectory;
     std::string m_destinationDatabaseFile;
     std::string m_destinationDatabaseLockName;
+    std::string m_destinationDebugRepoDirectory;
+    std::string m_destinationDebugDatabaseFile;
+    std::string m_destinationDebugDatabaseLockName;
     std::string m_workingDirectory;
-    std::vector<std::string> m_fileNames;
+    std::vector<std::string> m_fileNames, m_debugFileNames;
+    std::mutex m_resultMutex;
     PackageMovementResult m_result;
-    std::vector<std::tuple<std::string_view, LibPkg::PackageLocation, bool>> m_packageLocations;
+    PackageLocations m_packageLocations;
+    PackageLocations m_debugPackageLocations;
     boost::filesystem::path m_repoRemovePath;
     boost::filesystem::path m_repoAddPath;
     boost::filesystem::path m_makeContainerPkgPath;
@@ -352,8 +365,14 @@ struct LIBREPOMGR_EXPORT RemovePackages : public PackageMovementAction {
     void run();
 
 private:
-    void handleRepoRemoveResult(boost::process::v1::child &&child, ProcessResult &&result);
-    void movePackagesToArchive();
+    void fillPackageListFromLocations(const PackageLocations &locations, std::vector<std::string> &res);
+    void removePackagesFromDatabaseFile(const typename MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
+        std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &packageNames,
+        const PackageLocations &packageLocations);
+    void handleRepoRemoveResult(
+        boost::process::v1::child &&child, ProcessResult &&result, std::vector<std::string> &packageNames, const PackageLocations &packageLocations);
+    void movePackagesToArchive(std::vector<std::string> &packageNames, const PackageLocations &packageLocations);
+    void conclude();
 };
 
 struct LIBREPOMGR_EXPORT MovePackages : public PackageMovementAction {
@@ -361,11 +380,21 @@ struct LIBREPOMGR_EXPORT MovePackages : public PackageMovementAction {
     void run();
 
 private:
-    void handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result);
-    void handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result);
+    void copyPackagesFromSourceToDestinationRepo(PackageLocations &locations, std::vector<std::string> &packageNames,
+        std::vector<std::string> &fileNames, const std::string &destinationRepoDir);
+    void addPackagesToDestinationDatabaseFile(const typename MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
+        std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &packageNames,
+        PackageLocations &packageLocations);
+    void removePackagesFromSourceDatabaseFile(const typename MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
+        std::string_view logFile, const std::string &sourceRepoDir, const std::string &sourceDbFile, std::vector<std::string> &packageNames,
+        PackageLocations &packageLocations);
+    void handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result,
+        std::vector<std::string> &packageNames, PackageLocations &packageLocations);
+    void handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result,
+        std::vector<std::string> &packageNames, PackageLocations &packageLocations);
     void conclude();
 
-    std::string m_addErrorMessage;
+    std::vector<std::string> m_addErrorMessages;
     LibRepoMgr::MovePackagesFlags m_options = LibRepoMgr::MovePackagesFlags::None;
 };
 
@@ -514,7 +543,8 @@ private:
     CppUtilities::IniFile::ScopeList m_stagingDbConfig;
     std::unordered_set<std::string> m_baseDbs;
     std::unordered_set<std::string> m_requiredDbs;
-    std::string m_targetDbName, m_targetArch, m_stagingDbName;
+    std::string m_targetDbName, m_targetArch, m_stagingDbName, m_debugDbName, m_stagingDebugDbName;
+    std::vector<std::string> m_additionalBuildOptions;
     std::vector<std::vector<std::string>> m_batches;
     std::vector<std::string> m_cyclicLeftovers;
     std::vector<std::string> m_warnings;
@@ -562,28 +592,31 @@ private:
 };
 
 struct BinaryPackageInfo {
-    const std::string name;
-    const std::string fileName;
+    std::string name;
+    std::string fileName;
     std::filesystem::path path;
-    const bool isAny = false;
+    bool isAny = false;
+    bool isDebug = false;
     bool artefactAlreadyPresent = false;
 };
 
 struct SigningSession : public MultiSession<std::string> {
-    explicit SigningSession(
-        std::vector<BinaryPackageInfo> &&binaryPackages, const std::string *repoPath, boost::asio::io_context &ioContext, HandlerType &&handler);
+    explicit SigningSession(std::vector<BinaryPackageInfo> &&binaryPackages, const std::string *repoPath, const std::string *debugRepoPath,
+        boost::asio::io_context &ioContext, HandlerType &&handler);
     std::vector<BinaryPackageInfo> binaryPackages;
     std::vector<BinaryPackageInfo>::iterator currentPackage;
     const std::string *repoPath;
+    const std::string *debugRepoPath;
     std::mutex mutex;
 };
 
-inline SigningSession::SigningSession(std::vector<BinaryPackageInfo> &&binaryPackages, const std::string *repoPath,
+inline SigningSession::SigningSession(std::vector<BinaryPackageInfo> &&binaryPackages, const std::string *repoPath, const std::string *debugRepoPath,
     boost::asio::io_context &ioContext, SigningSession::HandlerType &&handler)
     : MultiSession<std::string>(ioContext, std::move(handler))
     , binaryPackages(std::move(binaryPackages))
     , currentPackage(this->binaryPackages.begin())
     , repoPath(repoPath)
+    , debugRepoPath(debugRepoPath)
 {
 }
 
@@ -604,7 +637,9 @@ struct LIBREPOMGR_EXPORT ConductBuild
 private:
     struct BuildResult {
         std::vector<std::string> binaryPackageNames;
+        std::vector<std::string> debugPackageNames;
         const std::string *repoPath = nullptr, *dbFilePath = nullptr;
+        const std::string *debugRepoPath = nullptr, *debugDbFilePath = nullptr;
         bool needsStaging = false;
     };
 
@@ -646,14 +681,19 @@ private:
     void invokeGpg(const std::shared_ptr<SigningSession> &signingSession, const std::string &packageName, PackageBuildProgress &packageProgress);
     void invokeRepoAdd(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
         PackageBuildProgress &packageProgress, BuildResult &&buildResult);
+    void invokeRepoAddFor(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const MultiSession<void>::SharedPointerType &session,
+        const std::string &packageName, PackageBuildProgress &packageProgress, const BuildResult &buildResult, const std::string &stagingDb,
+        const std::string &targetDb, const std::vector<std::string> &packageNames, const std::string &repoPath, const std::string &dbFilePath);
     void checkDownloadErrorsAndMakePackages(BatchProcessingSession::ContainerType &&failedPackages);
     void checkGpgErrorsAndContinueAddingPackagesToRepo(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
         const std::string &packageName, PackageBuildProgress &packageProgress, BuildResult &&buildResult,
         MultiSession<std::string>::ContainerType &&failedPackages);
     void handleMakechrootpkgErrorsAndAddPackageToRepo(const BatchProcessingSession::SharedPointerType &makepkgchrootSession,
         const std::string &packageName, PackageBuildProgress &packageProgress, boost::process::v1::child &&child, ProcessResult &&result);
-    void handleRepoAddErrorsAndMakeNextPackage(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
-        PackageBuildProgress &packageProgress, boost::process::v1::child &&child, ProcessResult &&result);
+    void handleRepoAddErrors(const BatchProcessingSession::SharedPointerType &makepkgchrootSession, const std::string &packageName,
+        PackageBuildProgress &packageProgress, MultiSession<void>::SharedPointerType session, boost::process::v1::child &&child,
+        ProcessResult &&result);
+    void makeNextPackage(const BatchProcessingSession::SharedPointerType &makepkgchrootSession);
     void checkBuildErrors(BatchProcessingSession::ContainerType &&failedPackages);
     void dumpBuildProgress();
     void addLogFile(std::string &&logFilePath);

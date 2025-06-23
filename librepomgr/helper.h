@@ -21,12 +21,22 @@ namespace LibRepoMgr {
 
 namespace Traits = CppUtilities::Traits;
 
-inline const char *getLastValue(const std::multimap<std::string, std::string> &multimap, const std::string &key)
+template <typename Container> inline const char *getLastValue(const Container &multimap, const std::string &key)
 {
     using namespace std;
-    const auto it = find_if(multimap.crbegin(), multimap.crend(), [&key](const pair<string, string> &i) { return i.first == key; });
+    const auto it = std::find_if(multimap.crbegin(), multimap.crend(), [&key](const auto &i) {
+        if constexpr (Traits::IsSpecializationOf<decltype(i), std::pair>()) {
+            return i.first == key;
+        } else {
+            return i.key == key;
+        }
+    });
     if (it != multimap.rend()) {
-        return it->second.data();
+        if constexpr (Traits::IsSpecializationOf<decltype(*it), std::pair>()) {
+            return it->second.data();
+        } else {
+            return it->value.data();
+        }
     }
     return nullptr;
 }

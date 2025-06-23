@@ -340,6 +340,7 @@ std::string_view LibPkg::PackageBase::computeRegularPackageName() const
         "android-x86-64-",
         "android-x86-",
         "android-armv7a-eabi-",
+        "android-riscv64-",
         "static-compat-",
     };
     for (const auto prefix : prefixes) {

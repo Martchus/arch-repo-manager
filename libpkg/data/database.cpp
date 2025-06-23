@@ -767,26 +767,54 @@ std::string Database::filesPathFromRegularPath() const
     return ext == std::string::npos ? path : argsToString(std::string_view(path.data(), ext), ".files");
 }
 
-bool Database::isStaging() const
+bool Database::isStaging(std::string_view name)
 {
     return name.ends_with("-staging");
 }
 
-bool Database::isTesting() const
+bool Database::isTesting(std::string_view name)
 {
     return name.ends_with("-testing");
 }
 
-std::string_view Database::specialSuffix() const
+bool Database::isDebug(std::string_view name)
+{
+    return name.ends_with("-debug");
+}
+
+std::string_view Database::specialSuffix(std::string_view name)
 {
     static constexpr auto suffixLength = std::string_view("-staging").size();
-    return isStaging() || isTesting() ? std::string_view(name.data() + name.size() - suffixLength) : std::string_view();
+    return isStaging(name) || isTesting(name) ? std::string_view(name.data() + name.size() - suffixLength) : std::string_view();
+}
+
+std::string_view Database::nameWithoutDebugSuffix() const
+{
+    return isDebug(name) ? std::string_view(name.data(), name.size() - 6) : std::string_view(name);
+}
+
+std::pair<string_view, string_view> Database::baseNameAndSuffix() const
+{
+    const auto name = nameWithoutDebugSuffix();
+    const auto suffix = specialSuffix(name);
+    return std::pair(std::string_view(name.data(), name.size() - suffix.size()), suffix);
+}
+
+std::string Database::stagingName() const
+{
+    const auto [baseName, _] = baseNameAndSuffix();
+    return argsToString(baseName, "-staging");
 }
 
 std::string Database::protectedName() const
 {
-    const auto suffix = specialSuffix();
-    return argsToString(std::string_view(name.data(), name.size() - suffix.size()), "-protected", suffix);
+    const auto [baseName, suffix] = baseNameAndSuffix();
+    return argsToString(baseName, "-protected", suffix);
+}
+
+std::string Database::debugName() const
+{
+    return name + "-debug";
 }
 
 PackageUpdaterPrivate::PackageUpdaterPrivate(DatabaseStorage &storage, bool clear)

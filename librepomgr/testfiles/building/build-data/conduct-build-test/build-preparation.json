@@ -874,9 +874,11 @@
             }
         ]
     ],
-    "targetDb": "boost",
     "targetArch": "x86_64",
+    "targetDb": "boost",
+    "debugDb": "boost-debug",
     "stagingDb": "boost-staging",
+    "stagingDebugDb": "boost-staging-debug",
     "batches": [["boost", "foo"], ["bar", "baz"]],
     "cyclicLeftovers": [],
     "warnings": [],

@@ -1014,7 +1014,7 @@ std::vector<PackageSpec> Package::fromAurRpcJson(const char *jsonData, std::size
 string PackageNameData::compose() const
 {
     auto res = std::string();
-    res.reserve(targetPrefix.size() + vcsSuffix.size() + actualName.size() + 2);
+    res.reserve(targetPrefix.size() + vcsSuffix.size() + actualName.size() + (isDebugPackage ? Package::debugSuffix.size() : 0) + 2);
     if (!targetPrefix.empty()) {
         res += targetPrefix;
         res += '-';
@@ -1023,6 +1023,9 @@ string PackageNameData::compose() const
     if (!vcsSuffix.empty()) {
         res += '-';
         res += vcsSuffix;
+    }
+    if (isDebugPackage) {
+        res += Package::debugSuffix;
     }
     return res;
 }
@@ -1054,15 +1057,16 @@ bool PackageNameData::isVcsPackage() const
 PackageNameData PackageNameData::decompose(std::string_view packageName)
 {
     static constexpr auto targetPrefixBrackets = 5;
-    static const auto packageNameRegex
-        = std::regex("((lib32|mingw-w64(-(ucrt|clang(-x86_64|-aarch64)?)?)?|android(-(aarch64|x86-64|x86|armv7a-eabi))?|arm-none-"
-                     "eabi|aarch64-linux-"
-                     "gnu|static-compat|riscv64-linux|avr|psp|wasm)-)?(.*?)((-(cvs|svn|hg|darcs|bzr|git|custom|compat|static|qt\\d+|doc|cli|gui))*)");
+    static const auto packageNameRegex = std::regex(
+        "((lib32|mingw-w64(-(ucrt|clang(-x86_64|-aarch64)?)?)?|android(-(aarch64|x86-64|x86|armv7a-eabi))?|arm-none-"
+        "eabi|aarch64-linux-"
+        "gnu|static-compat|riscv64-linux|avr|psp|wasm)-)?(.*?)((-(cvs|svn|hg|darcs|bzr|git|custom|compat|static|qt\\d+|doc|cli|gui))*)(-debug)?");
     auto data = PackageNameData{};
     auto match = std::cmatch{};
     if (!regex_match(packageName.cbegin(), packageName.cend(), match, packageNameRegex)) {
         return data;
     }
+    assert(match.size() == targetPrefixBrackets + 8);
     static constexpr auto matchToStringView = [](auto regexMatch, std::size_t offset = 0) {
         return std::string_view(
             regexMatch.first + offset, static_cast<std::size_t>(regexMatch.length() - static_cast<std::cmatch::difference_type>(offset)));
@@ -1070,6 +1074,7 @@ PackageNameData PackageNameData::decompose(std::string_view packageName)
     data.targetPrefix = matchToStringView(match[2]);
     data.actualName = matchToStringView(match[3 + targetPrefixBrackets]);
     data.vcsSuffix = match[4 + targetPrefixBrackets].length() ? matchToStringView(match[4 + targetPrefixBrackets], 1) : std::string_view{};
+    data.isDebugPackage = match[7 + targetPrefixBrackets].length() != 0;
     return data;
 }
 

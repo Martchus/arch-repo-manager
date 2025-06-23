@@ -198,10 +198,18 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     PackageUpdates checkForUpdates(const std::vector<Database *> &updateSources, UpdateCheckOptions options = UpdateCheckOptions::None);
     PackageLocation locatePackage(const std::string &packageName) const;
     std::string filesPathFromRegularPath() const;
+    static bool isStaging(std::string_view name);
+    static bool isTesting(std::string_view name);
+    static bool isDebug(std::string_view name);
+    static std::string_view specialSuffix(std::string_view name);
     bool isStaging() const;
     bool isTesting() const;
-    std::string_view specialSuffix() const;
+    bool isDebug() const;
+    std::string_view nameWithoutDebugSuffix() const;
+    std::pair<std::string_view, std::string_view> baseNameAndSuffix() const;
+    std::string stagingName() const;
     std::string protectedName() const;
+    std::string debugName() const;
 
 public:
     std::string name;
@@ -221,6 +229,21 @@ public:
 private:
     std::unique_ptr<DatabaseStorage> m_storage;
 };
+
+inline bool Database::isStaging() const
+{
+    return isStaging(nameWithoutDebugSuffix());
+}
+
+inline bool Database::isTesting() const
+{
+    return isTesting(nameWithoutDebugSuffix());
+}
+
+inline bool Database::isDebug() const
+{
+    return isDebug(name);
+}
 
 inline PackageSearchResult::PackageSearchResult()
     : db(nullptr)
