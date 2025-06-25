@@ -58,6 +58,8 @@ enum class RequiredDatabases {
     MaybeDestination = 0x20,
     AllowFromAur = 0x40,
     AllowToAur = 0x80,
+    PullInDebugSourceDbs = 0x100,
+    PullInDebugDestinationDbs = 0x200,
 };
 
 enum class RequiredParameters {
@@ -292,7 +294,7 @@ struct LIBREPOMGR_EXPORT InternalBuildAction {
 
 protected:
     std::string validateParameter(RequiredDatabases requiredDatabases, RequiredParameters requiredParameters);
-    std::string findDatabases();
+    std::string findDatabases(RequiredDatabases requiredDatabases);
     using InitReturnType = std::variant<std::monostate, std::shared_lock<std::shared_mutex>, std::unique_lock<std::shared_mutex>>;
     InitReturnType init(BuildActionAccess access, RequiredDatabases requiredDatabases, RequiredParameters requiredParameters);
     std::string determineWorkingDirectory(std::string_view name);

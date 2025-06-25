@@ -101,7 +101,7 @@ std::string InternalBuildAction::validateParameter(RequiredDatabases requiredDat
     return string();
 }
 
-std::string InternalBuildAction::findDatabases()
+std::string InternalBuildAction::findDatabases(RequiredDatabases requiredDatabases)
 {
     m_sourceDbs.clear();
     m_destinationDbs.clear();
@@ -111,6 +111,11 @@ std::string InternalBuildAction::findDatabases()
         }
         if (auto *const db = m_setup.config.findDatabaseFromDenotation(sourceDb)) {
             m_sourceDbs.emplace(db);
+            if (requiredDatabases & RequiredDatabases::PullInDebugSourceDbs) {
+                if (auto *const debugDb = m_setup.config.findDatabase(db->debugName(), db->arch)) {
+                    m_sourceDbs.emplace(debugDb);
+                }
+            }
         } else {
             return "source database " % sourceDb + " does not exist";
         }
@@ -121,6 +126,11 @@ std::string InternalBuildAction::findDatabases()
         }
         if (auto *const db = m_setup.config.findDatabaseFromDenotation(destinationDb)) {
             m_destinationDbs.emplace(db);
+            if (requiredDatabases & RequiredDatabases::PullInDebugDestinationDbs) {
+                if (auto *const debugDb = m_setup.config.findDatabase(db->debugName(), db->arch)) {
+                    m_destinationDbs.emplace(debugDb);
+                }
+            }
         } else {
             return "destination database " % destinationDb + " does not exist";
         }
@@ -144,7 +154,7 @@ typename InternalBuildAction::InitReturnType InternalBuildAction::init(
         configLock = m_setup.config.lockToWrite();
         break;
     }
-    if (auto error = findDatabases(); !error.empty()) {
+    if (auto error = findDatabases(requiredDatabases); !error.empty()) {
         configLock = monostate();
         reportError(std::move(error));
         return configLock;

@@ -31,10 +31,13 @@ void ReloadDatabase::run()
     const auto flags = static_cast<ReloadDatabaseFlags>(m_buildAction->flags);
     const auto force = flags & ReloadDatabaseFlags::ForceReload;
     const auto withFiles = m_setup.building.loadFilesDbs;
-    vector<LibPkg::Database *> dbsToLoadFromMirror;
+    auto dbFlags = RequiredDatabases::MaybeDestination | RequiredDatabases::AllowToAur;
+    if (flags & ReloadDatabaseFlags::WithDebugDbs) {
+        dbFlags += RequiredDatabases::PullInDebugDestinationDbs;
+    }
+    auto dbsToLoadFromMirror = std::vector<LibPkg::Database *>();
 
-    auto configReadLock
-        = init(BuildActionAccess::ReadConfig, RequiredDatabases::MaybeDestination | RequiredDatabases::AllowToAur, RequiredParameters::None);
+    auto configReadLock = init(BuildActionAccess::ReadConfig, dbFlags, RequiredParameters::None);
     if (holds_alternative<monostate>(configReadLock)) {
         return;
     }

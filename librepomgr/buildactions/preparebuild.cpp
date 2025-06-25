@@ -958,7 +958,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
 
     // find databases again
     auto configReadLock = m_setup.config.lockToRead();
-    if (auto error = findDatabases(); !error.empty()) {
+    if (auto error = findDatabases(RequiredDatabases::None); !error.empty()) {
         reportError(std::move(error));
         return;
     }
@@ -1181,7 +1181,7 @@ void PrepareBuild::computeBatches()
     // prepare computing batches
     auto batchItems = prepareBatches();
     auto configReadLock2 = m_setup.config.lockToRead();
-    if (auto error = findDatabases(); !error.empty()) {
+    if (auto error = findDatabases(RequiredDatabases::None); !error.empty()) {
         reportError(std::move(error));
         return;
     }

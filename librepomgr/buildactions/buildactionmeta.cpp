@@ -105,6 +105,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Load the database even if its last modification data isn't newer than the last time the database was loaded",
                     .param = "force-reload",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(ReloadDatabaseFlags::WithDebugDbs),
+                    .name = "With debug DBs",
+                    .desc = "Reload debug DBs as well (without having to mention them explicitly)",
+                    .param = "with-debug-dbs",
+                },
             },
             .settings = {},
             .directory = false,

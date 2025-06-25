@@ -72,6 +72,7 @@ enum class CheckForUpdatesFlags : BuildActionFlagType {
 enum class ReloadDatabaseFlags : BuildActionFlagType {
     None,
     ForceReload = (1 << 0),
+    WithDebugDbs = (2 << 0),
 };
 enum class ReloadLibraryDependenciesFlags : BuildActionFlagType {
     None,
