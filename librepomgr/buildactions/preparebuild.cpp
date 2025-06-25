@@ -1318,6 +1318,10 @@ BuildPreparation PrepareBuild::makeResultData(std::string &&error)
                     progress.targetRepoPath.clear();
                     progress.stagingDbFilePath.clear();
                     progress.stagingRepoPath.clear();
+                    progress.targetDebugDbFilePath.clear();
+                    progress.targetDebugRepoPath.clear();
+                    progress.stagingDebugDbFilePath.clear();
+                    progress.stagingDebugRepoPath.clear();
                     for (const auto &[packageName, buildData] : resultData.buildData) {
                         auto &buildProgress = progress.progressByPackage[packageName];
                         // add "--nocheck" flag
