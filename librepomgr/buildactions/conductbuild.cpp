@@ -662,16 +662,9 @@ void ConductBuild::makeMakepkgConfigFile(const std::filesystem::path &makepkgCon
     if (m_buildPreparation.additionalBuildOptions.empty()) {
         return;
     }
-    auto outputFile = std::ofstream();
-    outputFile.exceptions(std::ios_base::badbit | std::ios_base::failbit);
-    outputFile.open(makepkgConfigPath, std::ios_base::in | std::ios_base::out);
-    outputFile.seekp(0, std::ios_base::end);
-    outputFile << "BUILDENV+=(";
-    for (const auto &option : m_buildPreparation.additionalBuildOptions) {
-        outputFile << ' ' << option;
-    }
-    outputFile << " )\n";
-    outputFile.close();
+
+    // FIXME: configure BUILDENV to include m_buildPreparation.additionalBuildOptions
+    // note: Simply appending doesn't work so the existing BUILDENV=() line needs to be overridden.
 }
 
 /*!
