@@ -64,7 +64,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     std::string workingDirectory = "workingdir";
     std::string defaultArch = "x86_64";
     std::string dbPath = "libpkg-1.db";
-    std::uint32_t maxDbs = 512;
+    std::uint32_t maxDbs = 0;
     std::size_t packageCacheLimit = 1000;
 
     void loadConfigFiles(bool doFirstTimeSetup);

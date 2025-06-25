@@ -510,6 +510,7 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
 {
     // read config files
     auto configIni = IniFile();
+    auto databaseCount = std::uint32_t();
     for (const auto &configFilePath : configFilePaths) {
         std::cout << Phrases::InfoMessage << "Reading config file: " << configFilePath << Phrases::EndFlush;
         try {
@@ -568,6 +569,8 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
                     building.readComplementaryVariants(iniEntry.second);
                 } else if (startsWith(iniEntry.first, "user/")) {
                     auth.applyConfig(iniEntry.first.substr(5), iniEntry.second);
+                } else if (startsWith(iniEntry.first, "database/")) {
+                    ++databaseCount;
                 }
             }
         } catch (const std::ios_base::failure &) {
@@ -578,6 +581,7 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
 
     // restore state/cache and discard databases
     if (doFirstTimeSetup) {
+        config.databases.reserve(databaseCount);
         initStorage();
         doFirstTimeSetup = false;
     } else {
@@ -761,7 +765,7 @@ void ServiceSetup::restoreState()
 
     try {
         // open LMDB storage
-        cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << " (max DBs: " << maxDbs << ')' << Phrases::End;
+        cout << Phrases::InfoMessage << "Opening config LMDB file: " << dbPath << Phrases::End;
         config.initStorage(dbPath.data(), maxDbs);
         cout << Phrases::SubMessage << "Package cache limit: " << packageCacheLimit << Phrases::End;
         config.setPackageCacheLimit(packageCacheLimit);
