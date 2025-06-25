@@ -597,7 +597,9 @@ void BuildActionsTests::testConductingBuild()
         readFile("building/build-data/conduct-build-test/boost/pkg/build.log"));
     TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
         "fake repo-add: boost.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
-        readFile("building/build-data/conduct-build-test/boost/pkg/repo-add.log"));
+        readFile("building/build-data/conduct-build-test/boost/pkg/repo-add-boost.log"));
+    TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log", "fake repo-add: boost-debug.db.tar.zst boost-debug-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
+        readFile("building/build-data/conduct-build-test/boost/pkg/repo-add-boost-debug.log"));
 
     // check whether packages have actually been added to repo
     CPPUNIT_ASSERT_MESSAGE(
@@ -663,7 +665,7 @@ void BuildActionsTests::testConductingBuild()
         // check whether log files have been created accordingly
         TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
             "fake repo-add: boost-staging.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
-            readFile("building/build-data/conduct-build-test/boost/pkg/repo-add.log"));
+            readFile("building/build-data/conduct-build-test/boost/pkg/repo-add-boost-staging.log"));
 
         // check whether package have been added to staging repo
         CPPUNIT_ASSERT_MESSAGE(
@@ -705,7 +707,7 @@ void BuildActionsTests::testConductingBuild()
         // check whether log files have been created accordingly
         TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
             "fake repo-add: boost-staging.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
-            readFile("building/build-data/conduct-build-test/boost/pkg/repo-add.log"));
+            readFile("building/build-data/conduct-build-test/boost/pkg/repo-add-boost-staging.log"));
 
         // check whether package have been added to staging repo
         CPPUNIT_ASSERT_MESSAGE("staging needed: boost package added to staging repo (0)",
