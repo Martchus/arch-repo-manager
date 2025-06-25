@@ -1636,11 +1636,12 @@ void ConductBuild::invokeRepoAddFor(const BatchProcessingSession::SharedPointerT
     if (packageNames.empty()) {
         return;
     }
-    auto processSession = m_buildAction->makeBuildProcess("repo-add for " + packageName, packageProgress.buildDirectory + "/repo-add.log",
+    const auto &dbName = buildResult.needsStaging ? stagingDb : targetDb;
+    auto processSession = m_buildAction->makeBuildProcess(argsToString("repo-add for ", packageName, " -> ", dbName),
+        argsToString(packageProgress.buildDirectory, "/repo-add-", dbName, ".log"),
         std::bind(&ConductBuild::handleRepoAddErrors, this, makepkgchrootSession, std::ref(packageName), std::ref(packageProgress), session,
             std::placeholders::_1, std::placeholders::_2));
-    m_setup.locks.acquireToWrite(m_buildAction->log(),
-        ServiceSetup::Locks::forDatabase(buildResult.needsStaging ? stagingDb : targetDb, m_buildPreparation.targetArch),
+    m_setup.locks.acquireToWrite(m_buildAction->log(), ServiceSetup::Locks::forDatabase(dbName, m_buildPreparation.targetArch),
         [this, &packageName, processSession, buildAction = m_buildAction, &buildResult, &packageNames, &repoPath, &dbFilePath](
             UniqueLoggingLock &&lock) {
             if (!processSession) {
