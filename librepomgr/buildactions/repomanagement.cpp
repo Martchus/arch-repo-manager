@@ -411,8 +411,11 @@ void MovePackages::addPackagesToDestinationDatabaseFile(const MultiSession<void>
     std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &packageNames,
     PackageLocations &packageLocations)
 {
+    if (packageNames.empty()) {
+        return;
+    }
     m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(dbLockName),
-        [this, buildAction = m_buildAction, destinationRepoDir, destinationDbFile,
+        [this, buildAction = m_buildAction, destinationRepoDir, destinationDbFile, &packageNames,
             repoAddProcess = m_buildAction->makeBuildProcess("repo-add", argsToString(m_workingDirectory, '/', logFile),
                 std::bind(&MovePackages::handleRepoAddResult, this, session, std::placeholders::_1, std::placeholders::_2, std::ref(packageNames),
                     std::ref(packageLocations)))](UniqueLoggingLock &&lock) {
@@ -423,9 +426,9 @@ void MovePackages::addPackagesToDestinationDatabaseFile(const MultiSession<void>
             if (m_useContainer) {
                 repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir),
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-add",
-                    m_makeContainerPkgPath, "--", destinationDbFile, m_fileNames);
+                    m_makeContainerPkgPath, "--", destinationDbFile, packageNames);
             } else {
-                repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir), m_repoAddPath, destinationDbFile, m_fileNames);
+                repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir), m_repoAddPath, destinationDbFile, packageNames);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", destinationRepoDir, "\" for \"", destinationDbFile,
                 "\", see logfile for details\n");
@@ -436,8 +439,11 @@ void MovePackages::removePackagesFromSourceDatabaseFile(const MultiSession<void>
     std::string_view logFile, const std::string &sourceRepoDir, const std::string &sourceDbFile, std::vector<std::string> &packageNames,
     PackageLocations &packageLocations)
 {
+    if (packageNames.empty()) {
+        return;
+    }
     m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(dbLockName),
-        [this, buildAction = m_buildAction, sourceRepoDir, sourceDbFile,
+        [this, buildAction = m_buildAction, sourceRepoDir, sourceDbFile, &packageNames,
             repoRemoveProcess = m_buildAction->makeBuildProcess("repo-remove", argsToString(m_workingDirectory, '/', logFile),
                 std::bind(&MovePackages::handleRepoRemoveResult, this, session, std::placeholders::_1, std::placeholders::_2, std::ref(packageNames),
                     std::ref(packageLocations)))](UniqueLoggingLock &&lock) {
@@ -448,9 +454,9 @@ void MovePackages::removePackagesFromSourceDatabaseFile(const MultiSession<void>
             if (m_useContainer) {
                 repoRemoveProcess->launch(boost::process::v1::start_dir(sourceRepoDir),
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
-                    m_makeContainerPkgPath, "--", sourceDbFile, m_result.processedPackages);
+                    m_makeContainerPkgPath, "--", sourceDbFile, packageNames);
             } else {
-                repoRemoveProcess->launch(boost::process::v1::start_dir(sourceRepoDir), m_repoRemovePath, sourceDbFile, m_result.processedPackages);
+                repoRemoveProcess->launch(boost::process::v1::start_dir(sourceRepoDir), m_repoRemovePath, sourceDbFile, packageNames);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", sourceRepoDir, "\" for \"", sourceDbFile,
                 "\", see logfile for details\n");
