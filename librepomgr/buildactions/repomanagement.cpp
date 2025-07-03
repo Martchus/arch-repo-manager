@@ -346,10 +346,10 @@ void MovePackages::run()
     const auto session = MultiSession<void>::create(m_setup.building.ioContext, std::bind(&MovePackages::conclude, this));
 
     // add packages to database file of destination repo
-    addPackagesToDestinationDatabaseFile(session, std::move(m_destinationDatabaseLockName), "repo-add.log", m_destinationRepoDirectory,
-        m_destinationDatabaseFile, m_result.processedPackages, m_packageLocations);
+    addPackagesToDestinationDatabaseFile(
+        session, std::move(m_destinationDatabaseLockName), "repo-add.log", m_destinationRepoDirectory, m_destinationDatabaseFile, m_fileNames);
     addPackagesToDestinationDatabaseFile(session, std::move(m_destinationDebugDatabaseLockName), "repo-add-debug.log",
-        m_destinationDebugRepoDirectory, m_destinationDebugDatabaseFile, m_result.processedDebugPackages, m_debugPackageLocations);
+        m_destinationDebugRepoDirectory, m_destinationDebugDatabaseFile, m_debugFileNames);
 
     // remove package from database file of source repo
     removePackagesFromSourceDatabaseFile(session, std::move(m_sourceDatabaseLockName), "repo-remove.log", m_sourceRepoDirectory, m_sourceDatabaseFile,
@@ -408,17 +408,16 @@ void MovePackages::copyPackagesFromSourceToDestinationRepo(
 }
 
 void MovePackages::addPackagesToDestinationDatabaseFile(const MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
-    std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &packageNames,
-    PackageLocations &packageLocations)
+    std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &fileNames)
 {
-    if (packageNames.empty()) {
+    if (fileNames.empty()) {
         return;
     }
     m_setup.locks.acquireToWrite(m_buildAction->log(), std::move(dbLockName),
-        [this, buildAction = m_buildAction, destinationRepoDir, destinationDbFile, &packageNames,
+        [this, buildAction = m_buildAction, destinationRepoDir, destinationDbFile, &fileNames,
             repoAddProcess = m_buildAction->makeBuildProcess("repo-add", argsToString(m_workingDirectory, '/', logFile),
-                std::bind(&MovePackages::handleRepoAddResult, this, session, std::placeholders::_1, std::placeholders::_2, std::ref(packageNames),
-                    std::ref(packageLocations)))](UniqueLoggingLock &&lock) {
+                std::bind(&MovePackages::handleRepoAddResult, this, session, std::placeholders::_1, std::placeholders::_2))](
+            UniqueLoggingLock &&lock) {
             if (!repoAddProcess) {
                 return;
             }
@@ -426,9 +425,9 @@ void MovePackages::addPackagesToDestinationDatabaseFile(const MultiSession<void>
             if (m_useContainer) {
                 repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir),
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-add",
-                    m_makeContainerPkgPath, "--", destinationDbFile, packageNames);
+                    m_makeContainerPkgPath, "--", destinationDbFile, fileNames);
             } else {
-                repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir), m_repoAddPath, destinationDbFile, packageNames);
+                repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir), m_repoAddPath, destinationDbFile, fileNames);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", destinationRepoDir, "\" for \"", destinationDbFile,
                 "\", see logfile for details\n");
@@ -508,14 +507,12 @@ void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType 
     }
 }
 
-void MovePackages::handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child,
-    ProcessResult &&result, std::vector<string> &packageNames, PackageLocations &packageLocations)
+void MovePackages::handleRepoAddResult(
+    MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result)
 {
     // handle error
     CPP_UTILITIES_UNUSED(processSession)
     CPP_UTILITIES_UNUSED(child)
-    CPP_UTILITIES_UNUSED(packageNames)
-    CPP_UTILITIES_UNUSED(packageLocations)
     if (result.errorCode) {
         const auto errorCodeMessage = result.errorCode.message();
         const auto &errorMessage = result.error.empty() ? errorCodeMessage : result.error;

@@ -385,15 +385,13 @@ private:
     void copyPackagesFromSourceToDestinationRepo(PackageLocations &locations, std::vector<std::string> &packageNames,
         std::vector<std::string> &fileNames, const std::string &destinationRepoDir);
     void addPackagesToDestinationDatabaseFile(const typename MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
-        std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &packageNames,
-        PackageLocations &packageLocations);
+        std::string_view logFile, const std::string &destinationRepoDir, const std::string &destinationDbFile, std::vector<std::string> &fileNames);
     void removePackagesFromSourceDatabaseFile(const typename MultiSession<void>::SharedPointerType &session, std::string &&dbLockName,
         std::string_view logFile, const std::string &sourceRepoDir, const std::string &sourceDbFile, std::vector<std::string> &packageNames,
         PackageLocations &packageLocations);
     void handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result,
         std::vector<std::string> &packageNames, PackageLocations &packageLocations);
-    void handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result,
-        std::vector<std::string> &packageNames, PackageLocations &packageLocations);
+    void handleRepoAddResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child, ProcessResult &&result);
     void conclude();
 
     std::vector<std::string> m_addErrorMessages;
