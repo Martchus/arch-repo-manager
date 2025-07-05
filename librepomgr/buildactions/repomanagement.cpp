@@ -101,7 +101,7 @@ bool PackageMovementAction::prepareRepoAction(RequiredDatabases requiredDatabase
     configReadLock = std::monostate();
 
     // error-out early if not even a single package could be located
-    if (m_packageLocations.empty()) {
+    if (m_packageLocations.empty() && m_debugPackageLocations.empty()) {
         m_result.errorMessage = "none of the specified packages could be located";
         reportResultWithData(BuildActionResult::Failure);
         return false;
