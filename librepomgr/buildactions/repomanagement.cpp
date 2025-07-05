@@ -159,6 +159,9 @@ void PackageMovementAction::locatePackages()
     // determine repo path and package paths
     auto *const db = m_sourceDbs.empty() ? *m_destinationDbs.begin() : *m_sourceDbs.begin();
     auto *const debugDb = m_sourceDbs.empty() ? m_destinationDebugDb : m_sourceDebugDb;
+    if (debugDb) {
+        m_debugPackageNames.reserve(m_buildAction->packageNames.size());
+    }
     for (const auto &packageName : m_buildAction->packageNames) {
         const auto isDebugPackage = packageName.ends_with(LibPkg::Package::debugSuffix);
         // locate debug packages preferrably in the corresponding debug repo; otherwise just check for package in the regular repo
@@ -168,8 +171,11 @@ void PackageMovementAction::locatePackages()
         }
         // consider a potentially existing debug package in the corresponding debug repo as well
         if (!isDebugPackage && debugDb) {
-            locatePackage(debugDb, argsToString(packageName, LibPkg::Package::debugSuffix), m_debugPackageLocations);
+            m_debugPackageNames.emplace_back(argsToString(packageName, LibPkg::Package::debugSuffix));
         }
+    }
+    for (const auto &debugPackageName : m_debugPackageNames) {
+        locatePackage(debugDb, debugPackageName, m_debugPackageLocations);
     }
 }
 

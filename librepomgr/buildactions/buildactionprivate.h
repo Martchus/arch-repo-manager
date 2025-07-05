@@ -351,6 +351,7 @@ protected:
     std::string m_destinationDebugDatabaseFile;
     std::string m_destinationDebugDatabaseLockName;
     std::string m_workingDirectory;
+    std::vector<std::string> m_debugPackageNames;
     std::vector<std::string> m_fileNames, m_debugFileNames;
     std::mutex m_resultMutex;
     PackageMovementResult m_result;
