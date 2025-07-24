@@ -1539,8 +1539,7 @@ void ConductBuild::invokeGpg(const BatchProcessingSession::SharedPointerType &ma
             });
     constexpr auto gpgParallelLimit = 4;
     const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
-    for (auto i = 0; i != gpgParallelLimit && signingSession->currentPackage != signingSession->binaryPackages.end();
-        ++i, ++signingSession->currentPackage) {
+    for (auto i = 0; i != gpgParallelLimit && signingSession->currentPackage != signingSession->binaryPackages.end(); ++i) {
         invokeGpg(signingSession, packageName, packageProgress);
     }
 }
@@ -1549,14 +1548,14 @@ void ConductBuild::invokeGpg(
     const std::shared_ptr<SigningSession> &signingSession, const std::string &packageName, PackageBuildProgress &packageProgress)
 {
     const auto &binaryPackage = *signingSession->currentPackage;
+    ++signingSession->currentPackage;
     auto processSession = m_buildAction->makeBuildProcess("gpg for " + binaryPackage.name,
         packageProgress.buildDirectory % "/gpg-" % binaryPackage.name + ".log",
         [this, signingSession, &packageName, &packageProgress, isDebug = binaryPackage.isDebug, isAny = binaryPackage.isAny,
             binaryPackageName = binaryPackage.fileName](boost::process::v1::child &&child, ProcessResult &&result) mutable {
             // make the next gpg invocation
             if (const auto lock = std::unique_lock<std::mutex>(signingSession->mutex);
-                signingSession->currentPackage != signingSession->binaryPackages.end()
-                && ++signingSession->currentPackage != signingSession->binaryPackages.end()) {
+                signingSession->currentPackage != signingSession->binaryPackages.end()) {
                 invokeGpg(signingSession, packageName, packageProgress);
             }
 
