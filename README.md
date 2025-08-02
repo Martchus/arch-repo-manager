@@ -49,7 +49,11 @@ Further ideas (not implemented yet):
 * So far also no security review of the code has been done and at the same time the code
   base contains lots of rather low-level code (instead of relying on frameworks), many
   self-written parsers and exposes a web service. So use it at your own risk (like most
-  other open source projects, but here I'd like to highlight it specifically).
+  other open source projects, but here I'd like to highlight it specifically). When not
+  exposing the instance publicly and only building PKGBUILDs from trusted sources this
+  should be ok, though.
+* When building PKGBUILDs from the AUR you **must** review them, see the according note
+  under "Building packages" for details.
 * 32-bit architectures are  not supported (as the database needs a huge address space). Of
   course you can build packages *for* 32-bit architectures.
 
@@ -318,7 +322,18 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
       can generally be reused. Use "Clean source directories" as needed. To override only a single
       source directory, simply delete it manually before restarting the build action.
     * You can amend PKGBUILDs created in the "directory" as needed.
+    * The preparation step does *not* invoke dangerous commands like `makepkg --printsrcinfo` for
+      packages downloaded from the AUR. This is only done for local packages. So for AUR packages
+      the preparation only extracts the contents from the AUR tarball and parses the `.SRCINFO`
+      file that is already contained in that tarball. This is not dangerous but see the section
+      "Important caveats". **Before proceeding with the next step, review PKGBUILDs downloaded from
+      the AUR.** They are listed under "Artefacts". For better awareness of additional packages
+      being pulled into the build as dependencies you may consider using the flag
+      "Pulling-in further dependencies unexpected" by default and only remove that flag after doing
+      a thorough review of these new PKGBUILDs.
 2. Start the "Conduct building" build action.
+    * **This step will execute code from the PKGBUILDs download in the previous step. Make sure you
+      have reviewed them.**
     * Specify the same "directory" as in 1.
     * Do *not* specify any databases. The databases as specified in 1. will be used.
     * One can optionally specify package names to build only a subset of the initially prepared
