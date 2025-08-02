@@ -511,10 +511,10 @@ void PrepareBuild::fetchMissingBuildData()
 {
     auto multiSession
         = WebClient::AurSnapshotQuerySession::create(m_setup.building.ioContext, bind(&PrepareBuild::computeDependencies, this, placeholders::_1));
-    vector<WebClient::AurSnapshotQueryParams> snapshotQueries;
+    auto snapshotQueries = std::vector<WebClient::AurSnapshotQueryParams>();
 
     // prepare logging
-    auto logLines = vector<string>{
+    auto logLines = std::vector<std::string>{
         "  -> Generating .SRCINFO for local PKGBUILDs:", "  -> Retrieving sources from AUR:", "  -> Using existing source directories:"
     };
     auto needToGeneratedSrcInfo = false;
