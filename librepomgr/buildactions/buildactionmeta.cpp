@@ -233,6 +233,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Prevent cleanup of chroot and sources, skip actual build",
                     .param = "repackage",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::LocalOnly),
+                    .name = "Build only from local PKGBUILDs",
+                    .desc = "Never download packages from the AUR",
+                    .param = "local-only",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

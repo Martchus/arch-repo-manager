@@ -330,7 +330,9 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
       the AUR.** They are listed under "Artefacts". For better awareness of additional packages
       being pulled into the build as dependencies you may consider using the flag
       "Pulling-in further dependencies unexpected" by default and only remove that flag after doing
-      a thorough review of these new PKGBUILDs.
+      a thorough review of these new PKGBUILDs. If you only want to build from local sources anyway
+      it makes sense to use the flag "Build only from local PKGBUILDs" and not worry about the AUR
+      at all.
 2. Start the "Conduct building" build action.
     * **This step will execute code from the PKGBUILDs download in the previous step. Make sure you
       have reviewed them.**

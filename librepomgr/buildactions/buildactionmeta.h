@@ -94,6 +94,7 @@ enum class PrepareBuildFlags : BuildActionFlagType {
     PullInComplementaryVariants = (1 << 10),
     ContinueBuild = (1 << 11),
     Repackage = (1 << 12),
+    LocalOnly = (1 << 13),
 };
 enum class ConductBuildFlags : BuildActionFlagType {
     None,

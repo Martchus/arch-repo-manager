@@ -98,6 +98,7 @@ void PrepareBuild::run()
     m_pullingInFurtherDependenciesUnexpected = flags & PrepareBuildFlags::PullingInFurtherDependenciesUnexpected;
     m_fetchOfficialSources = flags & PrepareBuildFlags::FetchOfficialPackageSources;
     m_useContainer = flags & PrepareBuildFlags::UseContainer;
+    m_localOnly = flags & PrepareBuildFlags::LocalOnly;
     m_aurOnly = flags & PrepareBuildFlags::AurOnly;
     m_noCheck = flags & PrepareBuildFlags::NoCheck;
     m_pullInComplementaryVariants = flags & PrepareBuildFlags::PullInComplementaryVariants;
@@ -637,13 +638,18 @@ void PrepareBuild::fetchMissingBuildData()
     addAurQuery:
         // download latest snapshot containing PKGBUILD and .SRCINFO from AUR
         if (!buildData.hasSource) {
-            snapshotQueries.emplace_back(WebClient::AurSnapshotQueryParams{
-                .packageName = &packageName,
-                .lookupPackageName = &lookupPackageName,
-                .targetDirectory = &buildData.sourceDirectory,
-                .tryOfficial = m_fetchOfficialSources,
-            });
-            addPackageToLogLine(logLines[1], packageName);
+            if (m_localOnly) {
+                multiSession->addResponse(WebClient::AurSnapshotResult{
+                    .packageName = packageName, .errorOutput = std::string(), .packages = {}, .error = "download skipped" });
+            } else {
+                snapshotQueries.emplace_back(WebClient::AurSnapshotQueryParams{
+                    .packageName = &packageName,
+                    .lookupPackageName = &lookupPackageName,
+                    .targetDirectory = &buildData.sourceDirectory,
+                    .tryOfficial = m_fetchOfficialSources,
+                });
+                addPackageToLogLine(logLines[1], packageName);
+            }
         }
     }
 
@@ -1089,22 +1095,33 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
     // check for errors
     auto failedPackages = std::set<std::string>();
     auto localPackages = std::set<std::string>();
-    auto errorMessage = std::string();
+    auto downloadSkipped = std::set<std::string>();
+    auto errorMessages = std::vector<std::string>();
     for (const auto &buildData : m_buildDataByPackage) {
-        if (!buildData.second.error.empty()) {
+        if (m_localOnly && buildData.second.error == "download skipped") {
+            downloadSkipped.emplace(buildData.first);
+        } else if (!buildData.second.error.empty()) {
             failedPackages.emplace(buildData.first);
         } else if (m_aurOnly && !buildData.second.originalSourceDirectory.empty()) {
             localPackages.emplace(buildData.first);
         }
     }
     if (!failedPackages.empty()) {
-        errorMessage = "Unable to retrieve the following packages (see result data for details): " + joinStrings(failedPackages, " ");
-    } else if (!localPackages.empty()) {
-        errorMessage = "The following packages have a local override but the AUR-only flag was set: " + joinStrings(localPackages, " ");
+        errorMessages.emplace_back("Unable to retrieve the following packages (see result data for details): " + joinStrings(failedPackages, " "));
     }
-    if (!errorMessage.empty()) {
-        m_buildAction->appendOutput(Phrases::ErrorMessage, errorMessage, '\n');
-        auto resultData = makeResultData(std::move(errorMessage));
+    if (!localPackages.empty()) {
+        errorMessages.emplace_back("The following packages have a local override but the AUR-only flag was set: " + joinStrings(localPackages, " "));
+    }
+    if (!downloadSkipped.empty()) {
+        errorMessages.emplace_back(
+            "Download of the following packages not attempted as the local-only flag was set: " + joinStrings(downloadSkipped, " "));
+    }
+    if (!errorMessages.empty()) {
+        m_buildAction->appendOutput(Phrases::ErrorMessage, "Build preparation failed:\n");
+        for (const auto &errorMessage : errorMessages) {
+            m_buildAction->appendOutput(Phrases::SubError, errorMessage, '\n');
+        }
+        auto resultData = makeResultData(joinStrings(errorMessages, "\n"));
         auto buildActionWriteLock = m_setup.building.lockToWrite();
         m_buildAction->resultData = std::move(resultData);
         reportError();

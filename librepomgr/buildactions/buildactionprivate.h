@@ -559,6 +559,7 @@ private:
     bool m_pulledInFurtherDependencies = false;
     bool m_fetchOfficialSources = false;
     bool m_useContainer = false;
+    bool m_localOnly = false;
     bool m_aurOnly = false;
     bool m_noCheck = false;
     bool m_pullInComplementaryVariants = false;
