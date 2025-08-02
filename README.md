@@ -315,7 +315,7 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
       the specified "directory" should be overridden.
     * When the build action has finished, have a look at the results to check whether they are as
       expected. If not, just restart the build action with adjusted parameters. The "directory"
-      can generally be re-used. Use "Clean source directories" as needed. To override only a single
+      can generally be reused. Use "Clean source directories" as needed. To override only a single
       source directory, simply delete it manually before restarting the build action.
     * You can amend PKGBUILDs created in the "directory" as needed.
 2. Start the "Conduct building" build action.
