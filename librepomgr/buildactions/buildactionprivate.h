@@ -564,6 +564,7 @@ private:
     bool m_pullInComplementaryVariants = false;
     bool m_continueBuild = false;
     bool m_repackage = false;
+    bool m_aurApproval = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {

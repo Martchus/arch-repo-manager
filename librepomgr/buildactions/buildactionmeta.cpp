@@ -233,6 +233,12 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Prevent cleanup of chroot and sources, skip actual build",
                     .param = "repackage",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::AurApproval),
+                    .name = "Ask for approval",
+                    .desc = "Ask for approval before processing PKGBUILDs from the AUR",
+                    .param = "aur-approval",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{

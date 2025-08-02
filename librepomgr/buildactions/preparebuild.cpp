@@ -103,6 +103,7 @@ void PrepareBuild::run()
     m_pullInComplementaryVariants = flags & PrepareBuildFlags::PullInComplementaryVariants;
     m_continueBuild = flags & PrepareBuildFlags::ContinueBuild;
     m_repackage = flags & PrepareBuildFlags::Repackage;
+    m_aurApproval = flags & PrepareBuildFlags::AurApproval;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
