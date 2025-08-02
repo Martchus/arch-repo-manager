@@ -308,7 +308,7 @@ editing the presets JSON file (e.g. `/etc/buildservice-git/presets.json` in the 
           into the build as dependency.
         * If no source databases are specified the destination database and all databases the
           destination database is based on are used as source databases.
-        * Source databases must be the destination database or a database the destination database
+        * Source databases should be the destination database or a database the destination database
           is based on.
     * Specify a "directory" to store meta-data, logs, PKGBUILDs, sources and packages.
     * Check "Clean source directories" when previously prepared sources which are still present in
