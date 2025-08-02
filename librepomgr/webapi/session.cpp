@@ -96,7 +96,7 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
                 return;
             }
             if (!(userAuth.permissions & UserPermissions::AccessSecrets)) {
-                // accessing secrets is rather options; just don't access them if user lacks permissions
+                // accessing secrets is rather optional; just don't access them if user lacks permissions
                 requiredPermissions -= UserPermissions::AccessSecrets;
             }
             if (!checkFlagEnum(userAuth.permissions, requiredPermissions)) {
