@@ -243,6 +243,19 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                         .error = "Unable to extract AUR snapshot tarball for package " % *params.packageName % ": " + extractionError.what() });
                     return;
                 }
+
+                // mark target directory as from AUR to prevent running `makepkg --printsrcinfo` in that directory, also on subsequent runs
+                try {
+                    filesystem::create_directories(*params.targetDirectory);
+                    writeFile(*params.targetDirectory + "/from-aur", *params.lookupPackageName);
+                } catch (const std::runtime_error &e) {
+                    multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                        .errorOutput = std::string(),
+                        .packages = {},
+                        .error = argsToString("Unable to create directory marker for AUR contents: ", e.what()) });
+                    return;
+                }
+
                 auto result
                     = AurSnapshotResult{ .packageName = *params.packageName, .errorOutput = std::string(), .packages = {}, .error = std::string() };
                 auto haveSrcFileInfo = false, havePkgbuild = false;

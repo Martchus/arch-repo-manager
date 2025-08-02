@@ -455,6 +455,23 @@ void PrepareBuild::addPackageToLogLine(std::string &logLine, const std::string &
 void PrepareBuild::makeSrcInfo(
     std::shared_ptr<WebClient::AurSnapshotQuerySession> &multiSession, const std::string &sourceDirectory, const std::string &packageName)
 {
+    auto precheckError = std::string();
+    try {
+        if (std::filesystem::exists(sourceDirectory + "/from-aur")) {
+            precheckError = "Will not make .SRCINFO for \"" % sourceDirectory + "\" as \"from-aur\" is present.";
+        }
+    } catch (const std::filesystem::filesystem_error &e) {
+        precheckError = "Unable to check whether \"from-aur\" is present in \"" % sourceDirectory % "\": " + e.what();
+    }
+    if (!precheckError.empty()) {
+        multiSession->addResponse(WebClient::AurSnapshotResult{
+            .packageName = packageName,
+            .errorOutput = std::string(),
+            .packages = {},
+            .error = std::move(precheckError),
+        });
+        return;
+    }
     auto processSession = make_shared<ProcessSession>(
         m_setup.building.ioContext, [multiSession, &sourceDirectory, &packageName](boost::process::v1::child &&child, ProcessResult &&result) {
             processSrcInfo(*multiSession, sourceDirectory, packageName, std::move(child), std::move(result));
