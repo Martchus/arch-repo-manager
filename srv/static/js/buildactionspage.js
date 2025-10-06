@@ -801,7 +801,7 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
             packageNameLink.target = '_blank';
             from = 'AUR';
         } else {
-            packageNameLink.href = '#package-details-section?' + encodeURIComponent(newVersion.db + '@' + newVersion.arch + '/' + newPackageName);
+            packageNameLink.href = '#package-details-section?' + encodeURIComponent(`${newVersion.db}@${newVersion.dbArch ?? 'x86_64'}/${newPackageName}`);
         }
         packageNameLink.appendChild(document.createTextNode(newPackageName));
         if (newPackageName !== packageName) {
