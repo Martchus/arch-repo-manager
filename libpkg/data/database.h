@@ -195,6 +195,7 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
         const std::vector<std::shared_ptr<Package>> &newPackages, const DependencySet &removedPackages,
         const std::unordered_set<std::string_view> &depsToIgnore = std::unordered_set<std::string_view>(),
         const std::unordered_set<std::string_view> &libsToIgnore = std::unordered_set<std::string_view>());
+    void detectUnresolvedPackages(const std::vector<Database *> &deps, const DependencySet &newProvides, const std::set<std::string> &newLibProvides, const DependencySet &removedProvides, const std::set<std::string> &removedLibs, const std::unordered_set<std::string_view> &depsToIgnore, const std::unordered_set<std::string_view> &libsToIgnore, bool forStaging, bool forTesting, std::unordered_map<PackageSpec, UnresolvedDependencies> &unresolvedPackages);
     PackageUpdates checkForUpdates(const std::vector<Database *> &updateSources, UpdateCheckOptions options = UpdateCheckOptions::None);
     PackageLocation locatePackage(const std::string &packageName) const;
     std::string filesPathFromRegularPath() const;
@@ -207,7 +208,9 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     bool isDebug() const;
     std::string_view nameWithoutDebugSuffix() const;
     std::pair<std::string_view, std::string_view> baseNameAndSuffix() const;
+    std::string_view baseName() const;
     std::string stagingName() const;
+    std::string testingName() const;
     std::string protectedName() const;
     std::string debugName() const;
 
