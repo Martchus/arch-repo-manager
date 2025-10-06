@@ -569,6 +569,85 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
         }
     }
 
+    // check testing and base databases as well if this is a staging/testing database
+    auto dbsToCheck = std::vector<Database *>();
+    auto forStaging = false, forTesting = false;
+    dbsToCheck.reserve(3);
+    dbsToCheck.reserve(2);
+    dbsToCheck.emplace_back(this);
+    Database *stagingDb = nullptr, *testingDb = nullptr, *baseDb = nullptr;
+    if (isStaging()) {
+        stagingDb = this;
+        forStaging = true;
+        forTesting = true;
+        testingDb = config.findDatabase(testingName(), arch);
+        dbsToCheck.emplace_back(testingDb);
+    } else if (isTesting()) {
+        testingDb = this;
+        forTesting = true;
+    }
+    if (testingDb && (baseDb = config.findDatabase(baseName(), arch))) {
+        dbsToCheck.emplace_back(baseDb);
+    }
+
+    // compute list of libraries that are going to be removed by packages in staging/testing database
+    auto removedLibs = std::set<std::string>();
+    auto ri = deps.rbegin(), rend = deps.rend();
+    while (stagingDb) {
+        stagingDb->allPackages([&] (LibPkg::StorageID, std::shared_ptr<LibPkg::Package> &&package) {
+            for (auto i = deps.rbegin(), end = deps.rend(); i != end; ++i) {
+                auto *const db = *i;
+                if (db->isStaging()) {
+                    continue;
+                }
+                if (db->findPackage(package->name)) {
+                    removedLibs.insert(package->libprovides.begin(), package->libprovides.end());
+                    break;
+                }
+            }
+            return false;
+        });
+        stagingDb = nullptr;
+        for (; ri != rend; ++ri) {
+            if ((*ri)->isStaging()) {
+                stagingDb = *ri;
+                break;
+            }
+        }
+    }
+    ri = deps.rbegin(), rend = deps.rend();
+    while (testingDb) {
+        testingDb->allPackages([&] (LibPkg::StorageID, std::shared_ptr<LibPkg::Package> &&package) {
+            for (auto i = deps.rbegin(), end = deps.rend(); i != end; ++i) {
+                auto *const db = *i;
+                if (db->isStaging() || db->isTesting()) {
+                    continue;
+                }
+                if (db->findPackage(package->name)) {
+                    removedLibs.insert(package->libprovides.begin(), package->libprovides.end());
+                    break;
+                }
+            }
+            return false;
+        });
+        testingDb = nullptr;
+        for (; ri != rend; ++ri) {
+            if ((*ri)->isTesting()) {
+                testingDb = *ri;
+                break;
+            }
+        }
+    }
+
+    // check all relevant databases
+    for (auto *dbToCheck : dbsToCheck) {
+        dbToCheck->detectUnresolvedPackages(deps, newProvides, newLibProvides, removedProvides, removedLibs, depsToIgnore, libsToIgnore, forStaging, forTesting, unresolvedPackages);
+    }
+    return unresolvedPackages;
+}
+
+void Database::detectUnresolvedPackages(const std::vector<Database *> &deps, const DependencySet &newProvides, const std::set<std::string> &newLibProvides, const DependencySet &removedProvides, const std::set<string> &removedLibs, const std::unordered_set<std::string_view> &depsToIgnore, const std::unordered_set<std::string_view> &libsToIgnore, bool forStaging, bool forTesting, std::unordered_map<PackageSpec, UnresolvedDependencies> &unresolvedPackages)
+{
     // check whether all required dependencies are still provided
     for (auto txn = m_storage->requiredDeps.getROTransaction(); const auto &requiredDep : txn) {
         // skip dependencies to ignore
@@ -588,8 +667,13 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
 
         // skip if dependency is provided by a database this database depends on or the protected version of this db
         auto providedByAnotherDb = false;
-        for (const auto *db : deps) {
+        for (auto i = deps.rbegin(), end = deps.rend(); i != end; ++i) {
+            auto *const db = *i;
             if ((providedByAnotherDb = db->provides(requiredDep))) {
+                break;
+            }
+            // skip checking further databases if the package is present but doesn't satisfy the dependencies
+            if (db->findPackage(requiredDep.name)) {
                 break;
             }
         }
@@ -623,8 +707,13 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
         }
 
         // skip if dependency is provided by a database this database depends on or the protected version of this db
+        const auto removed = removedLibs.find(requiredLib.name) == removedLibs.end();
         auto providedByAnotherDb = false;
-        for (const auto *db : deps) {
+        for (auto i = deps.rbegin(), end = deps.rend(); i != end; ++i) {
+            auto *const db = *i;
+            if (((forTesting && (!db->isStaging() && !db->isTesting())) || (forStaging && (!db->isStaging()))) && removed) {
+                continue;
+            }
             if ((providedByAnotherDb = db->provides(requiredLib.name))) {
                 break;
             }
@@ -644,8 +733,6 @@ std::unordered_map<PackageSpec, UnresolvedDependencies> Database::detectUnresolv
             unresolvedPackages[GenericPackageSpec(affectedPackageID, affectedPackage)].libs.emplace_back(requiredLib.name);
         }
     }
-
-    return unresolvedPackages;
 }
 
 LibPkg::PackageUpdates LibPkg::Database::checkForUpdates(const std::vector<LibPkg::Database *> &updateSources, UpdateCheckOptions options)
@@ -800,10 +887,19 @@ std::pair<string_view, string_view> Database::baseNameAndSuffix() const
     return std::pair(std::string_view(name.data(), name.size() - suffix.size()), suffix);
 }
 
+string_view Database::baseName() const
+{
+    return baseNameAndSuffix().first;
+}
+
 std::string Database::stagingName() const
 {
-    const auto [baseName, _] = baseNameAndSuffix();
-    return argsToString(baseName, "-staging");
+    return argsToString(baseName(), "-staging");
+}
+
+std::string Database::testingName() const
+{
+    return argsToString(baseName(), "-testing");
 }
 
 std::string Database::protectedName() const
