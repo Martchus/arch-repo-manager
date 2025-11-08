@@ -1644,9 +1644,10 @@ void ConductBuild::invokeRepoAddFor(const BatchProcessingSession::SharedPointerT
                 m_buildAction->log()(
                     Phrases::InfoMessage, "Going to invoke repo-add for ", packageName, " via ", m_makeContainerPkgPath.string(), '\n');
                 processSession->launch(boost::process::v1::start_dir(repoPath), boost::process::v1::env["PKGNAME"] = packageName,
-                    boost::process::v1::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", *buildResult.dbFilePath, packageNames);
+                    boost::process::v1::env["TOOL"] = "repo-add", m_makeContainerPkgPath, "--", "--wait-for-lock", *buildResult.dbFilePath,
+                    packageNames);
             } else {
-                processSession->launch(boost::process::v1::start_dir(repoPath), m_repoAddPath, dbFilePath, packageNames);
+                processSession->launch(boost::process::v1::start_dir(repoPath), m_repoAddPath, "--wait-for-lock", dbFilePath, packageNames);
             }
             buildAction->log()(Phrases::InfoMessage, "Adding ", packageName, " to repo\n", ps(Phrases::SubMessage),
                 "repo path: ", buildResult.repoPath, '\n', ps(Phrases::SubMessage), "db path: ", dbFilePath, '\n', ps(Phrases::SubMessage),

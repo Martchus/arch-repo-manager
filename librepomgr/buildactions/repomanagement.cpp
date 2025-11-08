@@ -431,9 +431,10 @@ void MovePackages::addPackagesToDestinationDatabaseFile(const MultiSession<void>
             if (m_useContainer) {
                 repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir),
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-add",
-                    m_makeContainerPkgPath, "--", destinationDbFile, fileNames);
+                    m_makeContainerPkgPath, "--", "--wait-for-lock", destinationDbFile, fileNames);
             } else {
-                repoAddProcess->launch(boost::process::v1::start_dir(destinationRepoDir), m_repoAddPath, destinationDbFile, fileNames);
+                repoAddProcess->launch(
+                    boost::process::v1::start_dir(destinationRepoDir), m_repoAddPath, "--wait-for-lock", destinationDbFile, fileNames);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-add within \"", destinationRepoDir, "\" for \"", destinationDbFile,
                 "\", see logfile for details\n");
@@ -459,9 +460,10 @@ void MovePackages::removePackagesFromSourceDatabaseFile(const MultiSession<void>
             if (m_useContainer) {
                 repoRemoveProcess->launch(boost::process::v1::start_dir(sourceRepoDir),
                     boost::process::v1::env["PKGNAME"] = argsToString(m_buildAction->id), boost::process::v1::env["TOOL"] = "repo-remove",
-                    m_makeContainerPkgPath, "--", sourceDbFile, packageNames);
+                    m_makeContainerPkgPath, "--", "--wait-for-lock", sourceDbFile, packageNames);
             } else {
-                repoRemoveProcess->launch(boost::process::v1::start_dir(sourceRepoDir), m_repoRemovePath, sourceDbFile, packageNames);
+                repoRemoveProcess->launch(
+                    boost::process::v1::start_dir(sourceRepoDir), m_repoRemovePath, "--wait-for-lock", sourceDbFile, packageNames);
             }
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", sourceRepoDir, "\" for \"", sourceDbFile,
                 "\", see logfile for details\n");
