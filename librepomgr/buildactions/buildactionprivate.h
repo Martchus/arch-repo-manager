@@ -550,6 +550,7 @@ private:
     std::vector<std::string> m_cyclicLeftovers;
     std::vector<std::string> m_warnings;
     std::unordered_set<std::string> m_cleanedSourceDirs;
+    unsigned int m_aurRetries = 5;
     bool m_forceBumpPackageVersion = false;
     bool m_cleanSourceDirectory = false;
     bool m_keepOrder = false;

@@ -246,6 +246,11 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "A colon separated list of PKGBUILDs directories to consider before checking the standard directories",
                     .param = "pkgbuilds-dir",
                 },
+                BuildActionSettingMetaInfo{
+                    .name = "AUR retries",
+                    .desc = "The number of retries for AUR HTTP requests",
+                    .param = "aur-retries",
+                },
             },
             .directory = true,
             .sourceDb = true,

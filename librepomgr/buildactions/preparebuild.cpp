@@ -112,9 +112,17 @@ void PrepareBuild::run()
     auto metaInfoLock = metaInfo.lockToRead();
     const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::PrepareBuild);
     const auto pkgbuildsDirsSetting = std::string(typeInfo.settings[static_cast<std::size_t>(PrepareBuildSettings::PKGBUILDsDirs)].param);
+    const auto aurRetriesSetting = std::string(typeInfo.settings[static_cast<std::size_t>(PrepareBuildSettings::AurRetries)].param);
     metaInfoLock.unlock();
     if (const auto i = m_buildAction->settings.find(pkgbuildsDirsSetting); i != m_buildAction->settings.end()) {
         m_pkgbuildsDirs = splitString<std::vector<std::string>>(i->second, ":", EmptyPartsTreat::Omit);
+    }
+    if (const auto i = m_buildAction->settings.find(aurRetriesSetting); i != m_buildAction->settings.end() && !i->second.empty()) {
+        try {
+            m_aurRetries = stringToNumber<decltype(m_aurRetries)>(i->second);
+        } catch (const ConversionException &e) {
+            m_warnings.emplace_back(argsToString("Specified AUR retries are not a number: ", e.what()));
+        }
     }
 
     // read values from global config
@@ -663,6 +671,7 @@ void PrepareBuild::fetchMissingBuildData()
                     .packageName = &packageName,
                     .lookupPackageName = &lookupPackageName,
                     .targetDirectory = &buildData.sourceDirectory,
+                    .retries = m_aurRetries,
                     .tryOfficial = m_fetchOfficialSources,
                 });
                 addPackageToLogLine(logLines[1], packageName);

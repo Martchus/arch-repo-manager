@@ -118,7 +118,7 @@ enum class BuildServiceCleanupFlags : BuildActionFlagType {
 };
 enum class ReloadLibraryDependenciesSettings : std::size_t { PackageExcludeRegex };
 enum class CheckForProblemsSettings : std::size_t { IgnoreDeps, IgnoreLibDeps };
-enum class PrepareBuildSettings : std::size_t { PKGBUILDsDirs };
+enum class PrepareBuildSettings : std::size_t { PKGBUILDsDirs, AurRetries };
 enum class ConductBuildSettings : std::size_t { ChrootDir, ChrootDefaultUser, CCacheDir, PackageCacheDir, TestFilesDir, GpgKey };
 enum class MakeLicenseInfoSettings : std::size_t { OutputFilePath };
 enum class CustomCommandSettings : std::size_t { Command, SharedLocks, ExclusiveLocks };
