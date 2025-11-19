@@ -200,13 +200,6 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
         auto session = std::make_shared<WebClient::Session>(ioContext, setup.webServer.sslContext,
             [multiSession, params = params, &log, &setup, &ioContext](WebClient::Session &session2, const WebClient::HttpClientError &error) mutable {
                 if (error.errorCode != boost::beast::errc::success && error.errorCode.message() != "stream truncated") {
-                    // download from AUR after all if the sources cannot be found in the official Arch Linux Git repositories
-                    if (params.tryOfficial) {
-                        params.tryOfficial = false;
-                        queryAurSnapshots(log, setup, { params }, ioContext, multiSession);
-                        return;
-                    }
-
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
                         .errorOutput = std::string(),
                         .packages = {},
@@ -218,7 +211,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                 const auto &response = get<Response>(session2.response);
                 if (response.result() != boost::beast::http::status::ok) {
                     // download from AUR after all if the sources cannot be found in the official Arch Linux Git repositories
-                    if (response.result() != boost::beast::http::status::not_found && params.tryOfficial) {
+                    if (response.result() == boost::beast::http::status::not_found && params.tryOfficial) {
                         params.tryOfficial = false;
                         queryAurSnapshots(log, setup, { params }, ioContext, multiSession);
                         return;
