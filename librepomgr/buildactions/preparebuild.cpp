@@ -681,7 +681,7 @@ void PrepareBuild::fetchMissingBuildData()
 
     // schedule async AUR downloads
     if (!snapshotQueries.empty()) {
-        WebClient::queryAurSnapshots(m_buildAction->log(), m_setup, snapshotQueries, m_setup.building.ioContext, multiSession);
+        WebClient::queryAurSnapshots(m_buildAction, m_setup, snapshotQueries, m_setup.building.ioContext, multiSession);
     }
 
     // log status

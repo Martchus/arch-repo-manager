@@ -6,6 +6,7 @@
 
 #include "./session.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,7 @@
 
 namespace LibRepoMgr {
 
+struct BuildAction;
 struct LogContext;
 
 namespace WebClient {
@@ -23,6 +25,7 @@ struct AurSnapshotResult {
     std::string error;
     bool isOfficial = false;
     bool is404 = false;
+    void checkPackages();
 };
 struct AurSnapshotQueryParams {
     const std::string *packageName = nullptr;
@@ -46,7 +49,7 @@ std::shared_ptr<AurQuerySession> queryAurPackages(LogContext &log, ServiceSetup 
 std::shared_ptr<AurQuerySession> queryAurPackagesForDatabase(LogContext &log, ServiceSetup &setup, boost::asio::io_context &ioContext,
     std::shared_lock<std::shared_mutex> *configReadLock, LibPkg::Database &database, typename AurQuerySession::HandlerType &&handler);
 
-void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<AurSnapshotQueryParams> &queryParams,
+void queryAurSnapshots(std::shared_ptr<BuildAction> &buildAction, ServiceSetup &setup, const std::vector<AurSnapshotQueryParams> &queryParams,
     boost::asio::io_context &ioContext, std::shared_ptr<AurSnapshotQuerySession> &multiSession);
 
 } // namespace WebClient

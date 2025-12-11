@@ -131,6 +131,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::string workingDirectory = "building";
         std::vector<std::string> pkgbuildsDirs;
         std::regex ignoreLocalPkgbuildsRegex;
+        std::string aurDownloaderPath;
         std::string makePkgPath = "makepkg";
         std::string makeChrootPkgPath = "makechrootpkg";
         std::string makeContainerPkgPath = "makecontainerpkg";

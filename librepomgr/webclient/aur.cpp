@@ -8,12 +8,17 @@
 #include "../json.h"
 #include "../multisession.h"
 
+#include "../buildactions/buildactionprivate.h"
+#include "../buildactions/subprocess.h"
+
 #include "../../libpkg/data/package.h"
 #include "../../libpkg/parser/aur.h"
 
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/io/misc.h>
+
+#include <boost/process/v1/start_dir.hpp>
 
 #include <filesystem>
 #include <iostream>
@@ -185,14 +190,39 @@ std::shared_ptr<AurQuerySession> queryAurPackagesForDatabase(LogContext &log, Se
 }
 
 /*!
- * \brief Queries the AUR asynchronously to get the latest snapshot for the specified \a packageNames.
- * \remarks
- * If the "tryOfficial" flag in the parameter is set then this function attempts to download the sources from official Git repositories
- * first. If the official repositories are unavailable or the package cannot be found there it will still fallback to downloading the
- * sources from AUR.
- *
+ * \brief Marks target directory as from AUR to prevent running `makepkg --printsrcinfo` in that directory, also on subsequent runs.
  */
-void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<AurSnapshotQueryParams> &queryParams,
+static bool markAurPackageDirectory(const AurSnapshotQueryParams &params, std::shared_ptr<AurSnapshotQuerySession> &multiSession)
+{
+    try {
+        filesystem::create_directories(*params.targetDirectory);
+        writeFile(*params.targetDirectory + "/from-aur", *params.lookupPackageName);
+        return true;
+    } catch (const std::runtime_error &e) {
+        multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+            .errorOutput = std::string(),
+            .packages = {},
+            .error = argsToString("Unable to create directory marker for AUR contents: ", e.what()) });
+        return false;
+    }
+}
+
+/*!
+ * \brief Populates \a error if \a packages are not valid.
+ */
+void AurSnapshotResult::checkPackages()
+{
+    if (packages.empty() || packages.front().pkg->name.empty()) {
+        error = "Unable to parse .SRCINFO: no package name present";
+    } else if (!packages.front().pkg->sourceInfo.has_value()) {
+        error = "Unable to parse .SRCINFO: no source info present";
+    }
+}
+
+/*!
+ * \brief Downloads the latest snapshot from the AUR via HTTP as tar archive for the specified \a queryParams.
+ */
+static void queryAurSnapshotsViaTarDownload(LogContext &log, ServiceSetup &setup, const std::vector<AurSnapshotQueryParams> &queryParams,
     boost::asio::io_context &ioContext, std::shared_ptr<AurSnapshotQuerySession> &multiSession)
 {
     CPP_UTILITIES_UNUSED(log)
@@ -203,7 +233,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     // retry on connection errors
                     if (params.retries) {
                         --params.retries;
-                        queryAurSnapshots(log, setup, { params }, ioContext, multiSession);
+                        queryAurSnapshotsViaTarDownload(log, setup, { params }, ioContext, multiSession);
                         return;
                     }
 
@@ -220,13 +250,13 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     // download from AUR after all if the sources cannot be found in the official Arch Linux Git repositories
                     if (response.result() == boost::beast::http::status::not_found && params.tryOfficial) {
                         params.tryOfficial = false;
-                        queryAurSnapshots(log, setup, { params }, ioContext, multiSession);
+                        queryAurSnapshotsViaTarDownload(log, setup, { params }, ioContext, multiSession);
                         return;
                     }
                     // retry on 5xx errors
                     if (params.retries && response.result_int() >= 500 && response.result_int() < 600) {
                         --params.retries;
-                        queryAurSnapshots(log, setup, { params }, ioContext, multiSession);
+                        queryAurSnapshotsViaTarDownload(log, setup, { params }, ioContext, multiSession);
                         return;
                     }
                     multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
@@ -249,16 +279,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                         .error = "Unable to extract AUR snapshot tarball for package " % *params.packageName % ": " + extractionError.what() });
                     return;
                 }
-
-                // mark target directory as from AUR to prevent running `makepkg --printsrcinfo` in that directory, also on subsequent runs
-                try {
-                    filesystem::create_directories(*params.targetDirectory);
-                    writeFile(*params.targetDirectory + "/from-aur", *params.lookupPackageName);
-                } catch (const std::runtime_error &e) {
-                    multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
-                        .errorOutput = std::string(),
-                        .packages = {},
-                        .error = argsToString("Unable to create directory marker for AUR contents: ", e.what()) });
+                if (!markAurPackageDirectory(params, multiSession)) {
                     return;
                 }
 
@@ -338,11 +359,7 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
                     if (!haveSrcFileInfo) {
                         result.error = ".SRCINFO is missing";
                     }
-                    if (result.packages.empty() || result.packages.front().pkg->name.empty()) {
-                        result.error = "Unable to parse .SRCINFO: no package name present";
-                    } else if (!result.packages.front().pkg->sourceInfo.has_value()) {
-                        result.error = "Unable to parse .SRCINFO: no source info present";
-                    }
+                    result.checkPackages();
                 }
                 multiSession->addResponse(std::move(result));
             });
@@ -356,6 +373,96 @@ void queryAurSnapshots(LogContext &log, ServiceSetup &setup, const std::vector<A
             const auto url = "/cgit/aur.git/snapshot/" % encodedPackageName + ".tar.gz";
             session->run("aur.archlinux.org", "443", boost::beast::http::verb::get, url.data(), 11);
         }
+    }
+}
+
+/*!
+ * \brief Downloads the latest snapshot from the AUR via the specified external downloader script for the specified \a queryParams.
+ */
+void queryAurSnapshotsViaScript(std::shared_ptr<BuildAction> &buildAction, const boost::filesystem::path &downloaderPath,
+    const std::vector<AurSnapshotQueryParams> &queryParams, std::shared_ptr<AurSnapshotQuerySession> &multiSession)
+{
+    for (const auto &params : queryParams) {
+        try {
+            const auto targetPath = std::filesystem::path(*params.targetDirectory);
+            if (params.targetDirectory->empty()) {
+                throw std::filesystem::filesystem_error(
+                    "Target path must not be empty", targetPath, std::make_error_code(std::errc::invalid_argument));
+            }
+            if (std::filesystem::exists(targetPath)) {
+                std::filesystem::remove_all(targetPath);
+            }
+            std::filesystem::create_directories(targetPath);
+        } catch (const std::filesystem::filesystem_error &e) {
+            multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                .errorOutput = std::string(),
+                .packages = {},
+                .error = "Unable to create empty directory to store AUR snapshot of package " % *params.packageName % ": " + e.what() });
+            continue;
+        }
+        auto session = buildAction->makeBuildProcess("AUR download of " + *params.packageName,
+            argsToString(buildAction->directory, "aur-download-", *params.packageName, ".log"),
+            [multiSession, params = params](boost::process::v1::child &&child, ProcessResult &&processResult) mutable {
+                auto errorMessage = std::string();
+                if (processResult.errorCode) {
+                    errorMessage = processResult.errorCode.message();
+                } else if (child.exit_code() != 0) {
+                    errorMessage = argsToString("script exited with code ", child.exit_code());
+                }
+                if (!errorMessage.empty()) {
+                    multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
+                        .errorOutput = std::string(),
+                        .packages = {},
+                        .error = "Unable to download AUR snapshot via script for package " % *params.packageName % ": " + errorMessage });
+                    return;
+                }
+                if (!markAurPackageDirectory(params, multiSession)) {
+                    return;
+                }
+
+                auto result
+                    = AurSnapshotResult{ .packageName = *params.packageName, .errorOutput = std::string(), .packages = {}, .error = std::string() };
+                try {
+                    if (!std::filesystem::exists(*params.targetDirectory + "/PKGBUILD")) {
+                        result.error = "PKGINFO is missing";
+                    }
+                    if (!std::filesystem::exists(*params.targetDirectory + "/.SRCINFO")) {
+                        result.error = ".SRCINFO is missing";
+                    }
+                    result.packages = Package::fromInfo(readFile(*params.targetDirectory + "/.SRCINFO"));
+                    result.checkPackages();
+                } catch (const std::ios_base::failure &e) {
+                    result.error = "I/O error occurred when reading AUR snapshot for package " % *params.packageName % ": " + e.what();
+                } catch (const std::filesystem::filesystem_error &e) {
+                    result.error = "'Filesystem error occurred when reading AUR snapshot for package " % *params.packageName % ": " + e.what();
+                }
+                multiSession->addResponse(std::move(result));
+            });
+        const auto &packageName = params.lookupPackageName ? *params.lookupPackageName : *params.packageName;
+        session->launch(downloaderPath, packageName, *params.targetDirectory);
+    }
+}
+
+/*!
+ * \brief Queries the AUR asynchronously to get the latest snapshot for the specified \a packageNames.
+ * \remarks
+ * - By default, downloads the tar file via http. If setup.building.aurDownloaderPath is set then this external script is invoked to do
+ *   the download.
+ * - If the "tryOfficial" flag in the parameter is set then this function attempts to download the sources from official Git repositories
+ *   first. If the official repositories are unavailable or the package cannot be found there it will still fallback to downloading the
+ *   sources from AUR. This is only used when downloading a tar file via http.
+ * - The specified \a ioContext is only used when downloading a tar file via http.
+ */
+void queryAurSnapshots(std::shared_ptr<BuildAction> &buildAction, ServiceSetup &setup, const std::vector<AurSnapshotQueryParams> &queryParams,
+    boost::asio::io_context &ioContext, std::shared_ptr<AurSnapshotQuerySession> &multiSession)
+{
+    auto configLock = setup.lockToRead();
+    auto downloaderPath = findExecutable(setup.building.aurDownloaderPath);
+    configLock.unlock();
+    if (downloaderPath.empty()) {
+        queryAurSnapshotsViaTarDownload(buildAction->log(), setup, queryParams, ioContext, multiSession);
+    } else {
+        queryAurSnapshotsViaScript(buildAction, downloaderPath, queryParams, multiSession);
     }
 }
 

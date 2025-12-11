@@ -177,6 +177,7 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     convertValue(multimap, "working_directory", workingDirectory);
     convertValue(multimap, "local_pkgbuilds_dir", pkgbuildsDirs);
     convertValue(multimap, "ignore_local_pkgbuilds_regex", ignoreLocalPkgbuildsRegex);
+    convertValue(multimap, "aur_downloader_path", aurDownloaderPath);
     convertValue(multimap, "makepkg_path", makePkgPath);
     convertValue(multimap, "makechrootpkg_path", makeChrootPkgPath);
     convertValue(multimap, "makecontainerpkg_path", makeContainerPkgPath);
