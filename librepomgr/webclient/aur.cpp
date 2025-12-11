@@ -401,7 +401,7 @@ void queryAurSnapshotsViaScript(std::shared_ptr<BuildAction> &buildAction, const
             continue;
         }
         auto session = buildAction->makeBuildProcess("AUR download of " + *params.packageName,
-            argsToString(buildAction->directory, "aur-download-", *params.packageName, ".log"),
+            argsToString(buildAction->directory, "/aur-download-", *params.packageName, ".log"),
             [multiSession, params = params](boost::process::v1::child &&child, ProcessResult &&processResult) mutable {
                 auto errorMessage = std::string();
                 if (processResult.errorCode) {
@@ -457,13 +457,16 @@ void queryAurSnapshots(std::shared_ptr<BuildAction> &buildAction, ServiceSetup &
     boost::asio::io_context &ioContext, std::shared_ptr<AurSnapshotQuerySession> &multiSession)
 {
     auto configLock = setup.lockToRead();
-    auto downloaderPath = findExecutable(setup.building.aurDownloaderPath);
+    auto configuredAurDownloaderPath = setup.building.aurDownloaderPath;
     configLock.unlock();
-    if (downloaderPath.empty()) {
-        queryAurSnapshotsViaTarDownload(buildAction->log(), setup, queryParams, ioContext, multiSession);
-    } else {
-        queryAurSnapshotsViaScript(buildAction, downloaderPath, queryParams, multiSession);
+    if (!configuredAurDownloaderPath.empty()) {
+        if (const auto downloaderPath = findExecutable(configuredAurDownloaderPath); !downloaderPath.empty()) {
+            queryAurSnapshotsViaScript(buildAction, downloaderPath, queryParams, multiSession);
+            return;
+        }
+        buildAction->log()(Phrases::Warning, "Unable to find configured AUR downloader path \"", configuredAurDownloaderPath, "\". Falling back to HTTP download.");
     }
+    queryAurSnapshotsViaTarDownload(buildAction->log(), setup, queryParams, ioContext, multiSession);
 }
 
 } // namespace WebClient
