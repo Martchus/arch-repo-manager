@@ -389,9 +389,6 @@ void queryAurSnapshotsViaScript(std::shared_ptr<BuildAction> &buildAction, const
                 throw std::filesystem::filesystem_error(
                     "Target path must not be empty", targetPath, std::make_error_code(std::errc::invalid_argument));
             }
-            if (std::filesystem::exists(targetPath)) {
-                std::filesystem::remove_all(targetPath);
-            }
             std::filesystem::create_directories(targetPath);
         } catch (const std::filesystem::filesystem_error &e) {
             multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
