@@ -195,8 +195,9 @@ std::shared_ptr<AurQuerySession> queryAurPackagesForDatabase(LogContext &log, Se
 static bool markAurPackageDirectory(const AurSnapshotQueryParams &params, std::shared_ptr<AurSnapshotQuerySession> &multiSession)
 {
     try {
-        filesystem::create_directories(*params.targetDirectory);
-        writeFile(*params.targetDirectory + "/from-aur", *params.lookupPackageName);
+        if (std::filesystem::exists(*params.targetDirectory)) {
+            writeFile(*params.targetDirectory + "/from-aur", *params.lookupPackageName);
+        }
         return true;
     } catch (const std::runtime_error &e) {
         multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = *params.packageName,
@@ -420,14 +421,16 @@ void queryAurSnapshotsViaScript(std::shared_ptr<BuildAction> &buildAction, const
                 auto result
                     = AurSnapshotResult{ .packageName = *params.packageName, .errorOutput = std::string(), .packages = {}, .error = std::string() };
                 try {
-                    if (!std::filesystem::exists(*params.targetDirectory + "/PKGBUILD")) {
-                        result.error = "PKGINFO is missing";
-                    }
                     if (!std::filesystem::exists(*params.targetDirectory + "/.SRCINFO")) {
                         result.error = ".SRCINFO is missing";
+                        result.is404 = true;
+                    } else if (!std::filesystem::exists(*params.targetDirectory + "/PKGBUILD")) {
+                        result.error = "PKGINFO is missing";
+                        result.is404 = true;
+                    } else {
+                        result.packages = Package::fromInfo(readFile(*params.targetDirectory + "/.SRCINFO"));
+                        result.checkPackages();
                     }
-                    result.packages = Package::fromInfo(readFile(*params.targetDirectory + "/.SRCINFO"));
-                    result.checkPackages();
                 } catch (const std::ios_base::failure &e) {
                     result.error = "I/O error occurred when reading AUR snapshot for package " % *params.packageName % ": " + e.what();
                 } catch (const std::filesystem::filesystem_error &e) {

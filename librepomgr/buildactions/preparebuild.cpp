@@ -568,10 +568,11 @@ void PrepareBuild::fetchMissingBuildData()
         // skip fetching if source directory already exists (from previous run or manual provisioning)
         // clean existing source directory if cleanup is enabled
         try {
-            const auto sourceDirectoryExists = filesystem::exists(buildData.sourceDirectory);
-            if (m_cleanSourceDirectory && sourceDirectoryExists && m_cleanedSourceDirs.emplace(buildData.sourceDirectory).second) {
-                filesystem::remove_all(buildData.sourceDirectory);
-            } else if (sourceDirectoryExists) {
+            const auto sourcePath = std::filesystem::path(buildData.sourceDirectory);
+            const auto sourceDirectoryNonEmpty = filesystem::exists(sourcePath) && !filesystem::is_empty(sourcePath);
+            if (m_cleanSourceDirectory && sourceDirectoryNonEmpty && m_cleanedSourceDirs.emplace(buildData.sourceDirectory).second) {
+                filesystem::remove_all(sourcePath);
+            } else if (sourceDirectoryNonEmpty) {
                 // verify the PKGBUILD file exists
                 const auto pkgbuildPath = buildData.sourceDirectory + "/PKGBUILD";
                 if (!filesystem::exists(pkgbuildPath)) {
