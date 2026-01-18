@@ -118,6 +118,12 @@ Dependency::Dependency(const char *denotation, std::size_t denotationSize)
     if (version) {
         this->version.assign(version, versionSize);
     }
+    if (this->version.empty()) {
+        // remove version constraint if no actual version is specified
+        // note: An empty version constraint can happen when parsing dependencies that are dynamically assigned
+        //       in the `package()` function. e.g. `depends=("linux=${_kernver}")`.
+        this->mode = DependencyMode::Any;
+    }
     if (description) {
         this->description.assign(description, descriptionSize);
     }
