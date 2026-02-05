@@ -584,7 +584,9 @@ void PrepareBuild::fetchMissingBuildData()
                 }
                 // generate the .SRCINFO file if not already present; otherwise read the existing .SRCINFO
                 const auto srcInfoPath = buildData.sourceDirectory + "/.SRCINFO";
-                if (!filesystem::exists(srcInfoPath) || filesystem::last_write_time(srcInfoPath) < filesystem::last_write_time(pkgbuildPath)) {
+                if (!filesystem::exists(srcInfoPath)
+                    || (filesystem::last_write_time(srcInfoPath) < filesystem::last_write_time(pkgbuildPath)
+                        && !std::filesystem::exists(buildData.sourceDirectory + "/from-aur"))) {
                     makeSrcInfo(multiSession, buildData.sourceDirectory, packageName);
                     needToGeneratedSrcInfo = true;
                 } else {
