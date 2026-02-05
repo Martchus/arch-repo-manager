@@ -464,7 +464,8 @@ void queryAurSnapshots(std::shared_ptr<BuildAction> &buildAction, ServiceSetup &
             queryAurSnapshotsViaScript(buildAction, downloaderPath, queryParams, multiSession);
             return;
         }
-        buildAction->log()(Phrases::Warning, "Unable to find configured AUR downloader path \"", configuredAurDownloaderPath, "\". Falling back to HTTP download.");
+        buildAction->log()(
+            Phrases::Warning, "Unable to find configured AUR downloader path \"", configuredAurDownloaderPath, "\". Falling back to HTTP download.");
     }
     queryAurSnapshotsViaTarDownload(buildAction->log(), setup, queryParams, ioContext, multiSession);
 }
