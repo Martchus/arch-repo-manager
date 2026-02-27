@@ -26,6 +26,8 @@ export function initBuildActionsForm()
         Utils.alterFormSelection(this.form, 'uncheck-all');
     };
     listFormElements.showselected.onclick = showSelectedActions;
+    listFormElements.startselected.onclick = startSelectedActions;
+    listFormElements.stopselected.onclick = stopSelectedActions;
     listFormElements.deleteselected.onclick = deleteSelectedActions;
 
     // allow selecting build action type / unselecting pre-defined action more easily
@@ -951,7 +953,7 @@ function deleteSelectedActions()
     }
 }
 
-function showSelectedActions()
+function handleSelectedActions(action)
 {
     const data = Utils.getFormTableData('build-actions-list');
     if (data === undefined) {
@@ -959,8 +961,23 @@ function showSelectedActions()
     }
     const ids = Utils.getSelectedRowProperties(data, 'id');
     if (ids.length) {
-        queryBuildActionDetails(ids);
+        action(ids);
     }
+}
+
+function showSelectedActions()
+{
+    handleSelectedActions(queryBuildActionDetails);
+}
+
+function startSelectedActions()
+{
+    handleSelectedActions(startBuildAction);
+}
+
+function stopSelectedActions()
+{
+    handleSelectedActions(stopBuildAction);
 }
 
 export function initBuildActionDetails(sectionElement, sectionData, newHashParts)
