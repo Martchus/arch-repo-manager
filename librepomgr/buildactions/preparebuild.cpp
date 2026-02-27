@@ -409,10 +409,9 @@ void PrepareBuild::invokeVariantConversion(
     try {
         auto convDirectoryPath = std::filesystem::absolute(sourceDirectory);
         auto origDirectoryPath = std::filesystem::absolute(sourceDirectory + "/../src-original");
-        auto origDirectoryExists = std::filesystem::exists(origDirectoryPath);
         convDirectory = convDirectoryPath.string();
         origDirectory = origDirectoryPath.string();
-        if (m_cleanSourceDirectory && origDirectoryExists) {
+        if (m_cleanSourceDirectory && std::filesystem::exists(origDirectoryPath)) {
             std::filesystem::remove_all(origDirectoryPath);
         }
         std::filesystem::rename(convDirectoryPath, origDirectoryPath);
