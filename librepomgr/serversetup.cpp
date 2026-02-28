@@ -200,6 +200,7 @@ void ServiceSetup::BuildSetup::applyConfig(const std::multimap<std::string, std:
     convertValue(multimap, "makepkg_flags", makepkgFlags);
     convertValue(multimap, "package_cache_dir", packageCacheDir);
     convertValue(multimap, "package_download_size_limit", packageDownloadSizeLimit);
+    convertValue(multimap, "additional_parsing_threads", additionalParsingThreads);
     convertValue(multimap, "test_files_dir", testFilesDir);
     convertValue(multimap, "build_action_retention", buildActionRetention);
     convertValue(multimap, "load_files_dbs", loadFilesDbs);

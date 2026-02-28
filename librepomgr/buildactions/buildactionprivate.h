@@ -466,6 +466,7 @@ private:
     WebClient::PackageCachingDataForSession m_cachingData;
     std::uint64_t m_packageDownloadSizeLimit;
     std::string m_cacheDir;
+    int m_additionalParsingThreads = -1;
     bool m_force = false;
 };
 

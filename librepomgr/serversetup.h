@@ -154,6 +154,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::vector<std::string> makepkgFlags;
         std::string packageCacheDir; // cache dir *without* architecture sub-folder (which is automatically added as needed)
         std::uint64_t packageDownloadSizeLimit = 500 * 1024 * 1024;
+        int additionalParsingThreads = -1;
         std::string testFilesDir;
         BuildPresets presets;
         std::unordered_map<std::string, std::vector<std::string>, StringHash, std::equal_to<>> complementaryVariants;

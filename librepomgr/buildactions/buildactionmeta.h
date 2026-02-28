@@ -116,7 +116,7 @@ enum class BuildServiceCleanupFlags : BuildActionFlagType {
     None,
     DryPackageCacheCleanup = (1 << 0),
 };
-enum class ReloadLibraryDependenciesSettings : std::size_t { PackageExcludeRegex };
+enum class ReloadLibraryDependenciesSettings : std::size_t { PackageExcludeRegex, AdditionalParsingThreads };
 enum class CheckForProblemsSettings : std::size_t { IgnoreDeps, IgnoreLibDeps };
 enum class PrepareBuildSettings : std::size_t { PKGBUILDsDirs, AurRetries };
 enum class ConductBuildSettings : std::size_t { ChrootDir, ChrootDefaultUser, CCacheDir, PackageCacheDir, TestFilesDir, GpgKey };

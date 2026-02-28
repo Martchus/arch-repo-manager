@@ -143,6 +143,11 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Regular expression to match package names against; matching packages will be excluded.",
                     .param = "pkg-exclude-regex",
                 },
+                BuildActionSettingMetaInfo{
+                    .name = "Additional parsing threads",
+                    .desc = "Number of additional threads to use for parsing packages",
+                    .param = "additional-parsing-threads",
+                },
             },
             .directory = false,
             .sourceDb = false,

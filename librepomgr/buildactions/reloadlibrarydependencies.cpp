@@ -33,6 +33,7 @@ void ReloadLibraryDependencies::run()
     auto metaInfoLock = metaInfo.lockToRead();
     const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::ReloadLibraryDependencies);
     const auto packageExcludeRegexSetting = typeInfo.settings[static_cast<std::size_t>(ReloadLibraryDependenciesSettings::PackageExcludeRegex)].param;
+    const auto additionalParsingThreadsSetting = typeInfo.settings[static_cast<std::size_t>(ReloadLibraryDependenciesSettings::AdditionalParsingThreads)].param;
     metaInfoLock.unlock();
     const auto &packageExcludeRegexValue = findSetting(packageExcludeRegexSetting);
     auto packageExcludeRegex = std::regex();
@@ -41,6 +42,15 @@ void ReloadLibraryDependencies::run()
             packageExcludeRegex = std::regex(packageExcludeRegexValue);
         } catch (const std::regex_error &e) {
             reportError(argsToString("configured package exclude regex is invalid: ", e.what()));
+            return;
+        }
+    }
+    const auto &additionalParsingThreadsValue = findSetting(additionalParsingThreadsSetting);
+    if (!additionalParsingThreadsValue.empty()) {
+        try {
+            m_additionalParsingThreads = stringToNumber<int>(additionalParsingThreadsValue);
+        } catch (const CppUtilities::ConversionException &e) {
+            reportError(argsToString("configured additional number of parsing threads is invalid: ", e.what()));
             return;
         }
     }
@@ -56,6 +66,9 @@ void ReloadLibraryDependencies::run()
     auto buildLock = m_setup.building.lockToRead();
     m_cacheDir = m_setup.building.packageCacheDir + '/';
     m_packageDownloadSizeLimit = m_setup.building.packageDownloadSizeLimit;
+    if (additionalParsingThreadsValue.empty()) {
+        m_additionalParsingThreads = m_setup.building.additionalParsingThreads;
+    }
     buildLock.unlock();
 
     // find relevant databases and packages
@@ -351,7 +364,7 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
             }
         }
     };
-    auto threads = std::vector<std::thread>(std::thread::hardware_concurrency() - 1);
+    auto threads = std::vector<std::thread>(m_additionalParsingThreads < 0 ? (std::thread::hardware_concurrency() - 1) : static_cast<std::size_t>(m_additionalParsingThreads));
     for (std::thread &t : threads) {
         t = std::thread(processPackage);
     }
