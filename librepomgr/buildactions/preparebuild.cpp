@@ -201,7 +201,7 @@ void PrepareBuild::run()
         m_warnings.emplace_back("Unable to find staging DB for \"" + destinationDb->name + "\". Auto-staging will not work.");
     }
     if (makeDebugPackages && !debugDb) {
-        m_warnings.emplace_back("Unable to find staging DB for \"" + destinationDb->name + "\". Will not enable creation of debug packages.");
+        m_warnings.emplace_back("Unable to find debug DB for \"" + destinationDb->name + "\". Will not enable creation of debug packages.");
         makeDebugPackages = false;
     }
 
