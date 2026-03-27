@@ -24,8 +24,7 @@ SignatureLevelConfig SignatureLevelConfig::fromString(std::string_view str)
             All,
             Package,
             Database,
-        } scope
-            = All;
+        } scope = All;
         if (startsWith(part, "Package")) {
             part = part.substr(7);
             scope = Package;

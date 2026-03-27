@@ -472,8 +472,7 @@ static void parsePkgInfo(const std::string &info, const std::function<Package *(
         Pad, // expecting padding
         FieldValue, // reading field value
         Comment // reading comment
-    } state
-        = FieldName;
+    } state = FieldName;
 
     // variables for current field
     const char *currentFieldName = nullptr;
@@ -642,8 +641,7 @@ std::shared_ptr<Package> Package::fromDescription(const std::vector<std::string>
             NewLine, // expecting new line (after field name)
             Next, // start reading next field value / next field name (initial state)
             FieldValue, // reading field value
-        } state
-            = Next;
+        } state = Next;
 
         // variables for current field
         const char *currentFieldName = nullptr;

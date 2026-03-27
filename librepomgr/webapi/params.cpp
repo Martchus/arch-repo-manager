@@ -106,8 +106,7 @@ std::string Url::decodeValue(std::string_view value)
         AnyChar,
         FirstDigit,
         SecondDigit,
-    } state
-        = AnyChar;
+    } state = AnyChar;
     auto encodedValue = boost::beast::string_view::value_type();
     try {
         for (const auto c : value) {

@@ -164,8 +164,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         Depends,
         LibProvides,
         LibDepends,
-    } mode
-        = Mode::Name;
+    } mode = Mode::Name;
     static const std::unordered_map<std::string_view, Mode> modeByParamValue{
         { "name", Mode::Name },
         { "name-contains", Mode::NameContains },

@@ -33,7 +33,8 @@ void ReloadLibraryDependencies::run()
     auto metaInfoLock = metaInfo.lockToRead();
     const auto &typeInfo = metaInfo.typeInfoForId(BuildActionType::ReloadLibraryDependencies);
     const auto packageExcludeRegexSetting = typeInfo.settings[static_cast<std::size_t>(ReloadLibraryDependenciesSettings::PackageExcludeRegex)].param;
-    const auto additionalParsingThreadsSetting = typeInfo.settings[static_cast<std::size_t>(ReloadLibraryDependenciesSettings::AdditionalParsingThreads)].param;
+    const auto additionalParsingThreadsSetting
+        = typeInfo.settings[static_cast<std::size_t>(ReloadLibraryDependenciesSettings::AdditionalParsingThreads)].param;
     metaInfoLock.unlock();
     const auto &packageExcludeRegexValue = findSetting(packageExcludeRegexSetting);
     auto packageExcludeRegex = std::regex();
@@ -364,7 +365,8 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
             }
         }
     };
-    auto threads = std::vector<std::thread>(m_additionalParsingThreads < 0 ? (std::thread::hardware_concurrency() - 1) : static_cast<std::size_t>(m_additionalParsingThreads));
+    auto threads = std::vector<std::thread>(
+        m_additionalParsingThreads < 0 ? (std::thread::hardware_concurrency() - 1) : static_cast<std::size_t>(m_additionalParsingThreads));
     for (std::thread &t : threads) {
         t = std::thread(processPackage);
     }
