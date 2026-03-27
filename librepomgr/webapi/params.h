@@ -86,7 +86,7 @@ struct LIBREPOMGR_EXPORT Params {
     Params(ServiceSetup &setup, Session &session, Url &&target);
     ServiceSetup &setup;
     Session &session;
-    const Url target;
+    Url target;
 
     template <typename FieldType> boost::beast::string_view headerValue(FieldType field) const;
     const Request &request() const;
