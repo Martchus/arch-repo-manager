@@ -16,6 +16,11 @@ export function queryRoute(method, path, callback, type, body)
         }
     }
 
+    const methodUpper = method.toUpperCase();
+    if (typeof body === 'string' && body.startsWith('?') && (methodUpper === 'GET' || methodUpper === 'HEAD')) {
+        path += body; // append query parameters to path for GET/HEAD requests where body is ignored
+    }
+
     const ajaxRequest = new XMLHttpRequest();
     ajaxRequest.onreadystatechange = function() {
         if (this.readyState === 4) {
