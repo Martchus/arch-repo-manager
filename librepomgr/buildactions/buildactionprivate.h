@@ -28,7 +28,7 @@
 #include <boost/process/v1/extend.hpp>
 
 #ifdef LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED
-#include <boost/asio/deadline_timer.hpp>
+#include <boost/asio/system_timer.hpp>
 #endif
 
 namespace boost::process {
@@ -771,7 +771,7 @@ private:
 
     std::uint64_t m_counter;
     std::string m_workingDirectory;
-    boost::asio::deadline_timer m_timer;
+    boost::asio::system_timer m_timer;
     std::shared_ptr<BuildProcessSession> m_logProcess;
 };
 #endif // LIBREPOMGR_DUMMY_BUILD_ACTION_ENABLED

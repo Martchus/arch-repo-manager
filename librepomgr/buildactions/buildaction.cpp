@@ -658,7 +658,7 @@ void DummyBuildAction::run()
 
 void DummyBuildAction::continuePrinting()
 {
-    m_timer.expires_from_now(boost::posix_time::seconds(1));
+    m_timer.expires_after(chrono::seconds(1));
     m_timer.async_wait(std::bind(&DummyBuildAction::printLine, this));
 }
 
@@ -674,10 +674,10 @@ void DummyBuildAction::printLine()
 void DummyBuildAction::stop()
 {
     m_buildAction->appendOutput("stopping"sv);
-    boost::system::error_code timerCancelError;
-    m_timer.cancel(timerCancelError);
-    if (timerCancelError.failed()) {
-        m_buildAction->appendOutput("failed to cancel timer: ", timerCancelError.message(), '\n');
+    try {
+        m_timer.cancel();
+    } catch (const boost::system::system_error &e) {
+        m_buildAction->appendOutput("failed to cancel timer: ", e.what(), '\n');
     }
     std::error_code terminateError;
     if (m_logProcess) {
