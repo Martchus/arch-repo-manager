@@ -50,6 +50,8 @@ struct LIBREPOMGR_EXPORT Url {
     std::string_view hash;
     std::vector<std::pair<std::string_view, std::string_view>> params;
 
+    static std::vector<std::string_view> splitParams(std::string_view joinedParams);
+    void populateParams(const std::vector<std::string_view> &paramParts);
     bool hasFlag(std::string_view paramName) const;
     bool hasPrettyFlag() const;
     std::string_view value(std::string_view paramName) const;

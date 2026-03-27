@@ -3,7 +3,7 @@ let authError = false;
 let ongoingRequests = {};
 
 /// \brief Makes an AJAX query with basic error handling.
-export function queryRoute(method, path, callback, type)
+export function queryRoute(method, path, callback, type, body)
 {
     if (type) {
         const ongoingRequest = ongoingRequests[type];
@@ -53,7 +53,7 @@ export function queryRoute(method, path, callback, type)
         args.push('try', 'again');
     }
     ajaxRequest.open(...args);
-    ajaxRequest.send();
+    ajaxRequest.send(body);
     if (type) {
         ongoingRequests[type] = ajaxRequest;
     }
@@ -73,7 +73,7 @@ export function startFormQueryEx(formId, handler)
     const params = makeFormQueryParameter(form);
     const queryType = formId.endsWith('-form') ? formId.substr(0, formId.length - 5) : formId;
     return {
-        ajaxRequest: queryRoute(form.method, form.getAttribute('action') + params, handler, queryType),
+        ajaxRequest: queryRoute(form.method, form.getAttribute('action'), handler, queryType, params),
         form: form,
         params, params,
     };

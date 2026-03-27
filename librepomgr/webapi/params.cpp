@@ -28,24 +28,41 @@ Url::Url(const Request &request)
         path = path.substr(0, hashBegin);
     }
 
-    // find params
+    // find query params
     const auto paramsBegin = path.find('?');
+    auto paramsFromPath = std::vector<std::string_view>();
     if (paramsBegin != std::string_view::npos) {
-        const auto joinedParams(path.substr(paramsBegin + 1));
-        const auto paramParts(splitStringSimple<std::vector<std::string_view>>(joinedParams, "&"));
-        params.reserve(paramParts.size());
-
-        // split param parts into key-value pairs
-        for (const auto &paramPart : paramParts) {
-            const auto eqBegin(paramPart.find('='));
-            if (eqBegin != std::string_view::npos) {
-                params.emplace_back(paramPart.substr(0, eqBegin), paramPart.substr(eqBegin + 1));
-            } else {
-                params.emplace_back(paramPart, std::string_view());
-            }
-        }
-
+        paramsFromPath = splitParams(path.substr(paramsBegin + 1));
         path = path.substr(0, paramsBegin);
+    }
+
+    // read params from request body as well
+    auto paramsFromBody = std::vector<std::string_view>();
+    if (request.body().starts_with('?')) {
+        paramsFromBody = splitParams(std::string_view(request.body()).substr(1));
+    }
+
+    // populate parameters from query and body
+    params.reserve(paramsFromPath.size() + paramsFromBody.size());
+    populateParams(paramsFromPath);
+    populateParams(paramsFromBody);
+}
+
+std::vector<std::string_view> Url::splitParams(std::string_view joinedParams)
+{
+    return splitStringSimple<std::vector<std::string_view>>(joinedParams, "&");
+}
+
+void Url::populateParams(const std::vector<string_view> &paramParts)
+{
+    // split param parts into key-value pairs
+    for (const auto &paramPart : paramParts) {
+        const auto eqBegin(paramPart.find('='));
+        if (eqBegin != std::string_view::npos) {
+            params.emplace_back(paramPart.substr(0, eqBegin), paramPart.substr(eqBegin + 1));
+        } else {
+            params.emplace_back(paramPart, std::string_view());
+        }
     }
 }
 
