@@ -123,7 +123,7 @@ void Session::received(boost::system::error_code ec, size_t bytesTransferred)
         // invoke the route's handler
         // note: The error handling is in vain if an exception in a deferred handler is thrown.
         try {
-            route.handler(move(params),
+            route.handler(std::move(params),
                 std::bind(
                     static_cast<void (Session::*)(std::shared_ptr<Response> &&)>(&Session::respond), shared_from_this(), std::placeholders::_1));
         } catch (const BadRequest &badRequest) {
