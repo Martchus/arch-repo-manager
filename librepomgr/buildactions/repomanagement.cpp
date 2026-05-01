@@ -841,19 +841,8 @@ void CleanRepository::run()
                 throw std::runtime_error("no *.db file present");
             }
             if (dbFilePaths.size() > 1) {
-                auto dbFileNames
-#if defined(__GNUC__) && !defined(__clang__)
+                const auto dbFileNames
                     = dbFilePaths | std::views::transform([](const std::filesystem::path &path) { return std::string(path.filename()); });
-#else
-                    = [&dbFilePaths] {
-                          auto res = std::vector<std::string>();
-                          res.reserve(dbFilePaths.size());
-                          for (const auto &path : dbFilePaths) {
-                              res.emplace_back(path.filename());
-                          }
-                          return res;
-                      }();
-#endif
                 throw std::runtime_error(
                     "multiple/ambiguous *.db files present: " + joinStrings<decltype(dbFileNames), std::string>(dbFileNames, ", "));
             }
