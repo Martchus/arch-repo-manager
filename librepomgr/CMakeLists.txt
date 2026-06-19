@@ -111,6 +111,11 @@ if (SYSTEMD_SUPPORT)
     use_pkg_config_module(PKG_CONFIG_MODULES "libsystemd" VISIBILITY PRIVATE)
 endif ()
 
+# find Corrosion to enable Rust-written features
+if (RUST)
+    # https://corrosion-rs.github.io/corrosion/usage.html
+endif ()
+
 # find reflective-rapidjson
 find_package(reflective_rapidjson${CONFIGURATION_PACKAGE_SUFFIX} REQUIRED)
 use_reflective_rapidjson(VISIBILITY PUBLIC)

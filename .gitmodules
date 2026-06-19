@@ -4,3 +4,6 @@
 [submodule "3rdparty/lmdb-safe"]
 	path = 3rdparty/lmdb-safe
 	url = git@github.com:ahupowerdns/lmdb-safe.git
+[submodule "3rdparty/corrosion"]
+	path = 3rdparty/corrosion
+	url = https://github.com/corrosion-rs/corrosion.git
