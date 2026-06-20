@@ -593,7 +593,7 @@ void BuildActionsTests::testConductingBuild()
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "no staging needed: updpkgsums log", "fake updatepkgsums: \n"s, readFile("building/build-data/conduct-build-test/boost/pkg/updpkgsums.log"));
     TESTUTILS_ASSERT_LIKE("no staging needed: build log",
-        "fake makechrootpkg: -c -u -Y .*building/test-cache-dir/x86_64 -r .*chroot-dir/arch-x86_64 -l buildservice --\n"s,
+        "fake makechrootpkg: -c -u -Y .*building/test-cache-dir/x86_64 -r .*chroot-dir/arch-x86_64 -l buildservice -- --nocheck\n"s,
         readFile("building/build-data/conduct-build-test/boost/pkg/build.log"));
     TESTUTILS_ASSERT_LIKE("no staging needed: repo-add log",
         "fake repo-add: --wait-for-lock boost.db.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst boost(-libs)?-1\\.73\\.0-1-x86_64.pkg.tar.zst\n"s,
@@ -763,9 +763,22 @@ void BuildActionsTests::testConductingBuild()
         CPPUNIT_ASSERT_EQUAL_MESSAGE("failure, same as before", BuildActionResult::Failure, m_buildAction->result);
         internalData = internalBuildAction<ConductBuild>();
         const auto &progressByPackage = internalData->m_buildProgress.progressByPackage;
-        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo still attempted", expectedFooError, progressByPackage.at("foo").error);
-        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar attempted now", expectedBarError, progressByPackage.at("bar").error);
-        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz attempted now", expectedBazError, progressByPackage.at("baz").error);
+        const auto &foo = progressByPackage.at("foo");
+        const auto &bar = progressByPackage.at("bar");
+        const auto &baz = progressByPackage.at("baz");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of foo still attempted", expectedFooError, foo.error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of bar attempted now", expectedBarError, bar.error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("build of baz attempted now", expectedBazError, baz.error);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has FOO=123 set via testgroup", "123"s, foo.environment.at("FOO"));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("foo has BAR=456 set via testgroup", "456"s, foo.environment.at("BAR"));
+        CPPUNIT_ASSERT_MESSAGE("foo has not BAZ set from controlgroup", !foo.environment.contains("BAZ"));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("bar has FOO=123 set via testgroup", "123"s, bar.environment.at("FOO"));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("bar has BAR=456 set via testgroup", "456"s, bar.environment.at("BAR"));
+        CPPUNIT_ASSERT_MESSAGE("bar has not BAZ set from controlgroup", !bar.environment.contains("BAZ"));
+        CPPUNIT_ASSERT_MESSAGE("baz has not FOO set from testgroup", !baz.environment.contains("FOO"));
+        CPPUNIT_ASSERT_MESSAGE("baz has not BAR set from testgroup", !baz.environment.contains("BAR"));
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "baz has BAZ=\"value with whitespace\" set via controlgroup", "value with whitespace"s, baz.environment.at("BAZ"));
     }
 
     // conduct build again with all packages/batches, building as far as possible assuming dependency between packages

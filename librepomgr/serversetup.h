@@ -157,6 +157,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         int additionalParsingThreads = -1;
         std::string testFilesDir;
         BuildPresets presets;
+        BuildSettings settings;
         std::unordered_map<std::string, std::vector<std::string>, StringHash, std::equal_to<>> complementaryVariants;
         CppUtilities::TimeSpan buildActionRetention = CppUtilities::TimeSpan::fromDays(14);
         bool loadFilesDbs = false;
@@ -171,7 +172,11 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         bool hasStorage() const;
         void applyConfig(const std::multimap<std::string, std::string> &multimap);
         void readComplementaryVariants(const std::multimap<std::string, std::string> &multimap);
-        void readPresets(const std::string &configFilePath, const std::string &presetsFile);
+        template <typename ConfigType>
+        void readExtraConfig(const std::string &configFilePath, const std::string &relativePath, std::string_view configName, ConfigType &config);
+        void readPresets(const std::string &configFilePath, const std::string &presetsFileRelativePath);
+        void readSettings(const std::string &configFilePath, const std::string &settingsFileRelativePath);
+        const PackageDefaults *findPackageDefaults(const std::string &packageName) const;
         Worker allocateBuildWorker();
         LibPkg::StorageID allocateBuildActionID();
         std::shared_ptr<BuildAction> getBuildAction(BuildActionIdType id);
@@ -190,6 +195,8 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     private:
         std::unordered_map<BuildActionIdType, std::shared_ptr<BuildAction>> m_runningActions;
         std::unordered_map<BuildActionIdType, std::unordered_set<BuildActionIdType>> m_followUpActions;
+        std::unordered_map<std::string, std::string> m_packageGroupByPackageName;
+        std::vector<std::pair<std::regex, std::string>> m_packageGroupByRegex;
         std::unique_ptr<Storage> m_storage;
     } building;
 

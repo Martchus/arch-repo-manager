@@ -1,0 +1,41 @@
+{
+    "packageGroups": [
+        {
+            "name": "mingw-w64-x86_64",
+            "containedPackages": ["mingw-w64-protobuf", "mingw-w64-grpc"],
+            "containedPackagesRegex": ""
+        },
+        {
+            "name": "mingw-w64-i686,x86_64",
+            "containedPackages": [],
+            "containedPackagesRegex": ""
+        },
+        {
+            "name": "broken-tests",
+            "containedPackages": [],
+            "containedPackagesRegex": ""
+        }
+    ],
+    "packageDefaults": {
+        "group:mingw-w64-x86_64": {
+            "makechrootpkgFlags": [],
+            "makepkgFlags": [],
+            "environment": {
+                "MINGW_W64_ARCHS": "x86_64-w64-mingw32"
+            }
+        },
+        "group:mingw-w64-i686,x86_64": {
+            "makechrootpkgFlags": [],
+            "makepkgFlags": [],
+            "environment": {
+                "MINGW_W64_ARCHS": "i686-w64-mingw32 x86_64-w64-mingw32"
+            }
+        },
+        "group:broken-tests": {
+            "makechrootpkgFlags": [],
+            "makepkgFlags": ["--nocheck"],
+            "environment": {
+            }
+        }
+    }
+}

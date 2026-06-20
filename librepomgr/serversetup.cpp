@@ -218,28 +218,81 @@ void ServiceSetup::BuildSetup::readComplementaryVariants(const std::multimap<std
     }
 }
 
-void ServiceSetup::BuildSetup::readPresets(const std::string &configFilePath, const std::string &presetsFileRelativePath)
+template <typename ConfigType>
+void ServiceSetup::BuildSetup::readExtraConfig(
+    const std::string &configFilePath, const std::string &relativePath, std::string_view configName, ConfigType &config)
 {
-    if (presetsFileRelativePath.empty()) {
+    if (relativePath.empty()) {
         return;
     }
-    auto presetsFilePath = presetsFileRelativePath;
+    auto filePath = relativePath;
     try {
-        if (presetsFilePath[0] != '/' && !configFilePath.empty()) {
-            presetsFilePath = std::filesystem::canonical(configFilePath).parent_path() / presetsFileRelativePath;
+        if (filePath[0] != '/' && !configFilePath.empty()) {
+            filePath = std::filesystem::canonical(configFilePath).parent_path() / relativePath;
         }
         ReflectiveRapidJSON::JsonDeserializationErrors errors{};
         errors.throwOn = ReflectiveRapidJSON::JsonDeserializationErrors::ThrowOn::All;
-        presets = BuildPresets::fromJson(readFile(presetsFilePath), &errors);
+        config = ConfigType::fromJson(readFile(filePath), &errors);
     } catch (const ReflectiveRapidJSON::JsonDeserializationError &e) {
-        cerr << Phrases::ErrorMessage << "Unable to deserialize presets file " << presetsFilePath << '\n'
+        cerr << Phrases::ErrorMessage << "Unable to deserialize build " << configName << " file " << filePath << '\n'
              << Phrases::SubMessage << ReflectiveRapidJSON::formatJsonDeserializationError(e) << Phrases::End;
     } catch (const RAPIDJSON_NAMESPACE::ParseResult &e) {
-        cerr << Phrases::ErrorMessage << "Unable to parse presets file " << presetsFilePath << '\n'
+        cerr << Phrases::ErrorMessage << "Unable to parse build " << configName << " file " << filePath << '\n'
              << Phrases::SubMessage << "parse error at " << e.Offset() << ": " << RAPIDJSON_NAMESPACE::GetParseError_En(e.Code()) << Phrases::End;
     } catch (const std::runtime_error &e) {
-        cerr << Phrases::ErrorMessage << "Unable to read presets file " << presetsFilePath << '\n' << Phrases::SubMessage << e.what() << Phrases::End;
+        cerr << Phrases::ErrorMessage << "Unable to read build " << configName << " file " << filePath << '\n'
+             << Phrases::SubMessage << e.what() << Phrases::End;
     }
+}
+
+void ServiceSetup::BuildSetup::readPresets(const std::string &configFilePath, const std::string &presetsFileRelativePath)
+{
+    readExtraConfig(configFilePath, presetsFileRelativePath, "presets", presets);
+}
+
+void ServiceSetup::BuildSetup::readSettings(const std::string &configFilePath, const std::string &settingsFileRelativePath)
+{
+    readExtraConfig(configFilePath, settingsFileRelativePath, "settings", settings);
+    m_packageGroupByPackageName.clear();
+    m_packageGroupByRegex.clear();
+    for (const auto &group : settings.packageGroups) {
+        for (const auto &packageName : group.containedPackages) {
+            m_packageGroupByPackageName[packageName] = "group:" + group.name;
+        }
+        if (!group.containedPackagesRegex.empty()) {
+            try {
+                m_packageGroupByRegex.emplace_back(group.containedPackagesRegex, "group:" + group.name);
+            } catch (const std::regex_error &) {
+                cerr << Phrases::ErrorMessage << "Regex \"" << group.containedPackagesRegex << "\" of package group \"" << group.name
+                     << "\" is invalid and will be ignored.\n";
+            }
+        }
+    }
+}
+
+const PackageDefaults *ServiceSetup::BuildSetup::findPackageDefaults(const std::string &packageName) const
+{
+    const auto &defaults = settings.packageDefaults;
+    if (const auto i = defaults.find(packageName); i != defaults.end()) {
+        return &i->second;
+    }
+    const std::string *groupName = nullptr;
+    if (const auto g = m_packageGroupByPackageName.find(packageName); g != m_packageGroupByPackageName.end()) {
+        groupName = &g->second;
+    } else {
+        for (const auto &[regex, gn] : m_packageGroupByRegex) {
+            if (std::regex_match(packageName, regex)) {
+                groupName = &gn;
+                break;
+            }
+        }
+    }
+    if (groupName) {
+        if (const auto i = defaults.find(*groupName); i != defaults.end()) {
+            return &i->second;
+        }
+    }
+    return nullptr;
 }
 
 void ServiceSetup::WebServerSetup::initSsl()
@@ -564,9 +617,11 @@ void ServiceSetup::loadConfigFiles(bool doFirstTimeSetup)
                     webServer.applyConfig(iniEntry.second);
                 } else if (iniEntry.first == "building") {
                     building.applyConfig(iniEntry.second);
-                    std::string presetsFile;
+                    auto presetsFile = std::string(), settingsFile = std::string();
                     convertValue(iniEntry.second, "presets", presetsFile);
+                    convertValue(iniEntry.second, "settings", settingsFile);
                     building.readPresets(configFilePath, presetsFile);
+                    building.readSettings(configFilePath, settingsFile);
                 } else if (iniEntry.first == "complementary_variants") {
                     building.readComplementaryVariants(iniEntry.second);
                 } else if (startsWith(iniEntry.first, "user/")) {

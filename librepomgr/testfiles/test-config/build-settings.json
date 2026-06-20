@@ -1,0 +1,42 @@
+{
+    "packageGroups": [
+        {
+            "name": "testgroup",
+            "containedPackages": ["foo", "bar"],
+            "containedPackagesRegex": ""
+        },
+        {
+            "name": "controlgroup",
+            "containedPackages": ["baz"],
+            "containedPackagesRegex": ""
+        },
+        {
+            "name": "broken-tests",
+            "containedPackages": [],
+            "containedPackagesRegex": "boost.*"
+        }
+    ],
+    "packageDefaults": {
+        "group:testgroup": {
+            "makechrootpkgFlags": [],
+            "makepkgFlags": [],
+            "environment": {
+                "FOO": "123",
+                "BAR": "456"
+            }
+        },
+        "group:controlgroup": {
+            "makechrootpkgFlags": [],
+            "makepkgFlags": [],
+            "environment": {
+                "BAZ": "value with whitespace"
+            }
+        },
+        "group:broken-tests": {
+            "makechrootpkgFlags": [],
+            "makepkgFlags": ["--nocheck"],
+            "environment": {
+            }
+        }
+    }
+}

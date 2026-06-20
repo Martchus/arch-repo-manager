@@ -75,8 +75,11 @@ struct LIBREPOMGR_EXPORT PackageBuildData : public ReflectiveRapidJSON::JsonSeri
     std::string error;
     std::size_t specifiedIndex = std::numeric_limits<std::size_t>::max();
     bool hasSource = false;
-REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
+
+    // clang-format off
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
     std::optional<PackageConversion> convertFrom;
+    // clang-format on
 };
 
 // clang-format on
@@ -91,10 +94,13 @@ struct LIBREPOMGR_EXPORT BuildPreparation : public ReflectiveRapidJSON::JsonSeri
     std::vector<std::string> warnings;
     std::string error;
     bool manuallyOrdered = false;
-    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2)
-        : std::string debugDb
-        , stagingDebugDb;
+
+    // clang-format off
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
+    std::string debugDb;
+    std::string stagingDebugDb;
     std::vector<std::string> additionalBuildOptions; // options to append to BUILDENV in makepkg.conf
+    // clang-format on
 };
 
 enum class PackageStagingNeeded {
@@ -103,8 +109,28 @@ enum class PackageStagingNeeded {
     No,
 };
 
+struct LIBREPOMGR_EXPORT PackageGroup : public ReflectiveRapidJSON::JsonSerializable<PackageGroup>,
+                                        public ReflectiveRapidJSON::BinarySerializable<PackageGroup, 1> {
+    std::string name;
+    std::set<std::string> containedPackages;
+    std::string containedPackagesRegex;
+};
+
+struct LIBREPOMGR_EXPORT PackageDefaults : public ReflectiveRapidJSON::JsonSerializable<PackageDefaults>,
+                                           public ReflectiveRapidJSON::BinarySerializable<PackageDefaults, 1> {
+    std::vector<std::string> makechrootpkgFlags;
+    std::vector<std::string> makepkgFlags;
+    std::map<std::string, std::string> environment;
+};
+
+struct LIBREPOMGR_EXPORT BuildSettings : public ReflectiveRapidJSON::JsonSerializable<BuildSettings>,
+                                         public ReflectiveRapidJSON::BinarySerializable<BuildSettings, 1> {
+    std::vector<PackageGroup> packageGroups;
+    std::unordered_map<std::string, PackageDefaults> packageDefaults;
+};
+
 struct LIBREPOMGR_EXPORT PackageBuildProgress : public ReflectiveRapidJSON::JsonSerializable<PackageBuildProgress>,
-                                                public ReflectiveRapidJSON::BinarySerializable<PackageBuildProgress, 1> {
+                                                public ReflectiveRapidJSON::BinarySerializable<PackageBuildProgress, 2> {
     bool hasBeenAnyProgressMade() const;
     void addMakepkgFlag(const std::string &flag);
     void resetProgress();
@@ -130,6 +156,11 @@ struct LIBREPOMGR_EXPORT PackageBuildProgress : public ReflectiveRapidJSON::Json
     bool checksumsUpdated = false;
     bool hasSources = false;
     bool addedToRepo = false;
+
+    // clang-format off
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
+    std::map<std::string, std::string> environment;
+    // clang-format on
 };
 
 struct LIBREPOMGR_EXPORT RebuildInfo : public ReflectiveRapidJSON::JsonSerializable<RebuildInfo>,
@@ -153,11 +184,13 @@ struct LIBREPOMGR_EXPORT BuildProgress : public ReflectiveRapidJSON::JsonSeriali
     std::string stagingRepoPath;
     RebuildInfoByPackage producedProvides, removedProvides;
     RebuildInfoByDatabase rebuildList;
-    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2)
-        : std::string targetDebugDbFilePath;
+    // clang-format off
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
+    std::string targetDebugDbFilePath;
     std::string targetDebugRepoPath;
     std::string stagingDebugDbFilePath;
     std::string stagingDebugRepoPath;
+    // clang-format on
 };
 
 struct LIBREPOMGR_EXPORT PackageMovementResult : public ReflectiveRapidJSON::JsonSerializable<PackageMovementResult>,
@@ -165,8 +198,10 @@ struct LIBREPOMGR_EXPORT PackageMovementResult : public ReflectiveRapidJSON::Jso
     std::vector<std::pair<std::string, std::string>> failedPackages;
     std::vector<std::string> processedPackages;
     std::string errorMessage;
-    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2)
-        : std::vector<std::string> processedDebugPackages;
+    // clang-format off
+    REFLECTIVE_RAPIDJSON_AS_OF_VERSION(2):
+    std::vector<std::string> processedDebugPackages;
+    // clang-format on
 };
 
 struct LIBREPOMGR_EXPORT RepositoryProblem : public ReflectiveRapidJSON::JsonSerializable<RepositoryProblem>,

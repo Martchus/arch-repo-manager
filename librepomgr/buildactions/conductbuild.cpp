@@ -497,6 +497,7 @@ void ConductBuild::run()
     auto setupReadLock2 = m_setup.lockToRead();
     for (auto &progressByPackage : m_buildProgress.progressByPackage) {
         const auto &packageName = progressByPackage.first;
+        const auto *packageDefaults = m_setup.building.findPackageDefaults(packageName);
         auto &progress = progressByPackage.second;
         if (progress.buildDirectory.empty()) {
             progress.buildDirectory = m_workingDirectory % '/' % packageName + "/pkg";
@@ -508,10 +509,13 @@ void ConductBuild::run()
             progress.chrootUser = chrootDefaultUser.empty() ? m_setup.building.chrootDefaultUser : chrootDefaultUser;
         }
         if (progress.makechrootpkgFlags.empty()) {
-            progress.makechrootpkgFlags = m_setup.building.makechrootpkgFlags;
+            progress.makechrootpkgFlags = packageDefaults ? packageDefaults->makechrootpkgFlags : m_setup.building.makechrootpkgFlags;
         }
         if (progress.makepkgFlags.empty()) {
-            progress.makepkgFlags = m_setup.building.makepkgFlags;
+            progress.makepkgFlags = packageDefaults ? packageDefaults->makepkgFlags : m_setup.building.makepkgFlags;
+        }
+        if (packageDefaults && progress.environment.empty()) {
+            progress.environment = packageDefaults->environment;
         }
         if (!progress.finished.isNull()) {
             progress.updatedVersion.clear(); // reset as there must not be an old value from a previous run
@@ -1171,7 +1175,11 @@ void ConductBuild::invokeMakechrootpkg(const BatchProcessingSession::SharedPoint
         makechrootpkgFlags.emplace_back(m_globalTestFilesDir + "/:/testfiles");
         makepkgFlags.emplace_back("TEST_FILE_PATH=/testfiles");
     }
-    // -> "sudo …" prefixc to launch build as different user
+    // -> package-specific environment variables
+    for (const auto &[key, value] : packageProgress.environment) {
+        makepkgFlags.emplace_back(argsToString(key, '=', value));
+    }
+    // -> "sudo …" prefix to launch build as different user
     if (!m_sudoUser.empty() && !m_sudoPassword.empty()) {
         sudoArgs = { "sudo", "--user", m_sudoUser, "--stdin" };
     }
