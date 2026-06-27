@@ -1038,7 +1038,7 @@ void PrepareBuild::computeDependencies(WebClient::AurSnapshotQuerySession::Conta
         if (buildData.error.empty()) {
             buildData.error = "no build data available";
         }
-        if (response.is404 && !buildData.convertFrom.has_value()) {
+        if ((response.is404 || (m_localOnly && buildData.error == "download skipped")) && !buildData.convertFrom.has_value()) {
             const auto packageNameParts = LibPkg::PackageNameData::decompose(response.packageName);
             if (packageNameParts.targetPrefix == "mingw-w64-clang-aarch64") {
                 auto &convertFrom = buildData.convertFrom.emplace();
