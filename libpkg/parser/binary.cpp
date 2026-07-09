@@ -362,6 +362,12 @@ void Binary::parseElf(BinaryReader &reader, const std::string_view *fileContent)
     case 0xB7:
         architecture = "aarch64";
         break;
+    case 0xF3:
+        architecture = binaryClass == BinaryClass::Class64Bit ? "riscv64" : "riscv32";
+        break;
+    case 0x102: // LoongArch
+        architecture = binaryClass == BinaryClass::Class64Bit ? "la64" : "la32";
+        break;
     default:
         architecture.clear();
     }
