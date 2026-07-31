@@ -798,8 +798,7 @@ void ConductBuild::enqueueDownloads(const BatchProcessingSession::SharedPointerT
         try {
             buildDirectory = std::filesystem::absolute(packageProgress.buildDirectory);
             std::filesystem::create_directory(buildDirectory);
-            std::filesystem::copy(buildData.sourceDirectory, packageProgress.buildDirectory,
-                std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::recursive);
+            copyDirectoryRecursive(buildData.sourceDirectory, packageProgress.buildDirectory);
         } catch (const std::filesystem::filesystem_error &e) {
             auto writeLock = lockToWrite(lock);
             packageProgress.error = argsToString("unable to prepare build directory: ", e.what());

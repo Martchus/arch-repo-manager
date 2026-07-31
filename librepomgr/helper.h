@@ -11,6 +11,7 @@
 #include <boost/system/error_code.hpp>
 
 #include <algorithm>
+#include <filesystem>
 #include <iostream>
 #include <map>
 #include <regex>
@@ -177,6 +178,50 @@ template <class ListType, class Objects, class Accessor> auto map(const Objects 
 template <class ListType, class Objects> auto names(const Objects &objects)
 {
     return map<ListType, Objects>(objects, [](const auto &object) { return Traits::dereferenceMaybe(object).name; });
+}
+
+/**
+ * \brief Recursively copies a directory (or copies a single file/symlink).
+ * \remarks Overrides any existing files or directories even if they are read-only (as long as the
+ *          current process has the permissions to delete/unlink them).
+ */
+inline void copyDirectoryRecursive(const std::filesystem::path &source, const std::filesystem::path &destination)
+{
+    const auto sourceStat = std::filesystem::status(source);
+    if (std::filesystem::is_directory(sourceStat)) {
+        std::filesystem::create_directories(destination);
+        for (const auto &entry : std::filesystem::recursive_directory_iterator(source, std::filesystem::directory_options::skip_permission_denied)) {
+            const auto &srcPath = entry.path();
+            const auto relative = std::filesystem::relative(srcPath, source);
+            const auto destPath = destination / relative;
+            if (entry.is_directory()) {
+                if (std::filesystem::exists(destPath) && !std::filesystem::is_directory(destPath)) {
+                    std::filesystem::remove_all(destPath);
+                }
+                std::filesystem::create_directories(destPath);
+            } else if (entry.is_symlink()) {
+                if (std::filesystem::exists(destPath) || std::filesystem::is_symlink(destPath)) {
+                    std::filesystem::remove_all(destPath);
+                }
+                std::filesystem::copy_symlink(srcPath, destPath);
+            } else {
+                if (std::filesystem::exists(destPath) || std::filesystem::is_symlink(destPath)) {
+                    std::filesystem::remove_all(destPath);
+                }
+                std::filesystem::copy_file(srcPath, destPath);
+            }
+        }
+        return;
+    }
+    const auto destinationStat = std::filesystem::status(destination);
+    if (std::filesystem::exists(destinationStat) || std::filesystem::is_symlink(destinationStat)) {
+        std::filesystem::remove_all(destination);
+    }
+    if (std::filesystem::is_symlink(sourceStat)) {
+        std::filesystem::copy_symlink(source, destination);
+    } else {
+        std::filesystem::copy_file(source, destination);
+    }
 }
 
 } // namespace LibRepoMgr

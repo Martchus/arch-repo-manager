@@ -1,4 +1,5 @@
 #include "../globallock.h"
+#include "../helper.h"
 #include "../logging.h"
 #include "../serversetup.h"
 
@@ -9,6 +10,8 @@
 #include <cppunit/TestFixture.h>
 #include <cppunit/extensions/HelperMacros.h>
 
+#include <filesystem>
+#include <fstream>
 #include <thread>
 
 using namespace std;
@@ -23,11 +26,13 @@ class UtilsTests : public TestFixture {
     CPPUNIT_TEST(testGlobalLock);
     CPPUNIT_TEST(testGlobalLockAsync);
     CPPUNIT_TEST(testLockTable);
+    CPPUNIT_TEST(testCopyDirectoryRecursive);
     CPPUNIT_TEST_SUITE_END();
 
     void testGlobalLock();
     void testGlobalLockAsync();
     void testLockTable();
+    void testCopyDirectoryRecursive();
 
 public:
     UtilsTests();
@@ -125,4 +130,78 @@ void UtilsTests::testLockTable()
     lockTable.second.unlock();
     locks.clear(); // should free up all locks now
     CPPUNIT_ASSERT_EQUAL_MESSAGE("read lock cleared", 0_st, lockTable.first->size());
+}
+
+void UtilsTests::testCopyDirectoryRecursive()
+{
+    const auto tempDir = std::filesystem::temp_directory_path();
+    const auto srcDir = tempDir / "librepomgr-test-copy-src";
+    const auto destDir = tempDir / "librepomgr-test-copy-dest";
+
+    // clean up any leftovers
+    std::filesystem::remove_all(srcDir);
+    std::filesystem::remove_all(destDir);
+
+    // create source directory structure
+    std::filesystem::create_directories(srcDir / "subdir");
+
+    // create a regular file in source
+    const auto srcFile1 = srcDir / "file1.txt";
+    std::ofstream(srcFile1) << "Hello, World!";
+
+    // create a read-only file in source
+    const auto srcFile2 = srcDir / "subdir/file2.txt";
+    std::ofstream(srcFile2) << "Read only source";
+    std::filesystem::permissions(
+        srcFile2, std::filesystem::perms::owner_read | std::filesystem::perms::group_read | std::filesystem::perms::others_read);
+
+    // copy using helper
+    copyDirectoryRecursive(srcDir, destDir);
+
+    // verify files copied correctly
+    const auto destFile1 = destDir / "file1.txt";
+    const auto destFile2 = destDir / "subdir/file2.txt";
+    CPPUNIT_ASSERT(std::filesystem::exists(destFile1));
+    CPPUNIT_ASSERT(std::filesystem::exists(destFile2));
+
+    // verify content of destFile1
+    auto ifs1 = std::ifstream(destFile1);
+    auto content1 = std::string((std::istreambuf_iterator<char>(ifs1)), std::istreambuf_iterator<char>());
+    CPPUNIT_ASSERT_EQUAL(std::string("Hello, World!"), content1);
+
+    // verify content of destFile2
+    auto ifs2 = std::ifstream(destFile2);
+    auto content2 = std::string((std::istreambuf_iterator<char>(ifs2)), std::istreambuf_iterator<char>());
+    CPPUNIT_ASSERT_EQUAL(std::string("Read only source"), content2);
+
+    // verify overwriting of read-only files
+    // note: Since destFile2 was copied from a read-only source file, it has been created as read-only.
+    //       Modify the source file to contain something else, make it writable first to be able to modify,
+    //       then read-only again.
+    std::filesystem::permissions(srcFile2, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+    std::ofstream(srcFile2, std::ios::trunc) << "Modified read only source";
+    std::filesystem::permissions(
+        srcFile2, std::filesystem::perms::owner_read | std::filesystem::perms::group_read | std::filesystem::perms::others_read);
+
+    // modify destFile1 as well to make sure we overwrite a writable file as well
+    std::ofstream(srcFile1, std::ios::trunc) << "Modified Hello!";
+
+    // run copyDirectoryRecursive again, this must overwrite destFile2 (which is read-only)
+    // without throwing a permission denied error!
+    CPPUNIT_ASSERT_NO_THROW(copyDirectoryRecursive(srcDir, destDir));
+
+    // verify contents again
+    auto ifs1_mod = std::ifstream(destFile1);
+    auto content1_mod = std::string((std::istreambuf_iterator<char>(ifs1_mod)), std::istreambuf_iterator<char>());
+    CPPUNIT_ASSERT_EQUAL(std::string("Modified Hello!"), content1_mod);
+
+    auto ifs2_mod = std::ifstream(destFile2);
+    auto content2_mod = std::string((std::istreambuf_iterator<char>(ifs2_mod)), std::istreambuf_iterator<char>());
+    CPPUNIT_ASSERT_EQUAL(std::string("Modified read only source"), content2_mod);
+
+    // clean up
+    std::filesystem::permissions(srcFile2, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+    std::filesystem::permissions(destFile2, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+    std::filesystem::remove_all(srcDir);
+    std::filesystem::remove_all(destDir);
 }

@@ -645,7 +645,7 @@ void PrepareBuild::fetchMissingBuildData()
                     continue;
                 }
                 filesystem::create_directories(buildData.sourceDirectory);
-                filesystem::copy(buildData.originalSourceDirectory, buildData.sourceDirectory, std::filesystem::copy_options::recursive);
+                copyDirectoryRecursive(buildData.originalSourceDirectory, buildData.sourceDirectory);
 
             } catch (const filesystem::filesystem_error &e) {
                 multiSession->addResponse(WebClient::AurSnapshotResult{ .packageName = packageName,
