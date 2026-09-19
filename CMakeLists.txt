@@ -12,6 +12,10 @@ set(META_VERSION_MINOR 0)
 set(META_VERSION_PATCH 4)
 set(META_VERSION_EXACT_SONAME ON)
 
+# use c++2b for std::move_only_function
+set(META_CXX_STANDARD "any")
+list(APPEND META_PUBLIC_COMPILE_OPTIONS "-std=c++2b")
+
 project(${META_PROJECT_NAME})
 
 # allow using non-default configuration
