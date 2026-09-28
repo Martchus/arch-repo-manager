@@ -192,6 +192,13 @@ void ParserTests::testParsingPackageName()
     CPPUNIT_ASSERT_EQUAL(""sv, debugPackage.vcsSuffix);
     CPPUNIT_ASSERT_EQUAL(true, debugPackage.isDebugPackage);
     CPPUNIT_ASSERT_EQUAL("android-x86-64-qt6-base-debug"s, debugPackage.compose());
+    const auto mingwStaticPackage = PackageNameData::decompose("mingw-w64-qt6-tools-static");
+    CPPUNIT_ASSERT_EQUAL("qt6-tools"sv, mingwStaticPackage.actualName);
+    CPPUNIT_ASSERT_EQUAL("mingw-w64"sv, mingwStaticPackage.targetPrefix);
+    CPPUNIT_ASSERT_EQUAL("static"sv, mingwStaticPackage.vcsSuffix);
+    CPPUNIT_ASSERT_EQUAL(false, mingwStaticPackage.isDebugPackage);
+    CPPUNIT_ASSERT_EQUAL("mingw-w64-qt6-tools-static"s, mingwStaticPackage.compose());
+    CPPUNIT_ASSERT_EQUAL("mingw-w64-static"s, mingwStaticPackage.variant());
 }
 
 void ParserTests::testParsingConfig()
