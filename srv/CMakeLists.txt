@@ -48,7 +48,9 @@ set(IMG_FILES
     static/img/icon/cogs-white.svg
     static/img/icon/console-line-white.svg
     static/img/icon/table-refresh.svg
-    static/img/icon/graph.svg)
+    static/img/icon/graph.svg
+    static/img/icon/eye.svg
+    static/img/icon/factory.svg)
 set(CMAKE_MODULE_FILES cmake/modules/SystemdService.cmake)
 set(CMAKE_TEMPLATE_FILES cmake/templates/systemd.service.in cmake/templates/sysusers.conf.in
                          cmake/templates/tmpfiles.conf.in)

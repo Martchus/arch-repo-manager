@@ -194,6 +194,17 @@
     height: 16px;
     background-size: 16px 16px;
 }
+.icon-link-small span {
+    width: 13px;
+    height: 13px;
+    padding: 3px 8px;
+    background-size: 13px 13px;
+    background-position: center;
+    background-repeat: no-repeat;
+    vertical-align: text-bottom;
+    opacity: 70%;
+    float: right;
+}
 .icon-magnify {
     background-image: url(../img/icon/magnify.svg);
 }
@@ -226,6 +237,12 @@
 }
 .icon-graph {
     background-image: url(../img/icon/graph.svg);
+}
+.icon-eye {
+    background-image: url(../img/icon/eye.svg);
+}
+.icon-factory {
+    background-image: url(../img/icon/factory.svg);
 }
 
 /* actions shown on top-right corner of build actions and build action details */

@@ -795,11 +795,13 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
     inputElement.value = packageName;
     const labelElement = document.createElement('label');
     labelElement.htmlFor = id;
+    const additionalElements = [];
     if (newVersion && newPackageName) {
         const packageNameLink = document.createElement('a');
+        const encodedPackageName = encodeURIComponent(newPackageName);
         let from = newVersion.db;
         if (newVersion.db === 'aur') {
-            packageNameLink.href = 'https://aur.archlinux.org/packages/' + encodeURIComponent(newPackageName);
+            packageNameLink.href = 'https://aur.archlinux.org/packages/' + encodedPackageName;
             packageNameLink.target = '_blank';
             from = 'AUR';
         } else {
@@ -821,12 +823,27 @@ function renderUpdateInfoWithCheckbox(id, packageName, newPackageName, versionIn
             ('Build date of old version: ') + GenericRendering.formatTimeAgoStringWithDate(oldVersion.buildDate),
         ];
         labelElement.title = tooltipLines.join('\n');
+        if (from === 'AUR') {
+            const historyLink = CustomRendering.renderIconLink(
+                'factory', newVersion, undefined, "View history on AUR",
+                "https://aur.archlinux.org/cgit/aur.git/log/?h=" + encodedPackageName
+            );
+            historyLink.target = '_blank';
+            historyLink.classList.add('icon-link-small');
+            const sourcesLink = CustomRendering.renderIconLink(
+                'eye', newVersion, undefined, "View sources on AUR",
+                "https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=" + encodedPackageName
+            );
+            sourcesLink.target = '_blank';
+            sourcesLink.classList.add('icon-link-small');
+            additionalElements.push(historyLink, sourcesLink);
+        }
     } else if (newPackageName && packageName !== newPackageName) {
         labelElement.appendChild(document.createTextNode(packageName + ' (' + newPackageName + '): ' + versionInfo));
     } else {
         labelElement.appendChild(document.createTextNode(packageName + ': ' + versionInfo));
     }
-    return [inputElement, labelElement];
+    return [...additionalElements, inputElement, labelElement];
 }
 
 function renderPackageList(packageList)
