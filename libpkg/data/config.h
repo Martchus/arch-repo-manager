@@ -59,8 +59,7 @@ struct LIBPKG_EXPORT BuildOrderResult : public ReflectiveRapidJSON::JsonSerializ
 enum BuildOrderOptions {
     None = 0x0, /**< none of the other options enabled */
     IncludeSourceOnlyDependencies = 0x2, /**< whether source-only dependencies should be added the list of resulting packages */
-    IncludeAllDependencies
-    = 0x3, /**< whether *all* dependencies should be added the list of resulting packages (implies IncludeSourceOnlyDependencies) */
+    IncludeAllDependencies = 0x3, /**< whether *all* dependencies should be added the list of resulting packages (implies IncludeSourceOnlyDependencies) */
     ConsiderBuildDependencies = 0x4, /**< whether build dependencies should be taken into account for the topo sort */
 };
 
