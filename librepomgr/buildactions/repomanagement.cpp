@@ -274,6 +274,46 @@ void RemovePackages::handleRepoRemoveResult(
     packageNames.clear();
 }
 
+/*!
+ * \brief Checks whether an "any" package at the specified \a storageLocation is still referenced by any sibling repository.
+ * \remarks Sibling repositories are directories located next to the "any" directory.
+ */
+static bool isAnyPackageReferencedBySiblingRepos(const std::filesystem::path &storageLocation)
+{
+    const auto anyDir = storageLocation.parent_path();
+    if (anyDir.filename() != "any") {
+        return false;
+    }
+    const auto osDir = anyDir.parent_path();
+    auto ec = std::error_code();
+    auto it = std::filesystem::directory_iterator(osDir, ec);
+    if (ec) {
+        return true;
+    }
+    const auto packageFileName = storageLocation.filename();
+    for (; !ec && it != std::filesystem::directory_iterator(); it.increment(ec)) {
+        if (it->path().filename() == "any" || !it->is_directory(ec) || ec) {
+            continue;
+        }
+        const auto candidate = it->path() / packageFileName;
+        if (!std::filesystem::is_symlink(candidate, ec) || ec) {
+            continue;
+        }
+        const auto symlinkTarget = std::filesystem::read_symlink(candidate, ec);
+        if (ec) {
+            continue;
+        }
+        if ((candidate.parent_path() / symlinkTarget).lexically_normal() == storageLocation) {
+            return true;
+        }
+        const auto canonicalTarget = std::filesystem::canonical(candidate, ec);
+        if (!ec && canonicalTarget == storageLocation) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void RemovePackages::movePackagesToArchive(std::vector<std::string> &packageNames, const PackageLocations &packageLocations)
 {
     m_buildAction->log()(Phrases::InfoMessage, "Moving packages to archive directory");
@@ -289,17 +329,20 @@ void RemovePackages::movePackagesToArchive(std::vector<std::string> &packageName
             if (std::filesystem::exists(signatureFile)) {
                 std::filesystem::rename(signatureFile, argsToString(destPath, ".sig"));
             }
-            if (packageLocation.storageLocation.empty()) {
-                continue;
-            }
-            // FIXME: The file at the storage location *might* still be used elsewhere. Better leave that to a repo cleanup task (to be implemented later).
-            archivePath = packageLocation.storageLocation.parent_path() / "archive";
-            destPath = archivePath / packageLocation.storageLocation.filename();
-            signatureFile = argsToString(packageLocation.storageLocation, ".sig");
-            std::filesystem::create_directory(archivePath);
-            std::filesystem::rename(packageLocation.storageLocation, destPath);
-            if (std::filesystem::exists(signatureFile)) {
-                std::filesystem::rename(signatureFile, argsToString(destPath, ".sig"));
+            if (!packageLocation.storageLocation.empty()) {
+                if (isAnyPackageReferencedBySiblingRepos(packageLocation.storageLocation)) {
+                    m_buildAction->log()(ps(Phrases::InfoMessage), "Preserving \"", packageLocation.storageLocation,
+                        "\" as it is still referenced by a sibling repository.");
+                } else {
+                    archivePath = packageLocation.storageLocation.parent_path() / "archive";
+                    destPath = archivePath / packageLocation.storageLocation.filename();
+                    signatureFile = argsToString(packageLocation.storageLocation, ".sig");
+                    std::filesystem::create_directory(archivePath);
+                    std::filesystem::rename(packageLocation.storageLocation, destPath);
+                    if (std::filesystem::exists(signatureFile)) {
+                        std::filesystem::rename(signatureFile, argsToString(destPath, ".sig"));
+                    }
+                }
             }
             ++processedPackageIterator;
         } catch (const std::filesystem::filesystem_error &e) {
@@ -468,46 +511,6 @@ void MovePackages::removePackagesFromSourceDatabaseFile(const MultiSession<void>
             m_buildAction->log()(ps(Phrases::InfoMessage), "Invoking repo-remove within \"", sourceRepoDir, "\" for \"", sourceDbFile,
                 "\", see logfile for details\n");
         });
-}
-
-/*!
- * \brief Checks whether an "any" package at the specified \a storageLocation is still referenced by any sibling repository.
- * \remarks Sibling repositories are directories located next to the "any" directory.
- */
-static bool isAnyPackageReferencedBySiblingRepos(const std::filesystem::path &storageLocation)
-{
-    const auto anyDir = storageLocation.parent_path();
-    if (anyDir.filename() != "any") {
-        return false;
-    }
-    const auto osDir = anyDir.parent_path();
-    auto ec = std::error_code();
-    auto it = std::filesystem::directory_iterator(osDir, ec);
-    if (ec) {
-        return true;
-    }
-    const auto packageFileName = storageLocation.filename();
-    for (; !ec && it != std::filesystem::directory_iterator(); it.increment(ec)) {
-        if (it->path().filename() == "any" || !it->is_directory(ec) || ec) {
-            continue;
-        }
-        const auto candidate = it->path() / packageFileName;
-        if (!std::filesystem::is_symlink(candidate, ec) || ec) {
-            continue;
-        }
-        const auto symlinkTarget = std::filesystem::read_symlink(candidate, ec);
-        if (ec) {
-            continue;
-        }
-        if ((candidate.parent_path() / symlinkTarget).lexically_normal() == storageLocation) {
-            return true;
-        }
-        const auto canonicalTarget = std::filesystem::canonical(candidate, ec);
-        if (!ec && canonicalTarget == storageLocation) {
-            return true;
-        }
-    }
-    return false;
 }
 
 void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child,
