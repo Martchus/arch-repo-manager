@@ -470,6 +470,46 @@ void MovePackages::removePackagesFromSourceDatabaseFile(const MultiSession<void>
         });
 }
 
+/*!
+ * \brief Checks whether an "any" package at the specified \a storageLocation is still referenced by any sibling repository.
+ * \remarks Sibling repositories are directories located next to the "any" directory.
+ */
+static bool isAnyPackageReferencedBySiblingRepos(const std::filesystem::path &storageLocation)
+{
+    const auto anyDir = storageLocation.parent_path();
+    if (anyDir.filename() != "any") {
+        return false;
+    }
+    const auto osDir = anyDir.parent_path();
+    auto ec = std::error_code();
+    auto it = std::filesystem::directory_iterator(osDir, ec);
+    if (ec) {
+        return true;
+    }
+    const auto packageFileName = storageLocation.filename();
+    for (; !ec && it != std::filesystem::directory_iterator(); it.increment(ec)) {
+        if (it->path().filename() == "any" || !it->is_directory(ec) || ec) {
+            continue;
+        }
+        const auto candidate = it->path() / packageFileName;
+        if (!std::filesystem::is_symlink(candidate, ec) || ec) {
+            continue;
+        }
+        const auto symlinkTarget = std::filesystem::read_symlink(candidate, ec);
+        if (ec) {
+            continue;
+        }
+        if ((candidate.parent_path() / symlinkTarget).lexically_normal() == storageLocation) {
+            return true;
+        }
+        const auto canonicalTarget = std::filesystem::canonical(candidate, ec);
+        if (!ec && canonicalTarget == storageLocation) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType processSession, boost::process::v1::child &&child,
     ProcessResult &&result, std::vector<string> &packageNames, PackageLocations &packageLocations)
 {
@@ -500,10 +540,19 @@ void MovePackages::handleRepoRemoveResult(MultiSession<void>::SharedPointerType 
         if (!ok) {
             continue;
         }
-        // delete package within source repo; leave package at storage location because some other repo might still link to it (cleanup action takes care of that)
+        // delete package within source repo; if it is an "any" package, also delete it from storage location if not referenced by any sibling repository
         try {
             std::filesystem::remove(packageLocation.pathWithinRepo);
             std::filesystem::remove(argsToString(packageLocation.pathWithinRepo, ".sig"));
+            if (!packageLocation.storageLocation.empty()) {
+                if (isAnyPackageReferencedBySiblingRepos(packageLocation.storageLocation)) {
+                    m_buildAction->log()(ps(Phrases::InfoMessage), "Preserving \"", packageLocation.storageLocation,
+                        "\" as it is still referenced by a sibling repository.");
+                } else {
+                    std::filesystem::remove(packageLocation.storageLocation);
+                    std::filesystem::remove(argsToString(packageLocation.storageLocation, ".sig"));
+                }
+            }
         } catch (const std::runtime_error &e) {
             ok = false;
             auto error = argsToString("unable to remove from source repo: ", e.what());

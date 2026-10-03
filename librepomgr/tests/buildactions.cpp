@@ -47,6 +47,7 @@ class BuildActionsTests : public TestFixture {
     CPPUNIT_TEST(testPreparingBuild);
     CPPUNIT_TEST(testConductingBuild);
     CPPUNIT_TEST(testRepoCleanup);
+    CPPUNIT_TEST(testMovePackages);
     CPPUNIT_TEST(testBuildServiceCleanup);
     CPPUNIT_TEST_SUITE_END();
 
@@ -62,6 +63,7 @@ public:
     void testPreparingBuild();
     void testConductingBuild();
     void testRepoCleanup();
+    void testMovePackages();
     void testBuildServiceCleanup();
 
 private:
@@ -982,6 +984,117 @@ void BuildActionsTests::testRepoCleanup()
         "x86_64/archive/syncthingtray-0.6.2-1-x86_64.pkg.tar.xz.sig",
     });
     CPPUNIT_ASSERT_EQUAL_MESSAGE("files preserved/archived/deleted", expectedFiles2, presentFiles2);
+}
+
+void BuildActionsTests::testMovePackages()
+{
+    // create a working directory for this test
+    const auto workingDir = std::filesystem::absolute(TestApplication::instance()->workingDirectory()) / "move-packages-test";
+    std::filesystem::remove_all(workingDir);
+    m_setup.workingDirectory = workingDir;
+    m_setup.configFilePaths.emplace_back(std::filesystem::absolute(testFilePath("test-config/server.conf")));
+    m_setup.building.repoAddPath = testFilePath("scripts/fake_repo_add.sh");
+    m_setup.building.repoRemovePath = testFilePath("scripts/fake_repo_add.sh");
+
+    const auto sourceRepoDir = workingDir / "source/os";
+    const auto sourceRepoDirAny = sourceRepoDir / "any";
+    const auto sourceRepoDir64 = sourceRepoDir / "x86_64";
+    const auto sourceRepoDirArm = sourceRepoDir / "aarch64";
+    const auto destRepoDir = workingDir / "dest/os";
+    const auto destRepoDir64 = destRepoDir / "x86_64";
+    const auto destRepoDirArm = destRepoDir / "aarch64";
+    std::filesystem::create_directories(sourceRepoDirAny);
+    std::filesystem::create_directories(sourceRepoDir64);
+    std::filesystem::create_directories(sourceRepoDirArm);
+    std::filesystem::create_directories(destRepoDir64);
+    std::filesystem::create_directories(destRepoDirArm);
+
+    // create package file and signature in source repo "any" directory
+    const auto pkgFileName = "package-foo-1-1-any.pkg.tar.zst"s;
+    const auto sigFileName = "package-foo-1-1-any.pkg.tar.zst.sig"s;
+    const auto anyPkgFile = sourceRepoDirAny / pkgFileName;
+    const auto anySigFile = sourceRepoDirAny / sigFileName;
+    writeFile(anyPkgFile.string(), "dummy package content");
+    writeFile(anySigFile.string(), "dummy signature content");
+
+    // create symlinks in x86_64 and aarch64 pointing to "any"
+    std::filesystem::create_symlink("../any/" + pkgFileName, sourceRepoDir64 / pkgFileName);
+    std::filesystem::create_symlink("../any/" + sigFileName, sourceRepoDir64 / sigFileName);
+    std::filesystem::create_symlink("../any/" + pkgFileName, sourceRepoDirArm / pkgFileName);
+    std::filesystem::create_symlink("../any/" + sigFileName, sourceRepoDirArm / sigFileName);
+
+    // create dummy db files
+    writeFile((sourceRepoDir64 / "source.db").string(), std::string_view());
+    writeFile((sourceRepoDirArm / "source.db").string(), std::string_view());
+    writeFile((destRepoDir64 / "dest.db").string(), std::string_view());
+    writeFile((destRepoDirArm / "dest.db").string(), std::string_view());
+
+    // setup databases
+    initStorage();
+    auto pkg = std::make_shared<LibPkg::Package>();
+    pkg->name = "package-foo";
+    pkg->version = "1-1";
+    pkg->arch = "any";
+
+    auto *const srcDb64 = m_setup.config.findOrCreateDatabase("source"sv, "x86_64"sv);
+    srcDb64->path = sourceRepoDir64 / "source.db";
+    srcDb64->localDbDir = srcDb64->localPkgDir = sourceRepoDir64;
+    srcDb64->updatePackage(pkg);
+
+    auto *const srcDbArm = m_setup.config.findOrCreateDatabase("source"sv, "aarch64"sv);
+    srcDbArm->path = sourceRepoDirArm / "source.db";
+    srcDbArm->localDbDir = srcDbArm->localPkgDir = sourceRepoDirArm;
+    srcDbArm->updatePackage(pkg);
+
+    auto *const destDb64 = m_setup.config.findOrCreateDatabase("dest"sv, "x86_64"sv);
+    destDb64->path = destRepoDir64 / "dest.db";
+    destDb64->localDbDir = destDb64->localPkgDir = destRepoDir64;
+
+    auto *const destDbArm = m_setup.config.findOrCreateDatabase("dest"sv, "aarch64"sv);
+    destDbArm->path = destRepoDirArm / "dest.db";
+    destDbArm->localDbDir = destDbArm->localPkgDir = destRepoDirArm;
+
+    // move package from source@x86_64 to dest@x86_64
+    m_buildAction = std::make_shared<BuildAction>(0, &m_setup);
+    m_buildAction->type = BuildActionType::MovePackages;
+    m_buildAction->flags = static_cast<BuildActionFlagType>(MovePackagesFlags::IgnoreExistingFiles);
+    m_buildAction->sourceDbs = { "source@x86_64" };
+    m_buildAction->destinationDbs = { "dest@x86_64" };
+    m_buildAction->packageNames = { "package-foo" };
+    runBuildAction("move package from x86_64");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("move success 1", BuildActionResult::Success, m_buildAction->result);
+
+    // verify that the package symlink in x86_64 is gone
+    CPPUNIT_ASSERT_MESSAGE("x86_64 symlink removed", !std::filesystem::exists(sourceRepoDir64 / pkgFileName));
+    CPPUNIT_ASSERT_MESSAGE("x86_64 sig symlink removed", !std::filesystem::exists(sourceRepoDir64 / sigFileName));
+
+    // verify that the package in "any" still exists (because aarch64 still references it)
+    CPPUNIT_ASSERT_MESSAGE("any package preserved after first move", std::filesystem::exists(anyPkgFile));
+    CPPUNIT_ASSERT_MESSAGE("any sig preserved after first move", std::filesystem::exists(anySigFile));
+
+    // verify that the destination has received the files
+    CPPUNIT_ASSERT_MESSAGE("dest x86_64 received package", std::filesystem::exists(destRepoDir64 / pkgFileName));
+    CPPUNIT_ASSERT_MESSAGE("dest package in x86_64 is symlink", std::filesystem::is_symlink(destRepoDir64 / pkgFileName));
+    CPPUNIT_ASSERT_MESSAGE("dest any received package", std::filesystem::exists(destRepoDir / "any" / pkgFileName));
+    CPPUNIT_ASSERT_MESSAGE("dest package in any is regular file", std::filesystem::is_regular_file(destRepoDir / "any" / pkgFileName));
+
+    // move package from source@aarch64 to dest@aarch64
+    m_buildAction = std::make_shared<BuildAction>(1, &m_setup);
+    m_buildAction->type = BuildActionType::MovePackages;
+    m_buildAction->flags = static_cast<BuildActionFlagType>(MovePackagesFlags::IgnoreExistingFiles);
+    m_buildAction->sourceDbs = { "source@aarch64" };
+    m_buildAction->destinationDbs = { "dest@aarch64" };
+    m_buildAction->packageNames = { "package-foo" };
+    runBuildAction("move package from aarch64");
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("move success 2", BuildActionResult::Success, m_buildAction->result);
+
+    // verify that the package symlink in aarch64 is gone
+    CPPUNIT_ASSERT_MESSAGE("aarch64 symlink removed", !std::filesystem::exists(sourceRepoDirArm / pkgFileName));
+    CPPUNIT_ASSERT_MESSAGE("aarch64 sig symlink removed", !std::filesystem::exists(sourceRepoDirArm / sigFileName));
+
+    // verify that the package in "any" is now deleted since no sibling references it
+    CPPUNIT_ASSERT_MESSAGE("any package deleted after second move", !std::filesystem::exists(anyPkgFile));
+    CPPUNIT_ASSERT_MESSAGE("any sig deleted after second move", !std::filesystem::exists(anySigFile));
 }
 
 void BuildActionsTests::testBuildServiceCleanup()
