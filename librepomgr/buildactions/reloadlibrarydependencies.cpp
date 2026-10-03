@@ -353,14 +353,20 @@ void ReloadLibraryDependencies::loadPackageInfoFromContents()
                         return false;
                     });
                 if (auto dllIssues = currentPkg.info.processDllsReferencedByImportLibs(std::move(dllsReferencedByImportLibs)); !dllIssues.empty()) {
-                    std::unique_lock<std::mutex> submitWarningLock(submitWarningMutex);
+                    auto submitWarningLock = std::unique_lock<std::mutex>(submitWarningMutex);
                     for (auto &issue : dllIssues) {
                         m_messages.warnings.emplace_back(std::move(issue));
                     }
                 }
                 currentPkg.info.origin = LibPkg::PackageOrigin::PackageContents;
+            } catch (const ArchiveException &e) {
+                auto ec = std::error_code();
+                std::filesystem::remove(currentPkg.path, ec);
+                auto deleteMsg = !ec ? std::string_view(", deleted invalid archive") : std::string_view();
+                auto submitErrorLock = std::unique_lock<std::mutex>(submitErrorMutex);
+                m_messages.errors.emplace_back(currentDb.name % '/' % currentPkg.info.name % ':' % ' ' % e.what() + deleteMsg);
             } catch (const std::runtime_error &e) {
-                std::unique_lock<std::mutex> submitErrorLock(submitErrorMutex);
+                auto submitErrorLock = std::unique_lock<std::mutex>(submitErrorMutex);
                 m_messages.errors.emplace_back(currentDb.name % '/' % currentPkg.info.name % ':' % ' ' + e.what());
             }
         }
