@@ -539,7 +539,7 @@ private:
     boost::filesystem::path m_makeContainerPkgPath;
     boost::filesystem::path m_conversionScriptPath;
     std::vector<std::string> m_pkgbuildsDirs;
-    std::regex m_ignoreLocalPkgbuildsRegex;
+    CppUtilities::Regex m_ignoreLocalPkgbuildsRegex;
     std::unordered_map<std::string, PackageBuildData> m_buildDataByPackage;
     CppUtilities::IniFile::ScopeList m_dbConfig;
     CppUtilities::IniFile::ScopeList m_stagingDbConfig;

@@ -105,22 +105,21 @@ void LibPkg::Database::rebuildDb()
     txn.commit();
 }
 
-void Database::dumpDb(const std::optional<std::regex> &filterRegex)
+void Database::dumpDb(const std::optional<CppUtilities::Regex> &filterRegex)
 {
     std::cout << "db: " << name << '@' << arch << '\n';
     auto txn = m_storage->packages.getROTransaction();
     auto end = txn.end();
     std::cout << "packages (" << txn.size() << "):\n";
     for (auto i = txn.begin(); i != end; ++i) {
-        if (const auto &value = i.value(); !filterRegex.has_value() || std::regex_match(value.name, filterRegex.value())) {
+        if (const auto &value = i.value(); !filterRegex.has_value() || filterRegex->isMatch(value.name)) {
             const auto key = i.getKey().get<LMDBSafe::IDType>();
             std::cout << key << ':' << ' ' << value.name << '\n';
         }
     }
     std::cout << "index (" << txn.size<0>() << "):\n";
     for (auto i = txn.begin<0>(); i != end; ++i) {
-        if (const auto key = i.getKey().get<std::string_view>();
-            !filterRegex.has_value() || std::regex_match(key.cbegin(), key.cend(), filterRegex.value())) {
+        if (const auto key = i.getKey().get<std::string_view>(); !filterRegex.has_value() || filterRegex->isMatch(key)) {
             const auto value = i.getID();
             std::cout << key << ':' << ' ' << value << '\n';
         }

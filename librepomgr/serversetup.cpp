@@ -262,7 +262,7 @@ void ServiceSetup::BuildSetup::readSettings(const std::string &configFilePath, c
         if (!group.containedPackagesRegex.empty()) {
             try {
                 m_packageGroupByRegex.emplace_back(group.containedPackagesRegex, "group:" + group.name);
-            } catch (const std::regex_error &) {
+            } catch (const CppUtilities::RegexException &) {
                 cerr << Phrases::ErrorMessage << "Regex \"" << group.containedPackagesRegex << "\" of package group \"" << group.name
                      << "\" is invalid and will be ignored.\n";
             }
@@ -281,7 +281,7 @@ const PackageDefaults *ServiceSetup::BuildSetup::findPackageDefaults(const std::
         groupName = &g->second;
     } else {
         for (const auto &[regex, gn] : m_packageGroupByRegex) {
-            if (std::regex_match(packageName, regex)) {
+            if (regex.isMatch(packageName)) {
                 groupName = &gn;
                 break;
             }
@@ -996,7 +996,7 @@ int ServiceSetup::dumpDb(std::string_view filterRegex)
     try {
 #endif
         loadConfigFiles(true);
-        config.dumpDb(filterRegex.empty() ? std::nullopt : std::optional(std::regex(filterRegex.begin(), filterRegex.end())));
+        config.dumpDb(filterRegex.empty() ? std::nullopt : std::optional(CppUtilities::Regex(filterRegex)));
 #ifndef CPP_UTILITIES_DEBUG_BUILD
     } catch (const std::exception &e) {
         cerr << Phrases::ErrorMessage << "Exception occurred: " << Phrases::End << "    " << e.what() << Phrases::EndFlush;

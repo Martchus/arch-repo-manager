@@ -6,11 +6,11 @@
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/io/path.h>
 #include <c++utilities/misc/parseerror.h>
+#include <c++utilities/misc/regex.h>
 
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <regex>
 
 using namespace CppUtilities;
 
@@ -121,11 +121,11 @@ int main(int argc, const char *argv[])
     // search databases for relevant packages
     const char *const searchTerm = fileNameArg.firstValue();
     const auto negate = negateArg.isPresent();
-    auto regex = std::optional<std::regex>();
+    auto regex = CppUtilities::Regex();
     if (regexArg.isPresent()) {
         try {
-            regex = std::regex(searchTerm, std::regex::egrep);
-        } catch (const std::regex_error &e) {
+            regex.compile(searchTerm);
+        } catch (const CppUtilities::RegexException &e) {
             std::cerr << "Specified regex is invalid: " << e.what() << std::endl;
             std::exit(3);
         }
@@ -138,7 +138,7 @@ int main(int argc, const char *argv[])
             }
             auto foundOne = false;
             for (const auto &file : pkgInfo->files) {
-                const auto found = regex.has_value() ? std::regex_match(file, regex.value()) : file.find(searchTerm) != std::string::npos;
+                const auto found = regex.isValid() ? regex.isMatch(file) : file.find(searchTerm) != std::string::npos;
                 if (negate) {
                     if (found) {
                         foundOne = true;

@@ -130,7 +130,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         // -> acquire the setup lock for these
         std::string workingDirectory = "building";
         std::vector<std::string> pkgbuildsDirs;
-        std::regex ignoreLocalPkgbuildsRegex;
+        CppUtilities::Regex ignoreLocalPkgbuildsRegex;
         std::string aurDownloaderPath;
         std::string makePkgPath = "makepkg";
         std::string makeChrootPkgPath = "makechrootpkg";
@@ -196,7 +196,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::unordered_map<BuildActionIdType, std::shared_ptr<BuildAction>> m_runningActions;
         std::unordered_map<BuildActionIdType, std::unordered_set<BuildActionIdType>> m_followUpActions;
         std::unordered_map<std::string, std::string> m_packageGroupByPackageName;
-        std::vector<std::pair<std::regex, std::string>> m_packageGroupByRegex;
+        std::vector<std::pair<CppUtilities::Regex, std::string>> m_packageGroupByRegex;
         std::unique_ptr<Storage> m_storage;
     } building;
 

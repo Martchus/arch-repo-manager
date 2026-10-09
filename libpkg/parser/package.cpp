@@ -9,11 +9,11 @@
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
 #include <c++utilities/io/path.h>
+#include <c++utilities/misc/regex.h>
 
 #include <cstring>
 #include <iostream>
 #include <memory>
-#include <regex>
 
 #include <sys/stat.h>
 
@@ -778,16 +778,15 @@ void Package::addInfoFromPkgInfoFile(const string &info)
     parsePkgInfo(info, [this](Package &) { return this; }, true);
 }
 
-static const regex pythonVersionRegex("usr/lib/python(2|3)\\.([0-9]*)(\\..*)?/site-packages");
-static const regex perlVersionRegex("usr/lib/perl5/5\\.([0-9]*)(\\..*)?/vendor_perl");
+static const auto pythonVersionRegex = CppUtilities::Regex("usr/lib/python(2|3)\\.([0-9]*)(\\..*)?/site-packages");
+static const auto perlVersionRegex = CppUtilities::Regex("usr/lib/perl5/5\\.([0-9]*)(\\..*)?/vendor_perl");
 
 void Package::addDepsAndProvidesFromContainedDirectory(std::string_view directoryPath)
 {
     // check for Python modules
-    thread_local auto match = std::match_results<std::string_view::const_iterator>();
-    if (std::regex_match(directoryPath.begin(), directoryPath.end(), match, pythonVersionRegex)) {
-        const auto majorVersion = match[1].str();
-        const auto minorVersion = match[2].str();
+    if (const auto match = pythonVersionRegex.match(directoryPath)) {
+        const auto majorVersion = match[1];
+        const auto minorVersion = match[2];
         const char *const pythonPackage(majorVersion == "3" ? "python" : "python2");
         auto currentVersion = argsToString(majorVersion, '.', minorVersion);
         auto nextVersion = argsToString(majorVersion, '.', stringToNumber<unsigned int>(minorVersion) + 1);
@@ -796,9 +795,9 @@ void Package::addDepsAndProvidesFromContainedDirectory(std::string_view director
     }
 
     // check for Perl modules
-    if (std::regex_match(directoryPath.begin(), directoryPath.end(), match, perlVersionRegex)) {
-        const auto minorVersion = match[1].str();
-        auto currentVersion = "5." + minorVersion;
+    if (const auto match = perlVersionRegex.match(directoryPath)) {
+        const auto minorVersion = match[1];
+        auto currentVersion = argsToString("5.", minorVersion);
         auto nextVersion = "5." + numberToString(stringToNumber<unsigned int>(minorVersion) + 1);
         dependencies.emplace_back("perl", std::move(currentVersion), DependencyMode::GreatherEqual);
         dependencies.emplace_back("perl", std::move(nextVersion), DependencyMode::LessThan);
@@ -1060,25 +1059,22 @@ bool PackageNameData::isVcsPackage() const
 
 PackageNameData PackageNameData::decompose(std::string_view packageName)
 {
-    static constexpr auto targetPrefixBrackets = 5;
-    static const auto packageNameRegex = std::regex(
-        "((lib32|mingw-w64(-(ucrt|clang(-x86_64|-aarch64)?)?)?|android(-(aarch64|x86-64|x86|armv7a-eabi))?|arm-none-"
-        "eabi|aarch64-linux-"
-        "gnu|static-compat|riscv64-linux|avr|psp|wasm)-)?(.*?)((-(cvs|svn|hg|darcs|bzr|git|custom|compat|static|qt\\d+|doc|cli|gui))*)(-debug)?");
+    static const auto packageNameRegex
+        = CppUtilities::Regex("(?:(lib32|mingw-w64(?:-(?:ucrt|clang(?:-x86_64|-aarch64)?)?)?|android(?:-(?:aarch64|x86-64|x86|armv7a-eabi))?|arm-"
+                              "none-eabi|aarch64-linux-gnu|static-compat|riscv64-linux|avr|psp|wasm)-)?(.*?)((?:(?:-(?:cvs|svn|hg|darcs|bzr|git|"
+                              "custom|compat|static|qt\\d+|doc|cli|gui)))*)(?:-(debug))?$");
+    const auto match = packageNameRegex.match(packageName);
     auto data = PackageNameData{};
-    auto match = std::cmatch{};
-    if (!regex_match(packageName.cbegin(), packageName.cend(), match, packageNameRegex)) {
+    if (!match) {
         return data;
     }
-    assert(match.size() == targetPrefixBrackets + 8);
-    static constexpr auto matchToStringView = [](auto regexMatch, std::size_t offset = 0) {
-        return std::string_view(
-            regexMatch.first + offset, static_cast<std::size_t>(regexMatch.length() - static_cast<std::cmatch::difference_type>(offset)));
-    };
-    data.targetPrefix = matchToStringView(match[2]);
-    data.actualName = matchToStringView(match[3 + targetPrefixBrackets]);
-    data.vcsSuffix = match[4 + targetPrefixBrackets].length() ? matchToStringView(match[4 + targetPrefixBrackets], 1) : std::string_view{};
-    data.isDebugPackage = match[7 + targetPrefixBrackets].length() != 0;
+    data.targetPrefix = match.captured(1);
+    data.actualName = match.captured(2);
+    data.vcsSuffix = match.captured(3);
+    data.isDebugPackage = match.hasCaptured(4);
+    if (!data.vcsSuffix.empty()) {
+        data.vcsSuffix = data.vcsSuffix.substr(1);
+    }
     return data;
 }
 

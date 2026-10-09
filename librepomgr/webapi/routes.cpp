@@ -16,11 +16,11 @@
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
+#include <c++utilities/misc/regex.h>
 
 #include <algorithm>
 #include <iostream>
 #include <numeric>
-#include <regex>
 
 using namespace std;
 using namespace CppUtilities;
@@ -297,11 +297,11 @@ void getPackages(const Params &params, ResponseHandler &&handler)
         }
         case Mode::Regex: {
             try {
-                const auto regex = std::regex(name.data(), name.size());
+                const auto regex = CppUtilities::Regex(name);
                 auto basePackage = PackageBase();
                 params.setup.config.packagesByName(
                     visitDb, [&](LibPkg::Database &db, std::string_view packageName, const std::function<StorageID(PackageBase &)> &getPackage) {
-                        if (std::regex_match(packageName.begin(), packageName.end(), regex)) {
+                        if (regex.isMatch(packageName)) {
                             const auto packageID = getPackage(basePackage);
                             if (!packageID) {
                                 cerr << Phrases::ErrorMessage << "Broken index in db \"" << db.name << "\": package \"" << packageName
@@ -314,7 +314,7 @@ void getPackages(const Params &params, ResponseHandler &&handler)
                         }
                         return false;
                     });
-            } catch (const std::regex_error &e) {
+            } catch (const CppUtilities::RegexException &e) {
                 throw BadRequest(argsToString("regex is invalid: ", e.what()));
             }
             break;

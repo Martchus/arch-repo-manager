@@ -621,7 +621,7 @@ void PrepareBuild::fetchMissingBuildData()
         // skip next block if package name matches configured pattern
         auto &lookupPackageName = buildData.convertFrom.has_value() ? buildData.convertFrom->sourcePackage : packageName;
         auto packageNameData = LibPkg::PackageNameData();
-        if (regex_match(lookupPackageName, m_ignoreLocalPkgbuildsRegex)) {
+        if (m_ignoreLocalPkgbuildsRegex.isMatch(lookupPackageName)) {
             goto addAurQuery;
         }
 

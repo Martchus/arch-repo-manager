@@ -50,12 +50,6 @@ DatabaseQuery prepareDatabaseQuery(LogContext &log, const std::vector<Database *
     return query;
 }
 
-static int matchToInt(const std::sub_match<const char *> &match)
-{
-    const auto sv = std::string_view(match.first, static_cast<std::size_t>(match.length()));
-    return stringToNumber<int>(sv);
-}
-
 static CppUtilities::DateTime parseLastModified(LogContext &log, const auto &message, std::string_view dbName, std::string_view dbArch)
 {
     auto lastModified = DateTime();
@@ -63,20 +57,20 @@ static CppUtilities::DateTime parseLastModified(LogContext &log, const auto &mes
     if (lastModifiedHeader != message.cend()) {
         // parse "Last-Modified" header which should be something like "<day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT"
         const auto lastModifiedStr = lastModifiedHeader->value();
-        static const auto lastModifiedPattern = std::regex("..., (\\d\\d) (...) (\\d\\d\\d\\d) (\\d\\d):(\\d\\d):(\\d\\d) GMT");
-        static const auto months = unordered_map<string, int>{ { "Jan", 1 }, { "Feb", 2 }, { "Mar", 3 }, { "Apr", 4 }, { "May", 5 }, { "Jun", 6 },
-            { "Jul", 7 }, { "Aug", 8 }, { "Sep", 9 }, { "Oct", 10 }, { "Nov", 11 }, { "Dec", 12 } };
+        static const auto lastModifiedPattern = CppUtilities::Regex("..., (\\d\\d) (...) (\\d\\d\\d\\d) (\\d\\d):(\\d\\d):(\\d\\d) GMT");
+        static const auto months = std::unordered_map<std::string_view, int>{ { "Jan", 1 }, { "Feb", 2 }, { "Mar", 3 }, { "Apr", 4 }, { "May", 5 },
+            { "Jun", 6 }, { "Jul", 7 }, { "Aug", 8 }, { "Sep", 9 }, { "Oct", 10 }, { "Nov", 11 }, { "Dec", 12 } };
         try {
-            auto match = std::cmatch();
-            if (!std::regex_search(lastModifiedStr.cbegin(), lastModifiedStr.cend(), match, lastModifiedPattern)) {
+            auto match = lastModifiedPattern.match(lastModifiedStr);
+            if (!match.hasMatch()) {
                 throw ConversionException("date/time denotation not in expected format");
             }
             const auto month = months.find(match[2]);
             if (month == months.cend()) {
                 throw ConversionException("month is invalid");
             }
-            lastModified = DateTime::fromDateAndTime(
-                matchToInt(match[3]), month->second, matchToInt(match[1]), matchToInt(match[4]), matchToInt(match[5]), matchToInt(match[6]));
+            lastModified = DateTime::fromDateAndTime(stringToNumber<int>(match[3]), month->second, stringToNumber<int>(match[1]),
+                stringToNumber<int>(match[4]), stringToNumber<int>(match[5]), stringToNumber<int>(match[6]));
         } catch (const ConversionException &e) {
             log(Phrases::WarningMessage, "Unable to parse \"Last-Modified\" header for database ", dbName, '@', dbArch, ": ", e.what(),
                 " (last modification time was \"", string_view(lastModifiedStr.data(), lastModifiedStr.size()), "\")\n");

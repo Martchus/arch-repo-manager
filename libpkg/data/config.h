@@ -10,9 +10,10 @@
 #include <reflective_rapidjson/binary/serializable.h>
 #include <reflective_rapidjson/json/serializable.h>
 
+#include <c++utilities/misc/regex.h>
+
 #include <cstring>
 #include <memory>
-#include <regex>
 #include <set>
 
 namespace LibPkg {
@@ -123,7 +124,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     // storage and caching
     void initStorage(const char *path = "libpkg.db", std::uint32_t maxDbs = 0);
     void rebuildDb();
-    void dumpDb(const std::optional<std::regex> &filterRegex);
+    void dumpDb(const std::optional<CppUtilities::Regex> &filterRegex);
     std::size_t cachedPackages() const;
     void setPackageCacheLimit(std::size_t limit);
     std::unique_ptr<StorageDistribution> &storage();

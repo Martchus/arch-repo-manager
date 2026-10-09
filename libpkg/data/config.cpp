@@ -72,7 +72,7 @@ void LibPkg::Config::rebuildDb()
     aur.rebuildDb();
 }
 
-void Config::dumpDb(const std::optional<std::regex> &filterRegex)
+void Config::dumpDb(const std::optional<CppUtilities::Regex> &filterRegex)
 {
     assert(m_storage != nullptr);
     for (auto &db : databases) {

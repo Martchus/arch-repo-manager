@@ -37,11 +37,11 @@ void ReloadLibraryDependencies::run()
         = typeInfo.settings[static_cast<std::size_t>(ReloadLibraryDependenciesSettings::AdditionalParsingThreads)].param;
     metaInfoLock.unlock();
     const auto &packageExcludeRegexValue = findSetting(packageExcludeRegexSetting);
-    auto packageExcludeRegex = std::regex();
+    auto packageExcludeRegex = CppUtilities::Regex();
     if (!packageExcludeRegexValue.empty()) {
         try {
-            packageExcludeRegex = std::regex(packageExcludeRegexValue);
-        } catch (const std::regex_error &e) {
+            packageExcludeRegex.compile(packageExcludeRegexValue);
+        } catch (const CppUtilities::RegexException &e) {
             reportError(argsToString("configured package exclude regex is invalid: ", e.what()));
             return;
         }
@@ -125,7 +125,7 @@ void ReloadLibraryDependencies::run()
                     return true;
                 }
                 // skip if package should be excluded
-                if (!packageExcludeRegexValue.empty() && std::regex_match(package->name, packageExcludeRegex)) {
+                if (packageExcludeRegex.isMatch(package->name)) {
                     m_messages.notes.emplace_back(db->name % '/' % package->name + ": matches exclude regex");
                     return false;
                 }

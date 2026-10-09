@@ -5,6 +5,7 @@
 #include <c++utilities/conversion/conversionexception.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
+#include <c++utilities/misc/regex.h>
 #include <c++utilities/misc/traits.h>
 
 #include <boost/asio/ip/address.hpp>
@@ -99,14 +100,14 @@ template <> inline void convertValue(const std::multimap<std::string, std::strin
     }
 }
 
-template <> inline void convertValue(const std::multimap<std::string, std::string> &multimap, const std::string &key, std::regex &result)
+template <> inline void convertValue(const std::multimap<std::string, std::string> &multimap, const std::string &key, CppUtilities::Regex &result)
 {
     using namespace CppUtilities::EscapeCodes;
 
     if (const char *const value = getLastValue(multimap, key)) {
         try {
-            result = value;
-        } catch (const std::regex_error &e) {
+            result.compile(value);
+        } catch (const CppUtilities::RegexException &e) {
             std::cerr << Phrases::ErrorMessage << "Specified regex \"" << value << "\" for key \"" << key << "\" is invalid: " << Phrases::End;
             std::cerr << e.what() << '\n';
         }
