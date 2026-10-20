@@ -133,6 +133,7 @@ struct LIBREPOMGR_EXPORT PackageBuildProgress : public ReflectiveRapidJSON::Json
                                                 public ReflectiveRapidJSON::BinarySerializable<PackageBuildProgress, 2> {
     bool hasBeenAnyProgressMade() const;
     void addMakepkgFlag(const std::string &flag);
+    void removeMakepkgFlag(const std::string &flag);
     void resetProgress();
     void resetChrootSettings();
     void continueBuild();

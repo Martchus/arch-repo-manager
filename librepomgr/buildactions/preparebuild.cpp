@@ -26,6 +26,7 @@
 #include <rapidjson/filewritestream.h>
 #include <rapidjson/prettywriter.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 
@@ -47,6 +48,11 @@ void PackageBuildProgress::addMakepkgFlag(const std::string &flag)
     }
 }
 
+void PackageBuildProgress::removeMakepkgFlag(const std::string &flag)
+{
+    std::erase(makepkgFlags, flag);
+}
+
 void PackageBuildProgress::resetProgress()
 {
     checksumsUpdated = false;
@@ -56,11 +62,18 @@ void PackageBuildProgress::resetProgress()
     stagingNeeded = PackageStagingNeeded::Undetermined;
 }
 
+static const std::string &repackageFlag()
+{
+    static const auto f = std::string("--repackage");
+    return f;
+}
+
 void PackageBuildProgress::resetChrootSettings()
 {
     chrootDirectory.clear();
     chrootUser.clear();
     skipChrootUpgrade = skipChrootCleanup = keepPreviousSourceTree = false;
+    removeMakepkgFlag(repackageFlag());
 }
 
 void PackageBuildProgress::continueBuild()
@@ -71,8 +84,7 @@ void PackageBuildProgress::continueBuild()
 void PackageBuildProgress::repackage()
 {
     skipChrootUpgrade = skipChrootCleanup = keepPreviousSourceTree = true;
-    static const auto repackageFlag = std::string("--repackage");
-    addMakepkgFlag(repackageFlag);
+    addMakepkgFlag(repackageFlag());
 }
 
 PrepareBuild::PrepareBuild(ServiceSetup &setup, const std::shared_ptr<BuildAction> &buildAction)
