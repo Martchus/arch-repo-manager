@@ -734,16 +734,21 @@ void PrepareBuild::fetchMissingBuildData()
             if (candidatesIt != m_sourcePackagesByName.end() && !candidatesIt->second.empty()) {
                 const auto &candidates = candidatesIt->second;
                 const CandidateSourcePackage *bestCandidate = nullptr;
-                if (m_matchExistingVersion && !buildData.existingVersion.empty()) {
-                    const auto existingVer = LibPkg::PackageVersion::fromString(buildData.existingVersion);
-                    for (const auto &cand : candidates) {
-                        if (cand.version.compare(existingVer) == LibPkg::PackageVersionComparison::Equal) {
-                            bestCandidate = &cand;
-                            break;
+                if (m_matchExistingVersion) {
+                    if (!buildData.existingVersion.empty()) {
+                        const auto existingVer = LibPkg::PackageVersion::fromString(buildData.existingVersion);
+                        for (const auto &cand : candidates) {
+                            if (cand.version.compare(existingVer) == LibPkg::PackageVersionComparison::Equal) {
+                                bestCandidate = &cand;
+                                break;
+                            }
+                            if (cand.version.upstream == existingVer.upstream && cand.version.package == existingVer.package) {
+                                bestCandidate = &cand;
+                            }
                         }
-                        if (cand.version.upstream == existingVer.upstream && cand.version.package == existingVer.package) {
-                            bestCandidate = &cand;
-                        }
+                    } else {
+                        m_warnings.emplace_back(
+                            argsToString("Unable to match package version of \"", packageName, "\" as no existing version is present."));
                     }
                 }
                 if (!bestCandidate) {
