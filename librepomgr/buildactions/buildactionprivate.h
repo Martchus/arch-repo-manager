@@ -523,6 +523,11 @@ private:
     static void addResultFromSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &packageName, const std::string &srcInfo);
     static void addPackageToLogLine(std::string &logLine, const std::string &packageName);
     void indexSourcePackagesInDestinationRepo();
+    bool copySourcesFromLocalDirectory(WebClient::AurSnapshotQuerySession::SharedPointerType &multiSession, std::vector<std::string> &logLines,
+        const std::string &packageName, const std::string &lookupPackageName, PackageBuildData &buildData, bool &needToGeneratedSrcInfo);
+    bool copySourcesFromSourcePackage(WebClient::AurSnapshotQuerySession::SharedPointerType &multiSession, std::vector<std::string> &logLines,
+        const std::string &packageName, const std::string &lookupPackageName, PackageBuildData &buildData, bool &needToGeneratedSrcInfo,
+        bool &usingSourcePackages);
     void fetchMissingBuildData();
     bool pullFurtherDependencies(const std::vector<LibPkg::Dependency> &dependencies);
     void bumpVersions();
