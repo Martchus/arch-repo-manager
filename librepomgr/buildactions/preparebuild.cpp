@@ -589,12 +589,14 @@ void PrepareBuild::indexSourcePackagesInDestinationRepo()
                 .version = LibPkg::PackageVersion::fromString(version.data(), version.size()),
             });
         } catch (const std::runtime_error &e) {
-            m_warnings.emplace_back(argsToString("Unable to consider source package of destination repository under \"", entry.path(), "\":", e.what()));
+            m_warnings.emplace_back(
+                argsToString("Unable to consider source package of destination repository under \"", entry.path(), "\":", e.what()));
             continue;
         }
     }
     if (ec) {
-        m_warnings.emplace_back(argsToString("Unable to locate source packages of destination repository under \"", m_destinationSrcDirectory, "\": ", ec.message()));
+        m_warnings.emplace_back(
+            argsToString("Unable to locate source packages of destination repository under \"", m_destinationSrcDirectory, "\": ", ec.message()));
     }
 }
 
@@ -752,9 +754,8 @@ void PrepareBuild::fetchMissingBuildData()
                     }
                 }
                 if (!bestCandidate) {
-                    auto newestCandidate = std::ranges::max_element(candidates, [] (const auto &lhs, const auto &rhs) {
-                        return LibPkg::PackageVersion::isNewer(lhs.version.compare(rhs.version));
-                    });
+                    auto newestCandidate = std::ranges::max_element(candidates,
+                        [](const auto &lhs, const auto &rhs) { return LibPkg::PackageVersion::isNewer(lhs.version.compare(rhs.version)); });
                     if (newestCandidate != candidates.end()) {
                         bestCandidate = &(*newestCandidate);
                     }
