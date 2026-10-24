@@ -438,6 +438,47 @@ void BuildActionsTests::testPreparingBuild()
         CPPUNIT_ASSERT_MESSAGE(
             "PKGBUILD for " % pkg + " created", std::filesystem::is_regular_file("building/build-data/prepare-build-test/" % pkg + "/src/PKGBUILD"));
     }
+
+    // test using source packages
+    {
+        coreDb->updatePackage(LibPkg::Package::fromPkgFileName("zstd-1.4.5-1-x86_64.pkg.tar.zst"));
+        const auto srcPkgDir = std::filesystem::path("building/build-data/test-src-pkg/boost");
+        std::filesystem::create_directories(srcPkgDir);
+        std::filesystem::copy_file(
+            "building/build-data/prepare-build-test/boost/src/PKGBUILD", srcPkgDir / "PKGBUILD", std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(
+            "building/build-data/prepare-build-test/boost/src/.SRCINFO", srcPkgDir / ".SRCINFO", std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::create_directories("repos/boost/os/src");
+        const auto tarCommand = "tar -czf repos/boost/os/src/boost-1.73.0-1.src.tar.gz -C building/build-data/test-src-pkg boost";
+        CPPUNIT_ASSERT_EQUAL(0, std::system(tarCommand));
+
+        resetBuildAction();
+        m_buildAction->settings.clear();
+        m_buildAction->type = BuildActionType::PrepareBuild;
+        m_buildAction->directory = "prepare-build-src-pkgs-test";
+        m_buildAction->flags
+            = static_cast<BuildActionFlagType>(PrepareBuildFlags::UseSourcePackages | PrepareBuildFlags::LocalOnly | PrepareBuildFlags::CleanSrcDir);
+        m_buildAction->packageNames = { "boost" };
+        m_buildAction->destinationDbs = { "boost" };
+        runBuildAction("prepare build: use source packages");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("success with use-src-pkgs", BuildActionResult::Success, m_buildAction->result);
+        CPPUNIT_ASSERT_MESSAGE("build preparation present", std::holds_alternative<BuildPreparation>(m_buildAction->resultData));
+        CPPUNIT_ASSERT_MESSAGE("PKGBUILD for boost created from source package",
+            std::filesystem::is_regular_file("building/build-data/prepare-build-src-pkgs-test/boost/src/PKGBUILD"));
+        CPPUNIT_ASSERT_MESSAGE(".SRCINFO for boost created from source package",
+            std::filesystem::is_regular_file("building/build-data/prepare-build-src-pkgs-test/boost/src/.SRCINFO"));
+
+        // test that without UseSourcePackages, LocalOnly fails
+        resetBuildAction();
+        m_buildAction->settings.clear();
+        m_buildAction->type = BuildActionType::PrepareBuild;
+        m_buildAction->directory = "prepare-build-src-pkgs-fail-test";
+        m_buildAction->flags = static_cast<BuildActionFlagType>(PrepareBuildFlags::LocalOnly | PrepareBuildFlags::CleanSrcDir);
+        m_buildAction->packageNames = { "boost" };
+        m_buildAction->destinationDbs = { "boost" };
+        runBuildAction("prepare build: local only without source packages fails");
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("failure without use-src-pkgs", BuildActionResult::Failure, m_buildAction->result);
+    }
 }
 
 static void ensureEmptyDir(const std::filesystem::path &path)

@@ -15,6 +15,7 @@
 #include <c++utilities/conversion/stringbuilder.h>
 #include <c++utilities/conversion/stringconversion.h>
 #include <c++utilities/io/ansiescapecodes.h>
+#include <c++utilities/io/archive.h>
 #include <c++utilities/io/misc.h>
 
 #include <boost/asio/read.hpp>
@@ -116,6 +117,8 @@ void PrepareBuild::run()
     m_pullInComplementaryVariants = flags & PrepareBuildFlags::PullInComplementaryVariants;
     m_continueBuild = flags & PrepareBuildFlags::ContinueBuild;
     m_repackage = flags & PrepareBuildFlags::Repackage;
+    m_useSourcePackages = flags & PrepareBuildFlags::UseSourcePackages;
+    m_matchExistingVersion = flags & PrepareBuildFlags::MatchExistingVersion;
     if (m_forceBumpPackageVersion && m_keepPkgRelAndEpoch) {
         reportError("Can not force-bump pkgrel and keeping it at the same time.");
         return;
@@ -169,6 +172,11 @@ void PrepareBuild::run()
         configReadLock = std::monostate{};
         reportError("A debug DB must not be specified directly as destination DB.");
         return;
+    }
+    if (!destinationDb->localPkgDir.empty()) {
+        m_destinationSrcDirectory = std::filesystem::path(destinationDb->localPkgDir).parent_path() / "src";
+    } else {
+        m_destinationSrcDirectory.clear();
     }
     auto databaseDependencyOrderRes = m_setup.config.computeDatabaseDependencyOrder(*destinationDb);
     if (std::holds_alternative<std::string>(databaseDependencyOrderRes)) {
@@ -330,6 +338,10 @@ void PrepareBuild::run()
     }
 
     // locate PKGBUILDs locally or download them from AUR
+    indexSourcePackagesInDestinationRepo();
+    if (reportAbortedIfAborted()) {
+        return;
+    }
     fetchMissingBuildData();
 }
 
@@ -544,6 +556,48 @@ void PrepareBuild::addResultFromSrcInfo(WebClient::AurSnapshotQuerySession &mult
     multiSession.addResponse(std::move(snapshotResult));
 }
 
+/*!
+ * \brief Indexs available source packages in destination repository if requested.
+ */
+void PrepareBuild::indexSourcePackagesInDestinationRepo()
+{
+    if (!m_useSourcePackages || m_aurOnly) {
+        return;
+    }
+    if (m_destinationSrcDirectory.empty()) {
+        m_warnings.emplace_back("No soure package directory for destination repository configured.");
+        return;
+    }
+
+    auto ec = std::error_code();
+    for (const auto &entry : std::filesystem::directory_iterator(m_destinationSrcDirectory, ec)) {
+        try {
+            const auto status = entry.status();
+            if (!std::filesystem::is_regular_file(status) && !std::filesystem::is_symlink(status)) {
+                continue;
+            }
+            const auto fileName = entry.path().filename().string();
+            if (fileName.find(".src") == std::string::npos || fileName.ends_with(".sig")) {
+                continue;
+            }
+            const auto [name, version, arch] = LibPkg::Package::fileNameComponents(fileName);
+            if (arch != "src") {
+                continue;
+            }
+            m_sourcePackagesByName[std::string(name)].emplace_back(CandidateSourcePackage{
+                .path = entry.path(),
+                .version = LibPkg::PackageVersion::fromString(version.data(), version.size()),
+            });
+        } catch (const std::runtime_error &e) {
+            m_warnings.emplace_back(argsToString("Unable to consider source package of destination repository under \"", entry.path(), "\":", e.what()));
+            continue;
+        }
+    }
+    if (ec) {
+        m_warnings.emplace_back(argsToString("Unable to locate source packages of destination repository under \"", m_destinationSrcDirectory, "\": ", ec.message()));
+    }
+}
+
 void PrepareBuild::fetchMissingBuildData()
 {
     auto multiSession
@@ -551,11 +605,11 @@ void PrepareBuild::fetchMissingBuildData()
     auto snapshotQueries = std::vector<WebClient::AurSnapshotQueryParams>();
 
     // prepare logging
-    auto logLines = std::vector<std::string>{
-        "  -> Generating .SRCINFO for local PKGBUILDs:", "  -> Retrieving sources from AUR:", "  -> Using existing source directories:"
-    };
+    auto logLines = std::vector<std::string>{ "  -> Generating .SRCINFO for local PKGBUILDs:", "  -> Retrieving sources from AUR:",
+        "  -> Using existing source directories:", "  -> Retrieving sources from source packages:" };
     auto needToGeneratedSrcInfo = false;
     auto usingExistingSourceDirectories = false;
+    auto usingSourcePackages = false;
 
     // fetch build data (PKGBUILD, .SRCINFO, ...) for all the packages we want to build
     for (auto &[packageName, buildData] : m_buildDataByPackage) {
@@ -674,6 +728,162 @@ void PrepareBuild::fetchMissingBuildData()
             break;
         }
 
+        // retrieve sources from existing source packages of the destination repository
+        if (!buildData.hasSource && m_useSourcePackages && !m_aurOnly) {
+            const auto candidatesIt = m_sourcePackagesByName.find(lookupPackageName);
+            if (candidatesIt != m_sourcePackagesByName.end() && !candidatesIt->second.empty()) {
+                const auto &candidates = candidatesIt->second;
+                const CandidateSourcePackage *bestCandidate = nullptr;
+                if (m_matchExistingVersion && !buildData.existingVersion.empty()) {
+                    const auto existingVer = LibPkg::PackageVersion::fromString(buildData.existingVersion);
+                    for (const auto &cand : candidates) {
+                        if (cand.version.compare(existingVer) == LibPkg::PackageVersionComparison::Equal) {
+                            bestCandidate = &cand;
+                            break;
+                        }
+                        if (cand.version.upstream == existingVer.upstream && cand.version.package == existingVer.package) {
+                            bestCandidate = &cand;
+                        }
+                    }
+                }
+                if (!bestCandidate) {
+                    auto newestCandidate = std::ranges::max_element(candidates, [] (const auto &lhs, const auto &rhs) {
+                        return LibPkg::PackageVersion::isNewer(lhs.version.compare(rhs.version));
+                    });
+                    if (newestCandidate != candidates.end()) {
+                        bestCandidate = &(*newestCandidate);
+                    }
+                }
+                if (bestCandidate) {
+                    try {
+                        filesystem::create_directories(buildData.sourceDirectory);
+                    } catch (const filesystem::filesystem_error &fileSystemError) {
+                        multiSession->addResponse(WebClient::AurSnapshotResult{
+                            .packageName = packageName,
+                            .errorOutput = std::string(),
+                            .packages = {},
+                            .error = "Unable to make directory " % buildData.sourceDirectory % ": " + fileSystemError.what(),
+                        });
+                        continue;
+                    }
+
+                    auto snapshotFiles = FileMap();
+                    try {
+                        snapshotFiles = extractFiles(bestCandidate->path.string(), [](const char *, const char *, mode_t) { return true; });
+                    } catch (const std::runtime_error &extractionError) {
+                        multiSession->addResponse(WebClient::AurSnapshotResult{
+                            .packageName = packageName,
+                            .errorOutput = std::string(),
+                            .packages = {},
+                            .error = "Unable to extract source package for package " % packageName % ": " + extractionError.what(),
+                        });
+                        continue;
+                    }
+
+                    auto haveSrcFileInfo = false, havePkgbuild = false;
+                    auto srcInfo = std::string();
+                    auto extractionFailed = false;
+
+                    for (const auto &directory : snapshotFiles) {
+                        auto directoryPath = string_view{ directory.first };
+                        if (directoryPath.starts_with(lookupPackageName)) {
+                            directoryPath = directoryPath.substr(lookupPackageName.size());
+                            if (directoryPath.starts_with('/')) {
+                                directoryPath = directoryPath.substr(1);
+                            }
+                        } else if (!directoryPath.empty()) {
+                            continue;
+                        }
+
+                        if (directoryPath.empty()) {
+                            for (const auto &rootFile : directory.second) {
+                                if (rootFile.name == ".SRCINFO") {
+                                    srcInfo = rootFile.content;
+                                    haveSrcFileInfo = true;
+                                } else if (rootFile.name == "PKGBUILD") {
+                                    havePkgbuild = true;
+                                }
+                            }
+                        }
+
+                        // store files in target directory
+                        const auto targetDir = directoryPath.empty() ? buildData.sourceDirectory : (buildData.sourceDirectory % '/' + directoryPath);
+                        try {
+                            filesystem::create_directories(targetDir);
+                        } catch (const filesystem::filesystem_error &fileSystemError) {
+                            multiSession->addResponse(WebClient::AurSnapshotResult{
+                                .packageName = packageName,
+                                .errorOutput = std::string(),
+                                .packages = {},
+                                .error = "Unable to make directory " % targetDir % ": " + fileSystemError.what(),
+                            });
+                            extractionFailed = true;
+                            break;
+                        }
+
+                        for (const auto &file : directory.second) {
+                            const auto targetPath = targetDir % '/' + file.name;
+                            if (file.type == ArchiveFileType::Link) {
+                                try {
+                                    filesystem::create_symlink(file.content, targetPath);
+                                } catch (const filesystem::filesystem_error &fileSystemError) {
+                                    multiSession->addResponse(WebClient::AurSnapshotResult{
+                                        .packageName = packageName,
+                                        .errorOutput = std::string(),
+                                        .packages = {},
+                                        .error = "Unable to make symlink " % targetPath % ": " + fileSystemError.what(),
+                                    });
+                                    extractionFailed = true;
+                                    break;
+                                }
+                                continue;
+                            }
+                            try {
+                                writeFile(targetPath, file.content);
+                                LibPkg::setLastModified(targetPath, file.modificationTime);
+                            } catch (const std::ios_base::failure &failure) {
+                                multiSession->addResponse(WebClient::AurSnapshotResult{
+                                    .packageName = packageName,
+                                    .errorOutput = std::string(),
+                                    .packages = {},
+                                    .error = "Unable to write " % targetPath % ": " + failure.what(),
+                                });
+                                extractionFailed = true;
+                                break;
+                            }
+                        }
+                        if (extractionFailed) {
+                            break;
+                        }
+                    }
+                    if (extractionFailed) {
+                        continue;
+                    }
+
+                    if (!havePkgbuild) {
+                        multiSession->addResponse(WebClient::AurSnapshotResult{
+                            .packageName = packageName,
+                            .errorOutput = std::string(),
+                            .packages = {},
+                            .error = "PKGBUILD is missing in source package for package " + packageName,
+                        });
+                        continue;
+                    }
+
+                    if (haveSrcFileInfo) {
+                        addResultFromSrcInfo(*multiSession, packageName, srcInfo);
+                    } else {
+                        makeSrcInfo(multiSession, buildData.sourceDirectory, packageName);
+                        needToGeneratedSrcInfo = true;
+                        addPackageToLogLine(logLines[0], packageName);
+                    }
+                    buildData.hasSource = true;
+                    usingSourcePackages = true;
+                    addPackageToLogLine(logLines[3], packageName);
+                }
+            }
+        }
+
     addAurQuery:
         // download latest snapshot containing PKGBUILD and .SRCINFO from AUR
         if (!buildData.hasSource) {
@@ -707,6 +917,9 @@ void PrepareBuild::fetchMissingBuildData()
     }
     if (!usingExistingSourceDirectories) {
         logLines[2].clear();
+    }
+    if (!usingSourcePackages) {
+        logLines[3].clear();
     }
     m_buildAction->appendOutput(Phrases::InfoMessage, "Fetching missing build data\n", joinStrings(logLines, string(), true, string(), "\n"));
 }

@@ -522,6 +522,7 @@ private:
         boost::process::v1::child &&child, ProcessResult &&result);
     static void addResultFromSrcInfo(WebClient::AurSnapshotQuerySession &multiSession, const std::string &packageName, const std::string &srcInfo);
     static void addPackageToLogLine(std::string &logLine, const std::string &packageName);
+    void indexSourcePackagesInDestinationRepo();
     void fetchMissingBuildData();
     bool pullFurtherDependencies(const std::vector<LibPkg::Dependency> &dependencies);
     void bumpVersions();
@@ -532,6 +533,11 @@ private:
     void addBatchesToResult(BatchList &&batches, Batch &&cyclicLeftovers);
     void configureBuildProgress(PackageBuildProgress &buildProgress, bool reset = true) const;
     BuildPreparation makeResultData(std::string &&error = std::string());
+
+    struct CandidateSourcePackage {
+        std::filesystem::path path;
+        LibPkg::PackageVersion version;
+    };
 
     std::mutex m_mutex;
     std::string m_workingDirectory;
@@ -545,12 +551,14 @@ private:
     CppUtilities::IniFile::ScopeList m_stagingDbConfig;
     std::unordered_set<std::string> m_baseDbs;
     std::unordered_set<std::string> m_requiredDbs;
+    std::filesystem::path m_destinationSrcDirectory;
     std::string m_targetDbName, m_targetArch, m_stagingDbName, m_debugDbName, m_stagingDebugDbName;
     std::vector<std::string> m_additionalBuildOptions;
     std::vector<std::vector<std::string>> m_batches;
     std::vector<std::string> m_cyclicLeftovers;
     std::vector<std::string> m_warnings;
     std::unordered_set<std::string> m_cleanedSourceDirs;
+    std::unordered_map<std::string, std::vector<CandidateSourcePackage>> m_sourcePackagesByName;
     unsigned int m_aurRetries = 5;
     bool m_forceBumpPackageVersion = false;
     bool m_cleanSourceDirectory = false;
@@ -567,6 +575,8 @@ private:
     bool m_pullInComplementaryVariants = false;
     bool m_continueBuild = false;
     bool m_repackage = false;
+    bool m_useSourcePackages = false;
+    bool m_matchExistingVersion = false;
 };
 
 struct LIBREPOMGR_EXPORT BatchProcessingSession : public MultiSession<std::string> {

@@ -244,6 +244,18 @@ BuildActionMetaInfo::BuildActionMetaInfo()
                     .desc = "Never download packages from the AUR",
                     .param = "local-only",
                 },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::UseSourcePackages),
+                    .name = "Use source packages",
+                    .desc = "Before falling back to downloading from the AUR, retrieve sources from existing source packages of the destination repository (counts as local, use together with the local flag for local-only rebuilds)",
+                    .param = "use-src-pkgs",
+                },
+                BuildActionFlagMetaInfo{
+                    .id = static_cast<BuildActionFlagType>(PrepareBuildFlags::MatchExistingVersion),
+                    .name = "Match existing version",
+                    .desc = "When using source package, match the existing version",
+                    .param = "match-existing-version",
+                },
             },
             .settings = {
                 BuildActionSettingMetaInfo{
