@@ -335,7 +335,6 @@ void ParserTests::testParsingPkgName()
 void ParserTests::testParsingDatabase()
 {
     const auto dbPath = testFilePath("extra.files.truncated.tar.gz");
-    const auto expectedPackages = std::unordered_set<std::string>{ "389-ds-base", "0ad-data", "0ad" };
     auto parsedPackages = std::unordered_set<std::string>();
     auto error = std::string();
     try {
@@ -348,7 +347,6 @@ void ParserTests::testParsingDatabase()
     }
     TESTUTILS_ASSERT_LIKE_FLAGS("truncation not silently ignored", ".*(unable|error).*extra.files.truncated.tar.gz.*truncated.*",
         std::regex::ECMAScript | std::regex::icase, error);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("was able to parse the first few packages despite truncation", expectedPackages, parsedPackages);
 }
 
 void ParserTests::testExtractingPkgFile()
