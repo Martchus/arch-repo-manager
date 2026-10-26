@@ -624,7 +624,10 @@ void BuildActionsTests::testConductingBuild()
     writeFile(progressFile.native(), progressData); // reset "build-progress.json" to clear previous error
     runBuildAction("conduct build without staging");
     CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: success", BuildActionResult::Success, m_buildAction->result);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no result data present", ""s, std::get<std::string>(m_buildAction->resultData));
+    const auto &res = std::get<BuildActionMessages>(m_buildAction->resultData);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no errors present", std::vector<std::string>(), res.errors);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no warnings present", std::vector<std::string>(), res.warnings);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no notes present", std::vector<std::string>(), res.notes);
     internalData = internalBuildAction<ConductBuild>();
     CPPUNIT_ASSERT_MESSAGE("no staging needed: rebuild list empty", internalData->m_buildProgress.rebuildList.empty());
     CPPUNIT_ASSERT_MESSAGE(
@@ -695,7 +698,10 @@ void BuildActionsTests::testConductingBuild()
         writeFile(progressFile.native(), progressData); // reset "build-progress.json" so the package is re-considered
         runBuildAction("conduct build with staging");
         CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: success", BuildActionResult::Success, m_buildAction->result);
-        CPPUNIT_ASSERT_EQUAL_MESSAGE("staging needed: no result data present", ""s, std::get<std::string>(m_buildAction->resultData));
+        const auto &res2 = std::get<BuildActionMessages>(m_buildAction->resultData);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no errors present", std::vector<std::string>(), res2.errors);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no warnings present", std::vector<std::string>(), res2.warnings);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("no staging needed: no notes present", std::vector<std::string>(), res2.notes);
         internalData = internalBuildAction<ConductBuild>();
         const auto &rebuildList = internalData->m_buildProgress.rebuildList;
         const auto rebuildInfoForMisc = rebuildList.find("misc");
