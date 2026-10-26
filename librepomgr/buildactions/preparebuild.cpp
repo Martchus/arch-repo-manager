@@ -173,11 +173,6 @@ void PrepareBuild::run()
         reportError("A debug DB must not be specified directly as destination DB.");
         return;
     }
-    if (!destinationDb->localPkgDir.empty()) {
-        m_destinationSrcDirectory = std::filesystem::path(destinationDb->localPkgDir).parent_path() / "src";
-    } else {
-        m_destinationSrcDirectory.clear();
-    }
     auto databaseDependencyOrderRes = m_setup.config.computeDatabaseDependencyOrder(*destinationDb);
     if (std::holds_alternative<std::string>(databaseDependencyOrderRes)) {
         configReadLock = std::monostate{};
@@ -346,7 +341,7 @@ void PrepareBuild::run()
 }
 
 /*!
- * \brief Populates m_dbConfig (or m_dbStagingConfig if \a forStaging) with the specified \a dbOrder.
+ * \brief Populates m_dbConfig and m_destinationSrcDirectories (or m_dbStagingConfig if \a forStaging) with the specified \a dbOrder.
  */
 void PrepareBuild::populateDbConfig(const std::vector<LibPkg::Database *> &dbOrder, bool forStaging)
 {
@@ -360,6 +355,11 @@ void PrepareBuild::populateDbConfig(const std::vector<LibPkg::Database *> &dbOrd
         }
         if (m_sourceDbs.empty() || m_baseDbs.find(db->name) != m_baseDbs.cend() || (forStaging && endsWith(db->name, "-staging"))) {
             dbConfig.emplace_back(IniFile::Scope(db->name, std::move(scopeData)));
+        }
+        if (!forStaging && !db->localDbDir.empty() && !db->localPkgDir.empty()) {
+            if (auto path = std::filesystem::path(db->localPkgDir).parent_path() / "src"; !std::ranges::contains(m_destinationSrcDirectories, path)) {
+                m_destinationSrcDirectories.emplace_back(std::move(path));
+            }
         }
     }
 }
@@ -564,39 +564,41 @@ void PrepareBuild::indexSourcePackagesInDestinationRepo()
     if (!m_useSourcePackages || m_aurOnly) {
         return;
     }
-    if (m_destinationSrcDirectory.empty()) {
+    if (m_destinationSrcDirectories.empty()) {
         m_warnings.emplace_back("No soure package directory for destination repository configured.");
         return;
     }
 
     auto ec = std::error_code();
-    for (const auto &entry : std::filesystem::directory_iterator(m_destinationSrcDirectory, ec)) {
-        try {
-            const auto status = entry.status();
-            if (!std::filesystem::is_regular_file(status) && !std::filesystem::is_symlink(status)) {
+    for (const auto &dir : m_destinationSrcDirectories) {
+        for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
+            try {
+                const auto status = entry.status();
+                if (!std::filesystem::is_regular_file(status) && !std::filesystem::is_symlink(status)) {
+                    continue;
+                }
+                const auto fileName = entry.path().filename().string();
+                if (fileName.find(".src") == std::string::npos || fileName.ends_with(".sig")) {
+                    continue;
+                }
+                const auto [name, version, arch] = LibPkg::Package::fileNameComponents(fileName);
+                if (arch != "src") {
+                    continue;
+                }
+                m_sourcePackagesByName[std::string(name)].emplace_back(CandidateSourcePackage{
+                    .path = entry.path(),
+                    .version = LibPkg::PackageVersion::fromString(version.data(), version.size()),
+                });
+            } catch (const std::runtime_error &e) {
+                m_warnings.emplace_back(
+                    argsToString("Unable to consider source package of destination repository under \"", entry.path(), "\":", e.what()));
                 continue;
             }
-            const auto fileName = entry.path().filename().string();
-            if (fileName.find(".src") == std::string::npos || fileName.ends_with(".sig")) {
-                continue;
-            }
-            const auto [name, version, arch] = LibPkg::Package::fileNameComponents(fileName);
-            if (arch != "src") {
-                continue;
-            }
-            m_sourcePackagesByName[std::string(name)].emplace_back(CandidateSourcePackage{
-                .path = entry.path(),
-                .version = LibPkg::PackageVersion::fromString(version.data(), version.size()),
-            });
-        } catch (const std::runtime_error &e) {
-            m_warnings.emplace_back(
-                argsToString("Unable to consider source package of destination repository under \"", entry.path(), "\":", e.what()));
-            continue;
         }
-    }
-    if (ec) {
-        m_warnings.emplace_back(
-            argsToString("Unable to locate source packages of destination repository under \"", m_destinationSrcDirectory, "\": ", ec.message()));
+        if (ec) {
+            m_warnings.emplace_back(
+                argsToString("Unable to locate source packages of destination repository under \"", dir, "\": ", ec.message()));
+        }
     }
 }
 

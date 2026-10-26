@@ -556,7 +556,7 @@ private:
     CppUtilities::IniFile::ScopeList m_stagingDbConfig;
     std::unordered_set<std::string> m_baseDbs;
     std::unordered_set<std::string> m_requiredDbs;
-    std::filesystem::path m_destinationSrcDirectory;
+    std::vector<std::filesystem::path> m_destinationSrcDirectories;
     std::string m_targetDbName, m_targetArch, m_stagingDbName, m_debugDbName, m_stagingDebugDbName;
     std::vector<std::string> m_additionalBuildOptions;
     std::vector<std::vector<std::string>> m_batches;
