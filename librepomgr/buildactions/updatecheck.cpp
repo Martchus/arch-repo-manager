@@ -38,7 +38,7 @@ void UpdateCheck::run()
     std::get<std::shared_lock<std::shared_mutex>>(configReadLock).unlock();
 
     auto buildActionWriteLock = m_setup.building.lockToWrite();
-    m_buildAction->resultData = move(result);
+    m_buildAction->resultData = std::move(result);
     reportSuccess();
 }
 
