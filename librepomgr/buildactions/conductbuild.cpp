@@ -543,7 +543,7 @@ void LibRepoMgr::ConductBuild::readSecrets()
 {
     auto *const secretsFile = m_buildAction->secrets();
     if (!secretsFile) {
-        m_buildAction->log()(Phrases::WarningMessage, "No secrets present all.\n");
+        m_buildAction->log()(Phrases::InfoMessage, "There are no secrets present.\n");
         return;
     }
     if (!secretsFile->hasRootEntry()) {
