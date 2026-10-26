@@ -663,7 +663,7 @@ private:
     };
 
     void readSecrets();
-    [[nodiscard]] std::string locateGlobalConfigPath(const std::string &chrootDir, std::string_view trailingPath) const;
+    [[nodiscard]] std::string locateGlobalConfigPath(const std::string &chrootDir, std::string_view trailingPath);
     void makeMakepkgConfigFile(const std::filesystem::path &makepkgConfigPath);
     void makePacmanConfigFile(
         const std::filesystem::path &pacmanConfigPath, const std::vector<std::pair<std::string, std::multimap<std::string, std::string>>> &dbConfig);
@@ -750,6 +750,7 @@ private:
     std::string m_sourcePackageExtension;
     std::unordered_set<std::string_view> m_relevantPackages;
     std::mutex m_rebuildListMutex;
+    BuildActionMessages m_messages;
     bool m_buildAsFarAsPossible;
     bool m_saveChrootDirsOfFailures;
     bool m_updateChecksums;

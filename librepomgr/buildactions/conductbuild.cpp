@@ -200,11 +200,16 @@ ConductBuild::ConductBuild(ServiceSetup &setup, const std::shared_ptr<BuildActio
 {
 }
 
-[[nodiscard]] std::string ConductBuild::locateGlobalConfigPath(const std::string &chrootDir, std::string_view trailingPath) const
+[[nodiscard]] std::string ConductBuild::locateGlobalConfigPath(const std::string &chrootDir, std::string_view trailingPath)
 {
     const auto start = (chrootDir.empty() ? m_setup.building.chrootDir : chrootDir) % "/config-";
     const auto path = std::filesystem::path(start % m_buildPreparation.targetDb % '-' % m_buildPreparation.targetArch + trailingPath);
-    if (std::filesystem::exists(path)) {
+    auto ec = std::error_code();
+    const auto exists = std::filesystem::exists(path, ec);
+    if (ec) {
+        m_messages.warnings.emplace_back(argsToString("Unable to determine whether \"", path, "\" exists: ", ec.message()));
+    }
+    if (exists) {
         // return repository-specific path if it exists
         return path.string();
     }
@@ -1823,6 +1828,7 @@ void ConductBuild::checkBuildErrors(BatchProcessingSession::ContainerType &&fail
     }
 
     auto buildActionsWriteLock = m_setup.building.lockToWrite();
+    m_buildAction->resultData = std::move(m_messages);
     reportSuccess();
 }
 
