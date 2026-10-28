@@ -637,7 +637,7 @@ bool PrepareBuild::copySourcesFromLocalDirectory(WebClient::AurSnapshotQuerySess
                 .errorOutput = std::string(),
                 .packages = {},
                 .error = "Unable to copy files from PKGBUILDs directory " % pkgbuildsDir % " to " % buildData.sourceDirectory % ": " + e.what() });
-            continue;
+            return false;
         }
         makeSrcInfo(multiSession, buildData.sourceDirectory, packageName);
         needToGeneratedSrcInfo = true;
