@@ -596,8 +596,7 @@ void PrepareBuild::indexSourcePackagesInDestinationRepo()
             }
         }
         if (ec) {
-            m_warnings.emplace_back(
-                argsToString("Unable to locate source packages of destination repository under \"", dir, "\": ", ec.message()));
+            m_warnings.emplace_back(argsToString("Unable to locate source packages of destination repository under \"", dir, "\": ", ec.message()));
         }
     }
 }
