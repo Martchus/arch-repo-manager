@@ -1503,8 +1503,17 @@ void ConductBuild::addPackageToRepo(
     try {
         auto anyRepoPath = std::filesystem::path();
         const auto sourceRepoPath = std::filesystem::path(argsToString(buildResult.repoPath, "/../src/"));
+        const auto sourceDestPath = sourceRepoPath / sourcePackageName;
         std::filesystem::create_directories(sourceRepoPath);
-        std::filesystem::copy(sourcePackagePath, sourceRepoPath / sourcePackageName, std::filesystem::copy_options::overwrite_existing);
+        try {
+            std::filesystem::copy(sourcePackagePath, sourceDestPath, std::filesystem::copy_options::overwrite_existing);
+        } catch (const std::filesystem::filesystem_error &e) {
+            // avoid fatal error if the source package already exists but cannot be overridden due to permissions
+            // note: This is more a workaround. Not sure why the version bumping
+            if (e.code() != std::errc::permission_denied || !std::filesystem::exists(sourceDestPath)) {
+                throw;
+            }
+        }
         for (const auto &binaryPackage : binaryPackages) {
             const auto &repoPath = binaryPackage.isDebug ? *buildResult.debugRepoPath : *buildResult.repoPath;
             if (!binaryPackage.isAny) {
