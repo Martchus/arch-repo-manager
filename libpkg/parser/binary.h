@@ -73,7 +73,7 @@ constexpr std::uint64_t VirtualAddressMappingEntry::fileOffsetToVirtualAddress(s
 }
 
 struct LIBPKG_EXPORT VirtualAddressMapping : public std::vector<VirtualAddressMappingEntry> {
-    VirtualAddressMapping();
+    inline VirtualAddressMapping();
     std::uint64_t virtualAddressToFileOffset(std::uint64_t virtualAddress) const;
     std::uint64_t fileOffsetToVirtualAddress(std::uint64_t fileOffset) const;
 };

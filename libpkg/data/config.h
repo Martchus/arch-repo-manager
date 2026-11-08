@@ -134,7 +134,7 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     void discardDatabases();
 
     // computions
-    Status computeStatus() const;
+    inline Status computeStatus() const;
     BuildOrderResult computeBuildOrder(const std::vector<std::string> &dependencyDenotations, BuildOrderOptions options);
     LicenseResult computeLicenseInfo(const std::vector<std::string> &dependencyDenotations);
     std::variant<std::vector<Database *>, std::string> computeDatabaseDependencyOrder(Database &database, bool addSelf = true);
@@ -153,8 +153,8 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     // packages search
     static std::pair<std::string_view, std::string_view> parseDatabaseDenotation(std::string_view databaseDenotation);
     static std::tuple<std::string_view, std::string_view, std::string_view> parsePackageDenotation(std::string_view packageDenotation);
-    std::vector<PackageSearchResult> findPackages(std::string_view packageDenotation, std::size_t limit = std::numeric_limits<std::size_t>::max());
-    std::vector<PackageSearchResult> findPackages(
+    inline std::vector<PackageSearchResult> findPackages(std::string_view packageDenotation, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    inline std::vector<PackageSearchResult> findPackages(
         std::string_view dbName, std::string_view dbArch, std::string_view packageName, std::size_t limit = std::numeric_limits<std::size_t>::max());
     std::vector<PackageSearchResult> findPackages(std::tuple<std::string_view, std::string_view, std::string_view> dbAndPackageName,
         std::size_t limit = std::numeric_limits<std::size_t>::max());

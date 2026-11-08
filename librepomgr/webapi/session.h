@@ -35,7 +35,7 @@ public:
         const char *localFilePath, boost::beast::string_view mimeType, boost::beast::string_view contentDisposition, std::string_view urlPath);
     void close();
     const Request &request() const;
-    void assignEmptyRequest();
+    inline void assignEmptyRequest();
     boost::asio::ip::tcp::socket &socket();
     void received(boost::system::error_code ec, std::size_t bytesTransferred);
     void responded(boost::system::error_code ec, std::size_t bytesTransferred, bool shouldClose);

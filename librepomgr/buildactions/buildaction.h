@@ -226,12 +226,12 @@ struct LIBREPOMGR_EXPORT BuildActionBase : public ReflectiveRapidJSON::JsonSeria
                                            public ReflectiveRapidJSON::BinarySerializable<BuildActionBase, 1> {
     using IdType = BuildActionIdType;
     static constexpr IdType invalidId = std::numeric_limits<BuildActionBase::IdType>::max();
-    explicit BuildActionBase(IdType id = invalidId);
+    inline explicit BuildActionBase(IdType id = invalidId);
 
-    bool isScheduled() const;
-    bool isExecuting() const;
-    bool isDone() const;
-    bool hasSucceeded() const;
+    inline bool isScheduled() const;
+    inline bool isExecuting() const;
+    inline bool isDone() const;
+    inline bool hasSucceeded() const;
 
     IdType id;
     BuildActionType type = BuildActionType::Invalid;
@@ -274,20 +274,20 @@ public:
     BuildAction &operator=(BuildAction &&other);
     ~BuildAction();
     static bool haveSucceeded(const std::vector<std::shared_ptr<BuildAction>> &buildActions);
-    bool isAborted() const;
+    inline bool isAborted() const;
     const std::atomic_bool &aborted() const;
     LibPkg::StorageID start(ServiceSetup &setup, std::unique_ptr<Io::PasswordFile> &&secrets);
     void assignStartAfter(const std::vector<std::shared_ptr<BuildAction>> &startsAfterBuildActions);
     void abort(bool hasBuildLock = false);
     void acquireToWrite(std::string &&lockName, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback);
     void appendOutput(std::string_view output);
-    void appendOutput(std::string &&output);
+    inline void appendOutput(std::string &&output);
     template <typename... Args> void appendOutput(Args &&...args);
     template <typename... Args> void appendOutput(CppUtilities::EscapeCodes::Phrases phrase, Args &&...args);
     LogContext &log();
     void setStopHandler(std::function<void(void)> &&stopHandler);
     void setConcludeHandler(std::function<void(void)> &&concludeHandler);
-    std::shared_ptr<BuildProcessSession> findBuildProcess(const std::string &filePath);
+    inline std::shared_ptr<BuildProcessSession> findBuildProcess(const std::string &filePath);
     std::shared_ptr<BuildProcessSession> makeBuildProcess(
         std::string &&displayName, std::string &&logFilePath, ProcessHandler &&handler, AssociatedLocks &&locks = AssociatedLocks());
     void terminateOngoingBuildProcesses();

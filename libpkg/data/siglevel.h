@@ -45,13 +45,13 @@ namespace LibPkg {
 
 struct LIBPKG_EXPORT SignatureLevelConfig : public ReflectiveRapidJSON::JsonSerializable<SignatureLevelConfig>,
                                             public ReflectiveRapidJSON::BinarySerializable<SignatureLevelConfig> {
-    explicit SignatureLevelConfig();
-    explicit SignatureLevelConfig(SignatureLevel levelForAllScopes);
-    explicit SignatureLevelConfig(SignatureLevel levelForDbScope, SignatureLevel levelForPackageScope);
+    inline explicit SignatureLevelConfig();
+    inline explicit SignatureLevelConfig(SignatureLevel levelForAllScopes);
+    inline explicit SignatureLevelConfig(SignatureLevel levelForDbScope, SignatureLevel levelForPackageScope);
     static SignatureLevelConfig fromString(std::string_view str);
     std::string toString() const;
-    bool isValid() const;
-    bool operator==(const SignatureLevelConfig &other) const;
+    inline bool isValid() const;
+    inline bool operator==(const SignatureLevelConfig &other) const;
 
     SignatureLevel databaseScope = SignatureLevel::Default;
     SignatureLevel packageScope = SignatureLevel::Default;

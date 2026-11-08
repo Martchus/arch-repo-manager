@@ -29,8 +29,8 @@ struct ServiceSetup;
 namespace WebAPI {
 
 struct LIBREPOMGR_EXPORT BadRequest : std::runtime_error {
-    explicit BadRequest(const char *message);
-    explicit BadRequest(const std::string &message);
+    inline explicit BadRequest(const char *message);
+    inline explicit BadRequest(const std::string &message);
 };
 
 inline BadRequest::BadRequest(const char *message)
@@ -53,7 +53,7 @@ struct LIBREPOMGR_EXPORT Url {
     static std::vector<std::string_view> splitParams(std::string_view joinedParams);
     void populateParams(const std::vector<std::string_view> &paramParts);
     bool hasFlag(std::string_view paramName) const;
-    bool hasPrettyFlag() const;
+    inline bool hasPrettyFlag() const;
     std::string_view value(std::string_view paramName) const;
     std::vector<std::string> decodeValues(std::string_view paramName) const;
     template <typename Number> Number asNumber(std::string_view paramName, Number def = Number()) const;
@@ -84,8 +84,8 @@ inline bool Url::hasPrettyFlag() const
 }
 
 struct LIBREPOMGR_EXPORT Params {
-    Params(ServiceSetup &setup, Session &session);
-    Params(ServiceSetup &setup, Session &session, Url &&target);
+    inline Params(ServiceSetup &setup, Session &session);
+    inline Params(ServiceSetup &setup, Session &session, Url &&target);
     ServiceSetup &setup;
     Session &session;
     Url target;

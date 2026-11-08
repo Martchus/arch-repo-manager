@@ -32,7 +32,7 @@ struct LIBPKG_EXPORT PackageAmendment {
     /// \brief Sets pkgver to the existing version.
     bool setUpstreamVersion = false;
 
-    bool isEmpty() const;
+    inline bool isEmpty() const;
 };
 
 struct LIBPKG_EXPORT AmendedVersions {

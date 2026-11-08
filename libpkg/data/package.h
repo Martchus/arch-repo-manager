@@ -85,18 +85,18 @@ enum class DependencyMode {
 struct LIBPKG_EXPORT Dependency : public ReflectiveRapidJSON::JsonSerializable<Dependency>,
                                   public ReflectiveRapidJSON::BinarySerializable<Dependency> {
     explicit Dependency() = default;
-    explicit Dependency(const std::string &name, const std::string &version = std::string(), DependencyMode mode = DependencyMode::Any,
+    inline explicit Dependency(const std::string &name, const std::string &version = std::string(), DependencyMode mode = DependencyMode::Any,
         const std::string &description = std::string());
-    explicit Dependency(std::string &&name, std::string &&version = std::string(), DependencyMode mode = DependencyMode::Any,
+    inline explicit Dependency(std::string &&name, std::string &&version = std::string(), DependencyMode mode = DependencyMode::Any,
         std::string &&description = std::string());
     explicit Dependency(const char *denotation, std::size_t denotationSize = std::numeric_limits<std::size_t>::max());
-    explicit Dependency(std::string_view denotation);
-    bool operator==(const Dependency &other) const;
-    bool matches(const Dependency &other) const;
+    inline explicit Dependency(std::string_view denotation);
+    inline bool operator==(const Dependency &other) const;
+    inline bool matches(const Dependency &other) const;
     static bool matches(const DependencyMode mode, const std::string &version1, const std::string &version2);
 
     static Dependency fromString(const char *dependency, std::size_t dependencySize = std::numeric_limits<std::size_t>::max());
-    static Dependency fromString(std::string_view dependency);
+    inline static Dependency fromString(std::string_view dependency);
     std::string toString() const;
 
     std::string name;
@@ -150,8 +150,8 @@ struct LIBPKG_EXPORT DatabaseDependency : public Dependency,
                                           public ReflectiveRapidJSON::JsonSerializable<DatabaseDependency>,
                                           public ReflectiveRapidJSON::BinarySerializable<DatabaseDependency, 1> {
     explicit DatabaseDependency() = default;
-    explicit DatabaseDependency(const std::string &name, const std::string &version, DependencyMode mode);
-    explicit DatabaseDependency(std::string &&name, std::string &&version, DependencyMode mode);
+    inline explicit DatabaseDependency(const std::string &name, const std::string &version, DependencyMode mode);
+    inline explicit DatabaseDependency(std::string &&name, std::string &&version, DependencyMode mode);
     std::unordered_set<StorageID> relevantPackages;
 };
 
@@ -168,7 +168,7 @@ inline DatabaseDependency::DatabaseDependency(const std::string &name, const std
 struct LIBPKG_EXPORT DatabaseLibraryDependency : public ReflectiveRapidJSON::JsonSerializable<DatabaseLibraryDependency>,
                                                  public ReflectiveRapidJSON::BinarySerializable<DatabaseLibraryDependency, 1> {
     explicit DatabaseLibraryDependency() = default;
-    explicit DatabaseLibraryDependency(const std::string &name);
+    inline explicit DatabaseLibraryDependency(const std::string &name);
     std::string name;
     std::unordered_set<StorageID> relevantPackages;
 };
@@ -274,12 +274,12 @@ LIBPKG_EXPORT std::ostream &operator<<(std::ostream &o, const PackageVersionPart
 
 struct LIBPKG_EXPORT PackageVersion : public ReflectiveRapidJSON::JsonSerializable<Dependency> {
     static PackageVersion fromString(const char *versionString, std::size_t versionStringSize);
-    static PackageVersion fromString(const std::string &versionString);
+    inline static PackageVersion fromString(const std::string &versionString);
     static PackageVersionPartComparison compareParts(const std::string &part1, const std::string &part2, bool allowImplicitPkgRel = false);
     static std::string trimPackageVersion(const std::string &versionString);
     PackageVersionComparison compare(const PackageVersion &other) const;
-    static PackageVersionComparison compare(const std::string &versionString1, const std::string &versionString2);
-    static bool isNewer(PackageVersionComparison comparison);
+    inline static PackageVersionComparison compare(const std::string &versionString1, const std::string &versionString2);
+    inline static bool isNewer(PackageVersionComparison comparison);
     std::string toString() const;
 
     std::string epoch;
@@ -385,8 +385,8 @@ struct LIBPKG_EXPORT PackageBase : public ReflectiveRapidJSON::JsonSerializable<
     PackageBase(PackageBase &&other) = default;
     PackageBase &operator=(PackageBase &&other) = default;
 
-    bool isSame(const PackageBase &other) const;
-    bool isDebug() const;
+    inline bool isSame(const PackageBase &other) const;
+    inline bool isDebug() const;
     PackageVersionComparison compareVersion(const PackageBase &other) const;
     std::string_view computeRegularPackageName() const;
     void clear();
@@ -413,7 +413,7 @@ struct LIBPKG_EXPORT Package : public PackageBase,
     static void exportProvides(
         const std::shared_ptr<Package> &package, DependencySet &destinationProvides, std::unordered_set<std::string> &destinationLibProvides);
     std::string computeFileName(const char *extension = "pkg.tar.zst") const;
-    PackageNameData decomposeName() const;
+    inline PackageNameData decomposeName() const;
     void addInfoFromPkgInfoFile(const std::string &info);
     void addDepsAndProvidesFromContainedDirectory(std::string_view directoryPath);
     void addDepsAndProvidesFromContainedFile(
@@ -476,9 +476,9 @@ inline PackageNameData Package::decomposeName() const
 
 struct LIBPKG_EXPORT DependencyDetail : public ReflectiveRapidJSON::JsonSerializable<DependencyDetail>,
                                         public ReflectiveRapidJSON::BinarySerializable<DependencyDetail> {
-    DependencyDetail(const std::string &version = std::string(), DependencyMode mode = DependencyMode::Any,
+    inline DependencyDetail(const std::string &version = std::string(), DependencyMode mode = DependencyMode::Any,
         const std::unordered_set<std::shared_ptr<Package>> &relevantPackages = std::unordered_set<std::shared_ptr<Package>>());
-    DependencyDetail(std::string &&version, DependencyMode mode);
+    inline DependencyDetail(std::string &&version, DependencyMode mode);
 
     std::string version;
     DependencyMode mode = DependencyMode::Any;

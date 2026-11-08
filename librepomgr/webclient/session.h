@@ -22,9 +22,9 @@ struct ServiceSetup;
 namespace WebClient {
 
 struct LIBREPOMGR_EXPORT HttpClientError : std::runtime_error {
-    explicit HttpClientError();
+    inline explicit HttpClientError();
     explicit HttpClientError(const char *context, boost::beast::error_code errorCode);
-    operator bool() const;
+    inline operator bool() const;
 
     const char *const context;
     const boost::beast::error_code errorCode;

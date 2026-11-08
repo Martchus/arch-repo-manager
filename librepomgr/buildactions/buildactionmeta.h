@@ -174,7 +174,7 @@ struct LIBREPOMGR_EXPORT BuildActionMetaInfo : public ReflectiveRapidJSON::JsonS
     explicit BuildActionMetaInfo();
     const TypeInfoByName &typeInfoByName() const;
     const MetaMappingsForTypes &mappings() const;
-    bool isTypeIdValid(BuildActionType id) const;
+    inline bool isTypeIdValid(BuildActionType id) const;
     const BuildActionTypeMetaInfo &typeInfoForId(BuildActionType id) const;
     const BuildActionTypeMetaInfo &typeInfoForName(std::string_view name) const;
     const BuildActionTypeMetaMapping &mappingForId(BuildActionType id) const;

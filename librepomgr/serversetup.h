@@ -78,7 +78,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
     int run();
     int fixDb();
     int dumpDb(std::string_view filterRegex);
-    ServiceStatus computeStatus();
+    inline ServiceStatus computeStatus();
 
     // variables relevant for the web server; only changed when (re)loading config
     struct LIBREPOMGR_EXPORT WebServerSetup {
@@ -169,7 +169,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         std::string dbPath = "librepomgr-1.db";
 
         void initStorage(const char *path);
-        bool hasStorage() const;
+        inline bool hasStorage() const;
         void applyConfig(const std::multimap<std::string, std::string> &multimap);
         void readComplementaryVariants(const std::multimap<std::string, std::string> &multimap);
         template <typename ConfigType>
@@ -184,7 +184,7 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         LibPkg::StorageID storeBuildAction(const std::shared_ptr<BuildAction> &buildAction);
         void deleteBuildAction(const std::vector<std::shared_ptr<BuildAction>> &actions);
         std::size_t buildActionCount();
-        std::size_t runningBuildActionCount() const;
+        inline std::size_t runningBuildActionCount() const;
         void rebuildDb();
         using BuildActionVisitorBase = std::function<bool(LibPkg::StorageID, BuildActionBase &&)>;
         void forEachBuildAction(std::function<void(std::size_t)> count, BuildActionVisitorBase &&func, std::size_t limit, std::size_t start);
@@ -211,11 +211,11 @@ struct LIBREPOMGR_EXPORT ServiceSetup : public LibPkg::Lockable {
         using LockTable = std::unordered_map<std::string, GlobalLockable>;
 
         [[nodiscard]] GlobalLockable &namedLock(const std::string &lockName);
-        [[nodiscard]] SharedLoggingLock acquireToRead(LogContext &log, std::string &&lockName);
-        [[nodiscard]] UniqueLoggingLock acquireToWrite(LogContext &log, std::string &&lockName);
-        [[nodiscard]] std::pair<LockTable *, std::unique_lock<std::shared_mutex>> acquireLockTable();
-        void acquireToRead(LogContext &log, std::string &&name, std::move_only_function<void(SharedLoggingLock &&lock)> &&callback);
-        void acquireToWrite(LogContext &log, std::string &&name, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback);
+        [[nodiscard]] inline SharedLoggingLock acquireToRead(LogContext &log, std::string &&lockName);
+        [[nodiscard]] inline UniqueLoggingLock acquireToWrite(LogContext &log, std::string &&lockName);
+        [[nodiscard]] inline std::pair<LockTable *, std::unique_lock<std::shared_mutex>> acquireLockTable();
+        inline void acquireToRead(LogContext &log, std::string &&name, std::move_only_function<void(SharedLoggingLock &&lock)> &&callback);
+        inline void acquireToWrite(LogContext &log, std::string &&name, std::move_only_function<void(UniqueLoggingLock &&lock)> &&callback);
         void clear();
         static std::string forDatabase(std::string_view dbName, std::string_view dbArch);
         static std::string forDatabase(const LibPkg::Database &db);

@@ -13,7 +13,7 @@ namespace LibRepoMgr {
 struct BuildAction;
 
 struct LIBREPOMGR_EXPORT LogContext {
-    explicit LogContext(BuildAction *buildAction = nullptr);
+    inline explicit LogContext(BuildAction *buildAction = nullptr);
     LogContext &operator=(const LogContext &) = delete;
     LogContext &operator=(LogContext &&) = default;
     template <typename... Args> LogContext &operator()(CppUtilities::EscapeCodes::Phrases phrase, Args &&...args);

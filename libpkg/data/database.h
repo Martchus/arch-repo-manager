@@ -27,11 +27,11 @@ struct LIBPKG_EXPORT DatabaseInfo {
 };
 
 struct LIBPKG_EXPORT PackageSearchResult {
-    PackageSearchResult();
-    PackageSearchResult(Database &database, const std::shared_ptr<Package> &package, StorageID id);
-    PackageSearchResult(Database &database, std::shared_ptr<Package> &&package, StorageID id);
-    PackageSearchResult(Database &database, Package &&package, StorageID id);
-    bool operator==(const PackageSearchResult &other) const;
+    inline PackageSearchResult();
+    inline PackageSearchResult(Database &database, const std::shared_ptr<Package> &package, StorageID id);
+    inline PackageSearchResult(Database &database, std::shared_ptr<Package> &&package, StorageID id);
+    inline PackageSearchResult(Database &database, Package &&package, StorageID id);
+    inline bool operator==(const PackageSearchResult &other) const;
 
     /// \brief The related database.
     /// \remarks
@@ -45,7 +45,7 @@ struct LIBPKG_EXPORT PackageSearchResult {
 
 struct LIBPKG_EXPORT PackageBaseSearchResult {
     PackageBaseSearchResult() = default;
-    PackageBaseSearchResult(const Database &database, const PackageBase &package, StorageID id);
+    inline PackageBaseSearchResult(const Database &database, const PackageBase &package, StorageID id);
 
     /// \brief The related database.
     /// \remarks
@@ -202,9 +202,9 @@ struct LIBPKG_EXPORT Database : public ReflectiveRapidJSON::JsonSerializable<Dat
     static bool isTesting(std::string_view name);
     static bool isDebug(std::string_view name);
     static std::string_view specialSuffix(std::string_view name);
-    bool isStaging() const;
-    bool isTesting() const;
-    bool isDebug() const;
+    inline bool isStaging() const;
+    inline bool isTesting() const;
+    inline bool isDebug() const;
     std::string_view nameWithoutDebugSuffix() const;
     std::pair<std::string_view, std::string_view> baseNameAndSuffix() const;
     std::string stagingName() const;

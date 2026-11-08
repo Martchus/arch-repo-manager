@@ -144,7 +144,7 @@ public:
     void writeEnd();
     AssociatedLocks &locks();
     const std::string &logFilePath() const;
-    bool hasExited() const;
+    inline bool hasExited() const;
 
 private:
     using BufferPile = std::vector<std::pair<BufferType, std::size_t>>;
