@@ -153,7 +153,8 @@ struct LIBPKG_EXPORT Config : public Lockable, public ReflectiveRapidJSON::Binar
     // packages search
     static std::pair<std::string_view, std::string_view> parseDatabaseDenotation(std::string_view databaseDenotation);
     static std::tuple<std::string_view, std::string_view, std::string_view> parsePackageDenotation(std::string_view packageDenotation);
-    inline std::vector<PackageSearchResult> findPackages(std::string_view packageDenotation, std::size_t limit = std::numeric_limits<std::size_t>::max());
+    inline std::vector<PackageSearchResult> findPackages(
+        std::string_view packageDenotation, std::size_t limit = std::numeric_limits<std::size_t>::max());
     inline std::vector<PackageSearchResult> findPackages(
         std::string_view dbName, std::string_view dbArch, std::string_view packageName, std::size_t limit = std::numeric_limits<std::size_t>::max());
     std::vector<PackageSearchResult> findPackages(std::tuple<std::string_view, std::string_view, std::string_view> dbAndPackageName,
